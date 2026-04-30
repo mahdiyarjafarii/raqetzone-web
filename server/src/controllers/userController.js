@@ -1,0 +1,200 @@
+import { eq, and, or, ne } from "drizzle-orm";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+
+import { db } from "../db/index.js";
+import { users } from "../db/schema.js";
+import { validateIranianPhone } from "../utils/validation.js";
+import { getPlanCredits } from "../utils/credits/getPlanCredits.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+/**
+ * Get current user info (protected route)
+ */
+export const getCurrentUserController = async (req, res) => {
+  try {
+    const user = req.user;
+
+    if(user.subscriptionType) {
+      user.totalCredits = getPlanCredits(user.subscriptionType);
+    }
+
+    return res.status(200).json({
+      user: {
+        id: user.id,
+        phone: user.phone,
+        name: user.name,
+        email: user.email,
+        image: user.image,
+        credits: user.credits,
+        totalCredits: user.totalCredits,
+        subscriptionType: user.subscriptionType,
+        subscriptionEndDate: user.subscriptionEndDate,
+        createdAt: user.createdAt,
+      },
+    });
+  } catch (error) {
+    console.error("Get current user error:", error);
+    return res.status(500).json({ message: "خطای سرور" });
+  }
+};
+
+/**
+ * Update user profile
+ */
+export const updateProfileController = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { name, phone, email } = req.body;
+
+    // Validate phone if provided
+    if (phone && !validateIranianPhone(phone)) {
+      return res.status(400).json({ message: "فرمت شماره تلفن نامعتبر است" });
+    }
+
+    // Check if phone is taken by another user
+    if (phone) {
+      const [existingUser] = await db
+        .select()
+        .from(users)
+        .where(and(eq(users.phone, phone), ne(users.id, userId)))
+        .limit(1);
+
+      if (existingUser) {
+        return res
+          .status(400)
+          .json({ message: "این شماره تلفن قبلاً استفاده شده است" });
+      }
+    }
+
+    // Check if email is taken by another user
+    if (email) {
+      const [existingUser] = await db
+        .select()
+        .from(users)
+        .where(and(eq(users.email, email), ne(users.id, userId)))
+        .limit(1);
+
+      if (existingUser) {
+        return res
+          .status(400)
+          .json({ message: "این ایمیل قبلاً استفاده شده است" });
+      }
+    }
+
+    // Update user
+    const [updatedUser] = await db
+      .update(users)
+      .set({
+        name: name || req.user.name,
+        phone: phone || req.user.phone,
+        email: email || req.user.email,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId))
+      .returning();
+
+    return res.status(200).json({
+      user: {
+        id: updatedUser.id,
+        phone: updatedUser.phone,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        image: updatedUser.image,
+      },
+    });
+  } catch (error) {
+    console.error("Update profile error:", error);
+    return res.status(500).json({ message: "خطای سرور" });
+  }
+};
+
+/**
+ * Upload profile image
+ */
+export const uploadProfileImageController = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const file = req.file;
+
+    if (!file) {
+      return res.status(400).json({ message: "لطفاً تصویر را انتخاب کنید" });
+    }
+
+    // Get current user to check for existing image
+    const [currentUser] = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    // Delete previous image if it exists
+    if (currentUser?.image) {
+      try {
+        // Handle both relative paths and full URLs
+        let relativePath = currentUser.image;
+
+        // If it's a full URL, extract the relative path
+        if (
+          relativePath.startsWith("http://") ||
+          relativePath.startsWith("https://")
+        ) {
+          const urlParts = relativePath.split("/uploads/");
+          if (urlParts.length > 1) {
+            relativePath = urlParts[1];
+          } else {
+            // External URL (like Google), skip deletion
+            relativePath = null;
+          }
+        }
+
+        // Delete file if it's a local file
+        if (relativePath) {
+          const filePath = path.join(
+            __dirname,
+            "../../public/uploads/user",
+            relativePath
+          );
+
+          // Check if file exists and delete it
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+          }
+        }
+      } catch (deleteError) {
+        // Log error but don't fail the upload
+        console.error("Error deleting old image:", deleteError);
+      }
+    }
+
+    // Build relative image path (user/{date}/filename)
+    const currentDate = new Date().toISOString().split("T")[0];
+    const relativeImagePath = `${currentDate}/${file.filename}`;
+
+    // Update user image with relative path only
+    const [updatedUser] = await db
+      .update(users)
+      .set({
+        image: relativeImagePath,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId))
+      .returning();
+
+    return res.status(200).json({
+      user: {
+        id: updatedUser.id,
+        phone: updatedUser.phone,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        image: updatedUser.image,
+      },
+    });
+  } catch (error) {
+    console.error("Upload profile image error:", error);
+    return res.status(500).json({ message: "خطای سرور" });
+  }
+};
