@@ -20,6 +20,7 @@ export const users = pgTable("users", {
   subscriptionType: varchar("subscription_type", { length: 256 }),
   subscriptionEndDate: timestamp("subscription_end_date"),
   lastResetCreditsDate: timestamp("last_reset_credits_date"),
+  isAdmin: boolean("is_admin").notNull().default(false),
   // ─── Sports profile fields ───────────────────────────────────────────────
   bio: text("bio"),
   skillLevel: varchar("skill_level", { length: 20 }).default("beginner"), // beginner | intermediate | advanced | pro

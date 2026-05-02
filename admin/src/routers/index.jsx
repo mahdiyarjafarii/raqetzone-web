@@ -1,0 +1,33 @@
+import React, { lazy, Suspense } from "react";
+import { createBrowserRouter, createRoutesFromElements, Route } from "react-router-dom";
+import Layout from "@/components/Layout";
+
+const LoginPage      = lazy(() => import("@/pages/LoginPage"));
+const DashboardPage  = lazy(() => import("@/pages/DashboardPage"));
+const BookingsPage   = lazy(() => import("@/pages/BookingsPage"));
+const CourtsPage     = lazy(() => import("@/pages/CourtsPage"));
+const TournamentsPage = lazy(() => import("@/pages/TournamentsPage"));
+const AnalyticsPage  = lazy(() => import("@/pages/AnalyticsPage"));
+const UsersPage      = lazy(() => import("@/pages/UsersPage"));
+const DiscountsPage  = lazy(() => import("@/pages/DiscountsPage"));
+
+const S = (Page) => <Suspense fallback={<div className="p-8 animate-pulse text-muted-foreground text-sm">بارگذاری...</div>}><Page /></Suspense>;
+
+const router = createBrowserRouter(
+  createRoutesFromElements(
+    <>
+      <Route path="/login" element={S(LoginPage)} />
+      <Route path="/" element={<Layout />}>
+        <Route index element={S(DashboardPage)} />
+        <Route path="bookings"    element={S(BookingsPage)} />
+        <Route path="courts"      element={S(CourtsPage)} />
+        <Route path="discounts"   element={S(DiscountsPage)} />
+        <Route path="tournaments" element={S(TournamentsPage)} />
+        <Route path="analytics"   element={S(AnalyticsPage)} />
+        <Route path="users"       element={S(UsersPage)} />
+      </Route>
+    </>
+  )
+);
+
+export default router;

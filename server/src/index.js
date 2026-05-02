@@ -21,6 +21,7 @@ import bookingRoutes from "./routes/bookings.js";
 import homeRoutes from "./routes/home.js";
 import profileRoutes from "./routes/profile.js";
 import notificationRoutes from "./routes/notifications.js";
+import adminRoutes from "./routes/admin.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
 import "./workers/videoWorker.js";
@@ -63,6 +64,7 @@ app.use("/api", bookingRoutes);
 app.use("/api", homeRoutes);
 app.use("/api", profileRoutes);
 app.use("/api", notificationRoutes);
+app.use("/api", adminRoutes);
 
 // Health check
 app.get("/health", (req, res) => {

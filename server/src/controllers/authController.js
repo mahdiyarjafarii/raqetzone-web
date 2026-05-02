@@ -1,4 +1,4 @@
-import { eq, and, gt } from 'drizzle-orm';
+import { eq, and, gt, desc } from 'drizzle-orm';
 
 import { db } from "../db/index.js";
 import { users, otpCodes } from '../db/schema.js';
@@ -79,7 +79,7 @@ export const verifyOTPController = async (req, res) => {
           gt(otpCodes.expiresAt, new Date())
         )
       )
-      .orderBy(otpCodes.createdAt)
+      .orderBy(desc(otpCodes.createdAt))
       .limit(1);
 
     if (!otpRecord) {
@@ -130,6 +130,7 @@ export const verifyOTPController = async (req, res) => {
         name: user.name,
         email: user.email,
         image: user.image,
+        isAdmin: user.isAdmin ?? false,
       },
     });
   } catch (error) {
