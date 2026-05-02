@@ -12,7 +12,10 @@ import {
   LogOutIcon,
   Sun,
   Moon,
+  CalendarCheckIcon,
 } from "lucide-react";
+
+import NotificationBell from "@/features/notifications/components/NotificationBell";
 
 import OneTimeCheck from "./OneTimeCheck";
 import PricingSheet from "./PricingSheet";
@@ -273,6 +276,8 @@ function Layout() {
               </Link>
             )}
 
+            <NotificationBell />
+
             <DropdownMenu
               dir="rtl"
               open={isDropdownOpen}
@@ -405,6 +410,18 @@ function Layout() {
 
           <div className="h-16 w-screen md:w-120" />
         </>
+      )}
+
+      {/* Booking FAB — only on home page */}
+      {location.pathname === "/" && (
+        <Link
+          to="/booking"
+          className="fixed bottom-20 left-4 z-50 flex items-center gap-2 bg-primary text-primary-foreground pl-3 pr-4 py-3 rounded-full shadow-lg shadow-primary/30 active:scale-95 transition-transform"
+          style={{ width: "fit-content" }}
+        >
+          <CalendarCheckIcon className="w-5 h-5 shrink-0" />
+          <span className="text-sm font-bold">رزرو زمین</span>
+        </Link>
       )}
     </div>
   );

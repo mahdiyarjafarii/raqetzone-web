@@ -5,8 +5,8 @@ import { cn } from "@/lib/utils";
 import { Link, useLocation } from "react-router-dom";
 
 const defaultNavItems = [
-   { id: "home", icon: <Home />, label: "خانه", href: "/" },
-   { id: "tournament", icon: <Trophy />, label: "تورنومنت", href: "/tournament" },
+  { id: "home", icon: <Home />, label: "خانه", href: "/" },
+  { id: "tournament", icon: <Trophy />, label: "تورنومنت", href: "/tournament" },
   { id: "chat", icon: <Sparkles />, label: "هوش مصنوعی", href: "/ai" },
   { id: "profile", icon: <User />, label: "پروفایل", href: "/profile" },
 ];

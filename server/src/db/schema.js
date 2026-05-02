@@ -8,6 +8,7 @@ import {
   integer,
   index,
   boolean,
+  smallint,
 } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
@@ -19,6 +20,13 @@ export const users = pgTable("users", {
   subscriptionType: varchar("subscription_type", { length: 256 }),
   subscriptionEndDate: timestamp("subscription_end_date"),
   lastResetCreditsDate: timestamp("last_reset_credits_date"),
+  // ─── Sports profile fields ───────────────────────────────────────────────
+  bio: text("bio"),
+  skillLevel: varchar("skill_level", { length: 20 }).default("beginner"), // beginner | intermediate | advanced | pro
+  favoriteSport: varchar("favorite_sport", { length: 50 }).default("padel"),
+  xp: integer("xp").notNull().default(0),
+  level: smallint("level").notNull().default(1),
+  // ─────────────────────────────────────────────────────────────────────────
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [
@@ -180,4 +188,136 @@ export const pricingAnalytics = pgTable("pricing_analytics", {
   index("idx_pricing_analytics_modal_type").on(table.modalType),
   index("idx_pricing_analytics_created_at").on(table.createdAt),
   index("idx_pricing_analytics_trigger_source").on(table.triggerSource),
+]);
+
+// ─── Tournament / Matchmaking ────────────────────────────────────────────────
+
+export const matches = pgTable("matches", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  title: varchar("title", { length: 255 }).notNull(),
+  sportType: varchar("sport_type", { length: 50 }).notNull(), // 'padel' | 'tennis' | ...
+  location: varchar("location", { length: 255 }).notNull(),
+  courtName: varchar("court_name", { length: 255 }),
+  scheduledAt: timestamp("scheduled_at").notNull(),
+  teamSize: smallint("team_size").notNull().default(2), // players per team
+  status: varchar("status", { length: 20 }).notNull().default("open"), // open | full | cancelled | completed
+  createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_matches_status").on(table.status),
+  index("idx_matches_scheduled_at").on(table.scheduledAt),
+  index("idx_matches_sport_type").on(table.sportType),
+]);
+
+export const matchParticipants = pgTable("match_participants", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  matchId: uuid("match_id").notNull().references(() => matches.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  team: varchar("team", { length: 1 }).notNull(), // 'A' | 'B'
+  isWin: boolean("is_win"),                       // null = undecided
+  joinedAt: timestamp("joined_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_match_participants_match_id").on(table.matchId),
+  index("idx_match_participants_user_id").on(table.userId),
+]);
+
+// ─── Court Booking ────────────────────────────────────────────────────────────
+
+export const courts = pgTable("courts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: varchar("name", { length: 255 }).notNull(),
+  location: varchar("location", { length: 255 }).notNull(),
+  address: text("address"),
+  surfaceType: varchar("surface_type", { length: 50 }), // grass | clay | hard | artificial
+  sportType: varchar("sport_type", { length: 50 }).notNull().default("padel"),
+  pricePerHour: integer("price_per_hour").notNull(), // in Tomans
+  description: text("description"),
+  image: varchar("image", { length: 500 }),
+  openTime: varchar("open_time", { length: 5 }).notNull().default("07:00"),  // HH:mm
+  closeTime: varchar("close_time", { length: 5 }).notNull().default("23:00"), // HH:mm
+  slotDuration: smallint("slot_duration").notNull().default(60), // minutes
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_courts_sport_type").on(table.sportType),
+  index("idx_courts_is_active").on(table.isActive),
+]);
+
+export const bookings = pgTable("bookings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  courtId: uuid("court_id").notNull().references(() => courts.id, { onDelete: "cascade" }),
+  date: varchar("date", { length: 10 }).notNull(),       // YYYY-MM-DD
+  startTime: varchar("start_time", { length: 5 }).notNull(), // HH:mm
+  endTime: varchar("end_time", { length: 5 }).notNull(),     // HH:mm
+  durationHours: integer("duration_hours").notNull(),
+  totalPrice: integer("total_price").notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("pending"), // pending | approved | rejected | cancelled
+  notes: text("notes"),
+  adminNote: text("admin_note"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_bookings_user_id").on(table.userId),
+  index("idx_bookings_court_id").on(table.courtId),
+  index("idx_bookings_date").on(table.date),
+  index("idx_bookings_status").on(table.status),
+]);
+
+// ─── Home Feed ────────────────────────────────────────────────────────────────
+
+export const promotions = pgTable("promotions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  title: varchar("title", { length: 255 }).notNull(),
+  subtitle: text("subtitle"),
+  badgeText: varchar("badge_text", { length: 60 }),
+  ctaText: varchar("cta_text", { length: 80 }).notNull().default("مشاهده"),
+  ctaHref: varchar("cta_href", { length: 255 }).notNull().default("/booking"),
+  gradientFrom: varchar("gradient_from", { length: 30 }).notNull().default("#2B0FD9"),
+  gradientTo: varchar("gradient_to", { length: 30 }).notNull().default("#7C3AED"),
+  emoji: varchar("emoji", { length: 10 }),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: smallint("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_promotions_is_active").on(table.isActive),
+  index("idx_promotions_sort_order").on(table.sortOrder),
+]);
+
+export const deals = pgTable("deals", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  courtId: uuid("court_id").notNull().references(() => courts.id, { onDelete: "cascade" }),
+  slotDate: varchar("slot_date", { length: 10 }).notNull(),    // YYYY-MM-DD
+  slotStart: varchar("slot_start", { length: 5 }).notNull(),   // HH:mm
+  slotEnd: varchar("slot_end", { length: 5 }).notNull(),       // HH:mm
+  discountPercent: smallint("discount_percent").notNull(),     // 10-90
+  validUntil: timestamp("valid_until").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_deals_court_id").on(table.courtId),
+  index("idx_deals_valid_until").on(table.validUntil),
+  index("idx_deals_is_active").on(table.isActive),
+]);
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+export const notifications = pgTable("notifications", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  title: varchar("title", { length: 255 }).notNull(),
+  message: text("message").notNull(),
+  type: varchar("type", { length: 20 }).notNull().default("SYSTEM"),
+  // SYSTEM | PROMOTION | MATCH | BOOKING | ADMIN
+  isRead: boolean("is_read").notNull().default(false),
+  isPinned: boolean("is_pinned").notNull().default(false),
+  metadata: jsonb("metadata").default({}),
+  // { discountCode, bookingId, matchId, ctaHref, ctaLabel }
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_notifications_user_id").on(table.userId),
+  index("idx_notifications_is_read").on(table.isRead),
+  index("idx_notifications_type").on(table.type),
+  index("idx_notifications_created_at").on(table.createdAt),
 ]);

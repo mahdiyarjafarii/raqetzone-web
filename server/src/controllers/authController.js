@@ -6,6 +6,7 @@ import { generateOTP, sendOTP } from '../utils/sms.js';
 import { validateIranianPhone, validateOTPCode } from '../utils/validation.js';
 import { generateToken } from "../utils/jwt.js";
 import { getPlanCredits } from "../utils/credits/getPlanCredits.js";
+import { sendWelcomeNotification } from "../utils/sendNotification.js";
 
 /**
  * Send OTP code to phone number
@@ -107,6 +108,8 @@ export const verifyOTPController = async (req, res) => {
           updatedAt: new Date(),
         })
         .returning();
+      // Fire-and-forget welcome notification for new users
+      sendWelcomeNotification(user.id).catch(() => {});
     } else {
       // Update user's updatedAt
       [user] = await db
@@ -160,6 +163,8 @@ export const checkUserController = async (req, res) => {
           phone,
         })
         .returning();
+      // Fire-and-forget welcome notification
+      sendWelcomeNotification(user.id).catch(() => {});
     }
 
     if(user.subscriptionType) user.totalCredits = getPlanCredits(user.subscriptionType);

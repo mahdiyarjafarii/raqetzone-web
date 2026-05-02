@@ -15,6 +15,12 @@ import paymentRoutes from "./routes/payment.js";
 import analyticsRoutes from "./routes/analytics.js";
 import uploadRoutes from "./routes/upload.js";
 import preferenceRoutes from "./routes/preference.js";
+import matchRoutes from "./routes/matches.js";
+import courtRoutes from "./routes/courts.js";
+import bookingRoutes from "./routes/bookings.js";
+import homeRoutes from "./routes/home.js";
+import profileRoutes from "./routes/profile.js";
+import notificationRoutes from "./routes/notifications.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
 import "./workers/videoWorker.js";
@@ -51,6 +57,12 @@ app.use("/api", imageRoutes);
 app.use("/api", videoRoutes);
 app.use("/api", analyticsRoutes);
 app.use("/api", uploadRoutes);
+app.use("/api", matchRoutes);
+app.use("/api", courtRoutes);
+app.use("/api", bookingRoutes);
+app.use("/api", homeRoutes);
+app.use("/api", profileRoutes);
+app.use("/api", notificationRoutes);
 
 // Health check
 app.get("/health", (req, res) => {
