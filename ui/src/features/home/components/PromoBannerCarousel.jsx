@@ -14,8 +14,33 @@ function SkeletonBanner() {
 }
 
 export default function PromoBannerCarousel({ promotions = [], loading }) {
+  const FALLBACK_PROMOS = [
+    {
+      id: "fallback-clubs",
+      title: "رزرو زمین",
+      subtitle: "مجموعه‌های برتر پادل، تنیس و اسکواش در تهران",
+      badgeText: "جدید",
+      emoji: "🏓",
+      ctaText: "رزرو کن",
+      ctaHref: "/clubs",
+      gradientFrom: "#2B0FD9",
+      gradientTo: "#6B3FFF",
+    },
+    {
+      id: "fallback-booking",
+      title: "بازی امشب",
+      subtitle: "زمین‌های موجود برای امشب را ببین و همین الان رزرو کن",
+      badgeText: "موجود",
+      emoji: "🎾",
+      ctaText: "مشاهده",
+      ctaHref: "/mybooking",
+      gradientFrom: "#059669",
+      gradientTo: "#0891B2",
+    },
+  ];
+
   if (loading) return <SkeletonBanner />;
-  if (!promotions.length) return null;
+  const items = promotions.length ? promotions : FALLBACK_PROMOS;
 
   return (
     <motion.div
@@ -28,26 +53,26 @@ export default function PromoBannerCarousel({ promotions = [], loading }) {
         modules={[Autoplay, Pagination]}
         spaceBetween={0}
         slidesPerView={1}
-        loop={promotions.length > 1}
+        loop={items.length > 1}
         autoplay={{ delay: 4000, disableOnInteraction: false }}
-        pagination={{ clickable: true, bulletActiveClass: "swiper-pagination-bullet-active !bg-white !opacity-100", bulletClass: "swiper-pagination-bullet !bg-white/50 !opacity-100" }}
-        className="rounded-2xl overflow-hidden"
+        pagination={{ clickable: true, bulletActiveClass: "swiper-pagination-bullet-active !bg-white !opacity-100 !w-4", bulletClass: "swiper-pagination-bullet !h-1.5 !w-1.5 !rounded-full !bg-white/50 !opacity-100 !transition-all" }}
+        className="rounded-3xl overflow-hidden shadow-sm [&_.swiper-pagination]:!bottom-3 [&_.swiper-pagination-bullet]:!mx-0.5"
       >
-        {promotions.map((promo) => (
+        {items.map((promo) => (
           <SwiperSlide key={promo.id}>
             <div
-              className="relative h-40 flex flex-col justify-between p-5 overflow-hidden"
+              className="relative h-44 flex flex-col justify-between overflow-hidden px-5 pb-10 pt-5"
               style={{
                 background: `linear-gradient(135deg, ${promo.gradientFrom}, ${promo.gradientTo})`,
               }}
             >
               {/* Decorative circle */}
-              <div className="absolute -right-8 -top-8 h-32 w-32 rounded-full bg-white/10" />
-              <div className="absolute -right-2 top-8 h-16 w-16 rounded-full bg-white/5" />
+              <div className="absolute -right-10 -top-10 h-36 w-36 rounded-full bg-white/10 blur-sm" />
+              <div className="absolute -left-8 bottom-0 h-24 w-24 rounded-full bg-white/5 blur-md" />
 
               {/* Badge */}
               {promo.badgeText && (
-                <span className="self-start bg-white/20 backdrop-blur-sm text-white text-[10px] font-bold px-2.5 py-1 rounded-full border border-white/30 uppercase tracking-wider z-10">
+                <span className="self-start bg-white/15 backdrop-blur-md text-white text-[10px] font-bold px-3 py-1 rounded-full border border-white/20 uppercase tracking-wider z-10">
                   {promo.badgeText}
                 </span>
               )}
@@ -56,12 +81,12 @@ export default function PromoBannerCarousel({ promotions = [], loading }) {
               <div className="z-10">
                 <div className="flex items-end justify-between">
                   <div>
-                    <h3 className="text-white font-black text-lg leading-tight drop-shadow">
+                    <h3 className="text-white font-black text-lg leading-tight">
                       {promo.emoji && <span className="mr-1">{promo.emoji}</span>}
                       {promo.title}
                     </h3>
                     {promo.subtitle && (
-                      <p className="text-white/75 text-xs mt-1 leading-relaxed max-w-[200px]">
+                      <p className="text-white/80 text-xs mt-1.5 leading-relaxed max-w-[210px]">
                         {promo.subtitle}
                       </p>
                     )}
@@ -69,7 +94,7 @@ export default function PromoBannerCarousel({ promotions = [], loading }) {
 
                   <Link
                     to={promo.ctaHref}
-                    className="shrink-0 flex items-center gap-1 bg-white text-gray-900 text-xs font-bold px-3 py-2 rounded-xl shadow-md active:scale-95 transition-transform ml-2"
+                    className="shrink-0 flex items-center gap-1 bg-white/95 backdrop-blur text-gray-900 text-xs font-bold px-3 py-2 rounded-full shadow-sm active:scale-95 transition-transform ml-2"
                   >
                     {promo.ctaText}
                     <ArrowLeftIcon className="w-3 h-3" />

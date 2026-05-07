@@ -249,8 +249,15 @@ export default function DiscountsPage() {
   useEffect(() => { fetchDeals(); }, [tab]);
 
   useEffect(() => {
-    apiClient.get("/admin/courts").then(({ ok, data }) => {
-      if (ok) setCourts(data.courts.filter(c => c.isActive));
+    // Fetch all courts owned by this club owner
+    apiClient.get("/club-panel/clubs").then(async ({ ok, data }) => {
+      if (!ok) return;
+      const allCourts = [];
+      for (const club of data.clubs) {
+        const r = await apiClient.get(`/club-panel/clubs/${club.id}/courts`);
+        if (r.ok) allCourts.push(...r.data.courts.filter(c => c.isActive));
+      }
+      setCourts(allCourts);
     });
   }, []);
 

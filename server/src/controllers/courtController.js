@@ -1,9 +1,9 @@
 import { eq, and } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { courts, bookings } from "../db/schema.js";
+import { courts, bookings, clubs } from "../db/schema.js";
 
 // Build all slot strings for a court on a given date
-function generateSlots(openTime, closeTime, slotDuration, bookedSlots) {
+function generateSlots(openTime, closeTime, slotDuration, bookedSlots, pricePerHour = 0) {
   const slots = [];
   const [openH, openM] = openTime.split(":").map(Number);
   const [closeH, closeM] = closeTime.split(":").map(Number);
@@ -22,10 +22,11 @@ function generateSlots(openTime, closeTime, slotDuration, bookedSlots) {
       (b) => b.startTime === start && b.status !== "rejected" && b.status !== "cancelled"
     );
 
-    slots.push({ start, end, isBooked });
+    slots.push({ start, end, isBooked, price: pricePerHour });
   }
   return slots;
 }
+
 
 export const getCourtsController = async (req, res) => {
   try {
@@ -82,12 +83,46 @@ export const getCourtAvailabilityController = async (req, res) => {
       court.openTime,
       court.closeTime,
       court.slotDuration,
-      bookedSlots
+      bookedSlots,
+      court.pricePerHour
     );
 
     return res.status(200).json({ date, slots, court });
   } catch (error) {
     console.error("getCourtAvailability error:", error);
+    return res.status(500).json({ message: "خطای سرور" });
+  }
+};
+
+// ── Public clubs listing (no auth required) ───────────────────────────────────
+export const getPublicClubsController = async (req, res) => {
+  try {
+    const clubRows = await db
+      .select()
+      .from(clubs)
+      .where(eq(clubs.isActive, true));
+
+    const enriched = await Promise.all(clubRows.map(async (club) => {
+      const courtRows = await db
+        .select()
+        .from(courts)
+        .where(and(eq(courts.clubId, club.id), eq(courts.isActive, true)));
+
+      return {
+        ...club,
+        courts: courtRows,
+        priceFrom: courtRows.length > 0
+          ? Math.min(...courtRows.map(c => c.pricePerHour))
+          : 0,
+        sportTypes: club.sportTypes?.length > 0
+          ? club.sportTypes
+          : [...new Set(courtRows.map(c => c.sportType))],
+      };
+    }));
+
+    return res.json({ clubs: enriched });
+  } catch (error) {
+    console.error("getPublicClubs error:", error);
     return res.status(500).json({ message: "خطای سرور" });
   }
 };

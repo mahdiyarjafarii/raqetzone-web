@@ -1,11 +1,12 @@
 import React, { cloneElement } from "react";
-import { Sparkles, Trophy, Home, User } from "lucide-react";
+import { Sparkles, Trophy, Home, User, CalendarCheck } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Link, useLocation } from "react-router-dom";
 
 const defaultNavItems = [
   { id: "home", icon: <Home />, label: "خانه", href: "/" },
+  { id: "clubs", icon: <CalendarCheck />, label: "رزرو", href: "/clubs" },
   { id: "tournament", icon: <Trophy />, label: "تورنومنت", href: "/tournament" },
   { id: "chat", icon: <Sparkles />, label: "هوش مصنوعی", href: "/ai" },
   { id: "profile", icon: <User />, label: "پروفایل", href: "/profile" },

@@ -24,6 +24,11 @@ export const sendOTPController = async (req, res) => {
 
     if(phone == "09123456789") code = "1234";
 
+    console.log(`\n📱 OTP CODE ──────────────────`);
+    console.log(`   Phone : ${phone}`);
+    console.log(`   Code  : ${code}`);
+    console.log(`──────────────────────────────\n`);
+
     // Save OTP to database
     await db.insert(otpCodes).values({
       phone,

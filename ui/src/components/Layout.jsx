@@ -415,7 +415,7 @@ function Layout() {
       {/* Booking FAB — only on home page */}
       {location.pathname === "/" && (
         <Link
-          to="/booking"
+          to="/clubs"
           className="fixed bottom-20 left-4 z-50 flex items-center gap-2 bg-primary text-primary-foreground pl-3 pr-4 py-3 rounded-full shadow-lg shadow-primary/30 active:scale-95 transition-transform"
           style={{ width: "fit-content" }}
         >

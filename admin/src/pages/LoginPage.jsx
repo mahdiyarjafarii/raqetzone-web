@@ -37,10 +37,6 @@ export default function LoginPage() {
     setLoading(false);
     if (!ok) return toast.error(data?.message ?? "کد نامعتبر است");
 
-    if (!data.user?.isAdmin) {
-      return toast.error("این حساب دسترسی ادمین ندارد");
-    }
-
     localStorage.setItem("raqetzone-admin-token", data.token);
     localStorage.setItem("raqetzone-admin-user", JSON.stringify(data.user));
     setToken(data.token);
@@ -61,7 +57,7 @@ export default function LoginPage() {
           <img src="/logo.png" alt="Raqetzone" className="h-16 w-16 rounded-2xl object-contain shadow-lg" />
           <div className="text-center">
             <h1 className="text-2xl font-black text-foreground">رکت‌زون</h1>
-            <p className="text-muted-foreground text-sm mt-0.5">پنل مدیریت باشگاه</p>
+            <p className="text-muted-foreground text-sm mt-0.5">پنل مدیریت صاحب باشگاه</p>
           </div>
         </div>
 
@@ -70,7 +66,7 @@ export default function LoginPage() {
           {step === "phone" ? (
             <form onSubmit={handleSendOtp} className="space-y-4">
               <Input
-                label="شماره تلفن ادمین"
+                label="شماره تلفن"
                 type="tel"
                 value={phone}
                 onChange={e => setPhone(e.target.value)}

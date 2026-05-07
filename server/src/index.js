@@ -22,6 +22,8 @@ import homeRoutes from "./routes/home.js";
 import profileRoutes from "./routes/profile.js";
 import notificationRoutes from "./routes/notifications.js";
 import adminRoutes from "./routes/admin.js";
+import clubPanelRoutes from "./routes/clubPanel.js";
+import publicRoutes from "./routes/public.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
 import "./workers/videoWorker.js";
@@ -46,7 +48,9 @@ app.use("/uploads", express.static(path.join(__dirname, "../public/uploads"), {
   maxAge: '7d',
 }));
 
-// Routes
+// Routes — public first (no auth middleware interference)
+app.use("/api", publicRoutes);
+
 app.use("/api", authRoutes);
 app.use("/api", paymentRoutes);
 app.use("/api", preferenceRoutes);
@@ -64,6 +68,7 @@ app.use("/api", bookingRoutes);
 app.use("/api", homeRoutes);
 app.use("/api", profileRoutes);
 app.use("/api", notificationRoutes);
+app.use("/api", clubPanelRoutes);
 app.use("/api", adminRoutes);
 
 // Health check

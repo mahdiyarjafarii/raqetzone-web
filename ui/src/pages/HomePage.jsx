@@ -19,7 +19,7 @@ import HomeCourtsSection from "@/features/home/components/HomeCourtsSection";
 import BookingSummaryBar from "@/features/home/components/BookingSummaryBar";
 
 function SectionDivider() {
-  return <div className="h-2" />;
+  return <div className="h-4" />;
 }
 
 export default function HomePage() {

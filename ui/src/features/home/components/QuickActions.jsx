@@ -1,14 +1,14 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { CalendarCheckIcon, SwordsIcon, ClipboardListIcon } from "lucide-react";
+import { Building2Icon, SwordsIcon, ClipboardListIcon } from "lucide-react";
 
 const ACTIONS = [
   {
-    icon: CalendarCheckIcon,
+    icon: Building2Icon,
     label: "رزرو زمین",
-    sub: "سریع و آسان",
-    href: "/booking",
+    sub: "انتخاب مجموعه",
+    href: "/clubs",
     color: "bg-primary/10 text-primary",
     border: "border-primary/20",
   },
@@ -24,7 +24,7 @@ const ACTIONS = [
     icon: ClipboardListIcon,
     label: "رزروهای من",
     sub: "وضعیت رزرو",
-    href: "/booking",
+    href: "/mybooking",
     color: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
     border: "border-amber-500/20",
   },

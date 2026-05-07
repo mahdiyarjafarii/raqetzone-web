@@ -201,7 +201,7 @@ export const approveBookingController = async (req, res) => {
       title: "رزرو شما تأیید شد ✅",
       message: `رزرو زمین برای ${booking.date} ساعت ${booking.startTime} تأیید شد.`,
       type: "BOOKING", isPinned: true,
-      metadata: { bookingId: id, ctaHref: "/booking", ctaLabel: "مشاهده رزرو" },
+      metadata: { bookingId: id, ctaHref: "/mybooking", ctaLabel: "مشاهده رزرو" },
     }).catch(() => {});
 
     return res.status(200).json({ booking: updated });
@@ -226,7 +226,7 @@ export const rejectBookingController = async (req, res) => {
       title: "رزرو شما رد شد ❌",
       message: `متأسفانه رزرو ${booking.date} ساعت ${booking.startTime} رد شد.${adminNote ? ` دلیل: ${adminNote}` : ""}`,
       type: "BOOKING",
-      metadata: { bookingId: id, ctaHref: "/booking", ctaLabel: "مشاهده رزروها" },
+      metadata: { bookingId: id, ctaHref: "/mybooking", ctaLabel: "مشاهده رزروها" },
     }).catch(() => {});
 
     return res.status(200).json({ booking: updated });
@@ -332,7 +332,7 @@ export const createAdminDealController = async (req, res) => {
       message: `زمین «${court.name}» برای ${slotDate} ساعت ${slotStart} تا ${slotEnd} با ${discountPercent}٪ تخفیف! تا ${new Date(validUntil).toLocaleString("fa-IR")} فرصت داری.`,
       type: "PROMOTION",
       isPinned: true,
-      metadata: { discountCode: null, discountPct: discountPercent, ctaHref: "/booking", ctaLabel: "رزرو با تخفیف", dealId: deal.id },
+      metadata: { discountCode: null, discountPct: discountPercent, ctaHref: "/mybooking", ctaLabel: "رزرو با تخفیف", dealId: deal.id },
     }).catch(() => {});
 
     return res.status(201).json({ deal: { ...deal, court } });

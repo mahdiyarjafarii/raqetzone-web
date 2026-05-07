@@ -12,7 +12,7 @@ export default function BookingSummaryBar({ summary }) {
       animate={{ opacity: 1, y: 0 }}
       className="mx-4"
     >
-      <Link to="/booking">
+      <Link to="/mybooking">
         <div className="flex items-center justify-between bg-primary/8 border border-primary/20 rounded-2xl px-4 py-3">
           <div className="flex items-center gap-3">
             <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">

@@ -78,7 +78,7 @@ export const createBookingController = async (req, res) => {
       title: "درخواست رزرو ثبت شد ⏳",
       message: `رزرو زمین «${court.name}» برای ${date} ساعت ${startTime} ثبت شد. منتظر تأیید مدیر باشید.`,
       type: "BOOKING",
-      metadata: { bookingId: booking.id, courtName: court.name, date, startTime, endTime, ctaHref: "/booking", ctaLabel: "مشاهده رزرو" },
+      metadata: { bookingId: booking.id, courtName: court.name, date, startTime, endTime, ctaHref: "/mybooking", ctaLabel: "مشاهده رزرو" },
     }).catch(() => {});
 
     const enriched = { ...booking, court };
@@ -113,6 +113,7 @@ export const getMyBookingsController = async (req, res) => {
           sportType: courts.sportType,
           pricePerHour: courts.pricePerHour,
           image: courts.image,
+          managerPhone: courts.managerPhone,
         },
       })
       .from(bookings)
@@ -236,7 +237,7 @@ export const updateBookingStatusController = async (req, res) => {
         : `متأسفانه رزرو شما برای ${booking.date} ساعت ${booking.startTime} رد شد.${adminNote ? ` دلیل: ${adminNote}` : ""}`,
       type: "BOOKING",
       isPinned: isApproved,
-      metadata: { bookingId: id, date: booking.date, startTime: booking.startTime, ctaHref: "/booking", ctaLabel: "مشاهده رزروها" },
+      metadata: { bookingId: id, date: booking.date, startTime: booking.startTime, ctaHref: "/mybooking", ctaLabel: "مشاهده رزروها" },
     }).catch(() => {});
 
     return res.status(200).json({ booking: updated });

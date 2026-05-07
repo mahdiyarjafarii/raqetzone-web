@@ -1,5 +1,5 @@
 import React, { lazy } from "react";
-import { Navigate, Route } from "react-router-dom";
+import { Route } from "react-router-dom";
 import {
   createBrowserRouter,
   createRoutesFromElements,
@@ -17,8 +17,10 @@ const NotFoundPage = lazy(() => import("@/pages/404Page"));
 const ProfilePage = lazy(() => import("@/pages/user/ProfilePage"));
 const HomePage = lazy(() => import("@/pages/HomePage"));
 const TournamentPage = lazy(() => import("@/pages/tournament/tournamentPage"));
-const BookingPage = lazy(() => import("@/pages/booking/BookingPage"));
 const NotificationsPage = lazy(() => import("@/pages/notifications/NotificationsPage"));
+const ClubsPage = lazy(() => import("@/pages/clubs/ClubsPage"));
+const ClubDetailPage = lazy(() => import("@/pages/clubs/ClubDetailPage"));
+const MyBookingPage = lazy(() => import("@/pages/mybooking/MyBookingPage"));
 
 const getSuspensedElement = (Page) => (
   <SuspensedView>
@@ -41,7 +43,9 @@ const router = createBrowserRouter(
       <Route index element={getSuspensedElement(HomePage)} />
       <Route path="ai" element={getSuspensedElement(AiPage)} />
       <Route path="tournament" element={getSuspensedElement(TournamentPage)} />
-      <Route path="booking" element={getSuspensedElement(BookingPage)} />
+      <Route path="clubs" element={getSuspensedElement(ClubsPage)} />
+      <Route path="clubs/:clubId" element={getSuspensedElement(ClubDetailPage)} />
+      <Route path="mybooking" element={getSuspensedElement(MyBookingPage)} />
       <Route path="notifications" element={getSuspensedElement(NotificationsPage)} />
       <Route path="profile" element={getSuspensedElement(ProfilePage)} />
       <Route path="chat/new" element={getSuspensedElement(NewChatPage)} />

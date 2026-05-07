@@ -36,7 +36,7 @@ export default function BookingsPage() {
 
   const fetch = async (s = filter) => {
     setLoading(true);
-    const { ok, data } = await apiClient.get("/admin/bookings", s ? { status: s } : {});
+    const { ok, data } = await apiClient.get("/club-panel/bookings", s ? { status: s } : {});
     if (ok) setBookings(data.bookings);
     else toast.error("خطا در بارگذاری رزروها");
     setLoading(false);
@@ -47,7 +47,7 @@ export default function BookingsPage() {
   const handleAction = async () => {
     if (!actionModal) return;
     setActing(true);
-    const ep = `/admin/bookings/${actionModal.id}/${actionModal.action}`;
+    const ep = `/club-panel/bookings/${actionModal.id}/${actionModal.action}`;
     const { ok, data } = await apiClient.patch(ep, { adminNote: adminNote || undefined });
     setActing(false);
     if (!ok) return toast.error(data?.message ?? "خطا");

@@ -21,6 +21,7 @@ export const users = pgTable("users", {
   subscriptionEndDate: timestamp("subscription_end_date"),
   lastResetCreditsDate: timestamp("last_reset_credits_date"),
   isAdmin: boolean("is_admin").notNull().default(false),
+  isClubOwner: boolean("is_club_owner").notNull().default(false),
   // ─── Sports profile fields ───────────────────────────────────────────────
   bio: text("bio"),
   skillLevel: varchar("skill_level", { length: 20 }).default("beginner"), // beginner | intermediate | advanced | pro
@@ -225,8 +226,33 @@ export const matchParticipants = pgTable("match_participants", {
 
 // ─── Court Booking ────────────────────────────────────────────────────────────
 
+// ─── Clubs ────────────────────────────────────────────────────────────────────
+
+export const clubs = pgTable("clubs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  ownerId: uuid("owner_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  description: text("description"),
+  address: text("address").notNull().default(""),
+  phone: varchar("phone", { length: 20 }),
+  sportTypes: jsonb("sport_types").default([]),   // ["padel","tennis"]
+  amenities: jsonb("amenities").default([]),      // ["parking","shower"]
+  images: jsonb("images").default([]),            // array of image URLs
+  openTime: varchar("open_time", { length: 5 }).notNull().default("07:00"),
+  closeTime: varchar("close_time", { length: 5 }).notNull().default("23:00"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_clubs_owner_id").on(table.ownerId),
+  index("idx_clubs_is_active").on(table.isActive),
+]);
+
+// ─── Courts ───────────────────────────────────────────────────────────────────
+
 export const courts = pgTable("courts", {
   id: uuid("id").primaryKey().defaultRandom(),
+  clubId: uuid("club_id").references(() => clubs.id, { onDelete: "set null" }),
   name: varchar("name", { length: 255 }).notNull(),
   location: varchar("location", { length: 255 }).notNull(),
   address: text("address"),
@@ -235,6 +261,7 @@ export const courts = pgTable("courts", {
   pricePerHour: integer("price_per_hour").notNull(), // in Tomans
   description: text("description"),
   image: varchar("image", { length: 500 }),
+  managerPhone: varchar("manager_phone", { length: 20 }),
   openTime: varchar("open_time", { length: 5 }).notNull().default("07:00"),  // HH:mm
   closeTime: varchar("close_time", { length: 5 }).notNull().default("23:00"), // HH:mm
   slotDuration: smallint("slot_duration").notNull().default(60), // minutes
@@ -274,7 +301,7 @@ export const promotions = pgTable("promotions", {
   subtitle: text("subtitle"),
   badgeText: varchar("badge_text", { length: 60 }),
   ctaText: varchar("cta_text", { length: 80 }).notNull().default("مشاهده"),
-  ctaHref: varchar("cta_href", { length: 255 }).notNull().default("/booking"),
+  ctaHref: varchar("cta_href", { length: 255 }).notNull().default("/mybooking"),
   gradientFrom: varchar("gradient_from", { length: 30 }).notNull().default("#2B0FD9"),
   gradientTo: varchar("gradient_to", { length: 30 }).notNull().default("#7C3AED"),
   emoji: varchar("emoji", { length: 10 }),

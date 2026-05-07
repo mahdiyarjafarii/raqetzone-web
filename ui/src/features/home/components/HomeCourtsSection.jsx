@@ -1,84 +1,118 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { MapPinIcon, ClockIcon, ArrowRightIcon } from "lucide-react";
-import SectionHeader from "./SectionHeader";
+import { MapPinIcon, StarIcon, ArrowLeftIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import SectionHeader from "./SectionHeader";
+import { useClubs } from "@/features/clubs/hooks/useClubs";
 
-const SPORT_ICONS = { padel: "🏓", tennis: "🎾", squash: "🟡", badminton: "🏸" };
-const SPORT_DOT = {
-  padel: "bg-emerald-500",
-  tennis: "bg-yellow-500",
-  squash: "bg-red-500",
-  badminton: "bg-blue-500",
+const SPORT_LABELS = { padel: "پادل", tennis: "تنیس", squash: "اسکواش", badminton: "بدمینتون" };
+const SPORT_COLORS = {
+  padel: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
+  tennis: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-400",
+  squash: "bg-red-500/15 text-red-700 dark:text-red-400",
+  badminton: "bg-blue-500/15 text-blue-700 dark:text-blue-400",
 };
 
 function formatPrice(p) {
   return new Intl.NumberFormat("fa-IR").format(p);
 }
 
-function SkeletonCourt() {
-  return <div className="h-16 rounded-2xl bg-muted animate-pulse mx-4" />;
+function ClubCardHome({ club, index }) {
+  const [imgError, setImgError] = React.useState(false);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -16 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: index * 0.07 }}
+    >
+      <Link to={`/clubs/${club.id}`}>
+        <div className="flex items-center gap-3 bg-card border border-border rounded-2xl overflow-hidden shadow-sm active:scale-[0.99] transition-transform">
+          {/* Thumbnail */}
+          <div className="w-20 h-20 shrink-0 relative overflow-hidden bg-muted">
+            {!imgError ? (
+              <img
+                src={`${club.coverImage}&w=160&h=160`}
+                alt={club.name}
+                className="w-full h-full object-cover"
+                onError={() => setImgError(true)}
+                loading="lazy"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
+                <span className="text-2xl">🏟️</span>
+              </div>
+            )}
+          </div>
+
+          {/* Info */}
+          <div className="flex-1 min-w-0 py-3 pr-0">
+            <div className="flex items-start justify-between gap-2">
+              <p className="font-bold text-foreground text-sm leading-snug truncate">{club.name}</p>
+              <div className="flex items-center gap-0.5 shrink-0">
+                <StarIcon className="w-3 h-3 fill-amber-400 text-amber-400" />
+                <span className="text-xs font-bold text-foreground">{club.rating}</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1 mt-0.5 text-muted-foreground text-xs">
+              <MapPinIcon className="w-3 h-3 shrink-0" />
+              <span className="truncate">{club.location}</span>
+            </div>
+
+            <div className="flex items-center justify-between mt-2">
+              <div className="flex gap-1 flex-wrap">
+                {club.sportTypes.slice(0, 2).map((sport) => (
+                  <span key={sport} className={cn("text-[10px] px-1.5 py-0.5 rounded-full font-semibold", SPORT_COLORS[sport] ?? "bg-muted text-muted-foreground")}>
+                    {SPORT_LABELS[sport] ?? sport}
+                  </span>
+                ))}
+              </div>
+              <div className="text-right shrink-0">
+                <span className="text-primary font-black text-xs">{formatPrice(club.priceFrom)}</span>
+                <span className="text-muted-foreground text-[10px]"> ت</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="px-3">
+            <ArrowLeftIcon className="w-4 h-4 text-muted-foreground" />
+          </div>
+        </div>
+      </Link>
+    </motion.div>
+  );
 }
 
-export default function HomeCourtsSection({ courts = [], loading }) {
+export default function HomeCourtsSection({ courts = [], loading: homeLoading }) {
+  const { clubs: apiClubs, loading: clubsLoading } = useClubs();
+  const loading = homeLoading || clubsLoading;
+  const clubs = apiClubs.slice(0, 4);
+
   return (
     <div>
-      <SectionHeader title="زمین‌های موجود" emoji="🏟" href="/booking" />
+      <SectionHeader title="مجموعه‌های ورزشی" emoji="🏟" href="/clubs" />
 
       <div className="space-y-2.5 px-4">
         {loading ? (
-          Array.from({ length: 4 }).map((_, i) => <SkeletonCourt key={i} />)
-        ) : courts.length === 0 ? (
-          <p className="text-center text-muted-foreground text-sm py-6">زمینی یافت نشد</p>
+          Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="h-20 rounded-2xl bg-muted animate-pulse" />
+          ))
         ) : (
-          courts.slice(0, 5).map((court, i) => (
-            <motion.div
-              key={court.id}
-              initial={{ opacity: 0, x: -12 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.06 }}
-            >
-              <Link to="/booking">
-                <div className="flex items-center gap-3 bg-card border border-border rounded-2xl p-3 active:scale-[0.99] transition-transform shadow-sm">
-                  {/* Icon */}
-                  <div className="h-11 w-11 rounded-xl bg-muted flex items-center justify-center text-xl shrink-0">
-                    {SPORT_ICONS[court.sportType] ?? "🏅"}
-                  </div>
-
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className={cn("h-1.5 w-1.5 rounded-full shrink-0", SPORT_DOT[court.sportType] ?? "bg-primary")} />
-                      <p className="font-bold text-foreground text-sm truncate">{court.name}</p>
-                    </div>
-                    <div className="flex items-center gap-3 mt-0.5">
-                      <span className="flex items-center gap-1 text-muted-foreground text-xs">
-                        <MapPinIcon className="w-3 h-3 shrink-0" />
-                        <span className="truncate max-w-[100px]">{court.location}</span>
-                      </span>
-                      <span className="flex items-center gap-1 text-muted-foreground text-xs">
-                        <ClockIcon className="w-3 h-3 shrink-0" />
-                        {court.openTime}–{court.closeTime}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Price + arrow */}
-                  <div className="flex flex-col items-end gap-1 shrink-0">
-                    <div className="text-right">
-                      <p className="text-primary font-black text-sm leading-none">
-                        {formatPrice(court.pricePerHour)}
-                      </p>
-                      <p className="text-muted-foreground text-[10px]">ت/ساعت</p>
-                    </div>
-                    <ArrowRightIcon className="w-3.5 h-3.5 text-muted-foreground rotate-180" />
-                  </div>
-                </div>
-              </Link>
-            </motion.div>
+          clubs.map((club, i) => (
+            <ClubCardHome key={club.id} club={club} index={i} />
           ))
         )}
+
+        {/* See all link */}
+        <Link
+          to="/clubs"
+          className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl border border-dashed border-border text-muted-foreground text-sm font-medium active:bg-muted transition-colors"
+        >
+          مشاهده همه مجموعه‌ها
+          <ArrowLeftIcon className="w-4 h-4" />
+        </Link>
       </div>
     </div>
   );

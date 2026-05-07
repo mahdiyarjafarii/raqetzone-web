@@ -53,7 +53,7 @@ export default function DealCard({ deal, index = 0 }) {
       transition={{ delay: index * 0.07 }}
       className="shrink-0 w-64"
     >
-      <Link to="/booking">
+      <Link to="/clubs">
         <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm active:scale-[0.98] transition-transform">
           {/* Hot deal ribbon */}
           <div className="bg-gradient-to-r from-red-500 to-orange-500 px-3 py-1.5 flex items-center justify-between">

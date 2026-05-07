@@ -7,9 +7,10 @@ import { adminTokenAtom } from "@/store/authStore";
 
 const PAGE_TITLES = {
   "/":            "داشبورد",
-  "/bookings":    "مدیریت رزروها",
+  "/bookings":    "رزروها",
+  "/clubs":       "باشگاه‌هایم",
   "/courts":      "مدیریت زمین‌ها",
-  "/discounts":   "مدیریت تخفیف‌ها",
+  "/discounts":   "تخفیف‌ها",
   "/tournaments": "تورنومنت‌ها",
   "/analytics":   "آنالیتیکس",
   "/users":       "کاربران",
@@ -20,7 +21,9 @@ export default function Layout() {
   const location = useLocation();
   if (!token) return <Navigate to="/login" replace />;
 
-  const pageTitle = PAGE_TITLES[location.pathname] ?? "پنل مدیریت";
+  const pageTitle =
+    PAGE_TITLES[location.pathname] ??
+    (location.pathname.startsWith("/clubs/") ? "مدیریت زمین‌های باشگاه" : "پنل مدیریت باشگاه");
 
   return (
     <div className="flex h-screen bg-background overflow-hidden" dir="rtl">

@@ -72,7 +72,7 @@ export async function sendWelcomeNotification(userId) {
     metadata: {
       discountCode: "WELCOME20",
       discountPct: 20,
-      ctaHref: "/booking",
+      ctaHref: "/mybooking",
       ctaLabel: "رزرو اول رو ثبت کن",
     },
   });

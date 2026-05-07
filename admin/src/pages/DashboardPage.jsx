@@ -43,9 +43,29 @@ export default function DashboardPage() {
 
   useEffect(() => {
     (async () => {
-      const { ok, data } = await apiClient.get("/admin/stats");
-      if (ok) setStats(data);
-      else toast.error("خطا در بارگذاری آمار");
+      // Try club-panel stats first, fall back to admin stats
+      let res = await apiClient.get("/club-panel/stats");
+      if (res.ok) {
+        const s = res.data.stats;
+        setStats({
+          overview: {
+            totalBookings: s.totalBookings,
+            pendingCount:  s.pendingBookings,
+            activeCourts:  s.activeCourts,
+            totalUsers:    0,
+            totalRevenue:  s.totalRevenue,
+            totalMatches:  0,
+          },
+          statusBreakdown: [
+            { label: "تأیید شده", count: s.approvedBookings },
+            { label: "در انتظار", count: s.pendingBookings },
+            { label: "سایر",      count: Math.max(0, s.totalBookings - s.approvedBookings - s.pendingBookings) },
+          ],
+          dailyStats: [], courtUtilization: [], peakHours: [],
+        });
+      } else {
+        toast.error("خطا در بارگذاری آمار");
+      }
       setLoading(false);
     })();
   }, []);
