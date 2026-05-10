@@ -8,7 +8,7 @@ const defaultNavItems = [
   { id: "home", icon: <Home />, label: "خانه", href: "/" },
   { id: "clubs", icon: <CalendarCheck />, label: "رزرو", href: "/clubs" },
   { id: "tournament", icon: <Trophy />, label: "تورنومنت", href: "/tournament" },
-  { id: "chat", icon: <Sparkles />, label: "هوش مصنوعی", href: "/ai" },
+  { id: "chat", icon: <Sparkles />, label: "دستیار", href: "/ai" },
   { id: "profile", icon: <User />, label: "پروفایل", href: "/profile" },
 ];
 

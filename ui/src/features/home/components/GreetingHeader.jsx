@@ -20,9 +20,9 @@ export default function GreetingHeader({ user }) {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
       >
-        <p className="text-muted-foreground text-sm mb-0.5">{getGreeting()}، {firstName} 👋</p>
-        <h1 className="text-2xl font-black text-foreground leading-snug">
-          کجا بازی می‌کنیم؟
+        
+        <h1 className="text-1xl font-black text-foreground leading-snug">
+         امروز کدوم زمین رو برات رزور کنم ؟
         </h1>
       </motion.div>
 

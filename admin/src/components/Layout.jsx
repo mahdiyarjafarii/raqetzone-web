@@ -8,7 +8,7 @@ import { adminTokenAtom } from "@/store/authStore";
 const PAGE_TITLES = {
   "/":            "داشبورد",
   "/bookings":    "رزروها",
-  "/clubs":       "باشگاه‌هایم",
+  "/clubs":       "باشگاه ها",
   "/courts":      "مدیریت زمین‌ها",
   "/discounts":   "تخفیف‌ها",
   "/tournaments": "تورنومنت‌ها",

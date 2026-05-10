@@ -11,7 +11,7 @@
     "db:gen": "bunx drizzle-kit generate",
     "db:push": "bunx drizzle-kit push:pg",
     "db:studio": "drizzle-kit studio",
-    "seed:video-models": "node src/db/seed-video-models.js",
+    "seed:clubs": "node src/db/seed-clubs.js",
     "migrate:preferences": "node src/scripts/migrateUserPreferences.js"
   },
   "keywords": [],

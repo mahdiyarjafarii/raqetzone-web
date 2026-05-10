@@ -12,6 +12,7 @@ const UsersPage       = lazy(() => import("@/pages/UsersPage"));
 const DiscountsPage   = lazy(() => import("@/pages/DiscountsPage"));
 const ClubsPage       = lazy(() => import("@/pages/ClubsPage"));
 const ClubDetailPage  = lazy(() => import("@/pages/ClubDetailPage"));
+const ReviewsPage     = lazy(() => import("@/pages/ReviewsPage"));
 
 const S = (Page) => (
   <Suspense fallback={<div className="p-8 animate-pulse text-muted-foreground text-sm">بارگذاری...</div>}>
@@ -28,6 +29,7 @@ const router = createBrowserRouter(
         <Route path="bookings"  element={S(BookingsPage)} />
         <Route path="clubs"     element={S(ClubsPage)} />
         <Route path="clubs/:clubId" element={S(ClubDetailPage)} />
+        <Route path="reviews"   element={S(ReviewsPage)} />
         <Route path="courts"    element={S(CourtsPage)} />
         <Route path="discounts" element={S(DiscountsPage)} />
         <Route path="tournaments" element={S(TournamentsPage)} />

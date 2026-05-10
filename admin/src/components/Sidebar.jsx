@@ -5,17 +5,18 @@ import {
   LayoutDashboardIcon, CalendarCheckIcon,
   Building2Icon, MapPinIcon,
   TrophyIcon, BarChart3Icon, UsersIcon,
-  LogOutIcon, TagIcon, ShieldCheckIcon,
+  LogOutIcon, TagIcon, ShieldCheckIcon, StarIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { adminUserAtom, adminTokenAtom } from "@/store/authStore";
 
 const CLUB_OWNER_NAV = [
   { to: "/",          icon: LayoutDashboardIcon, label: "داشبورد"      },
-  { to: "/clubs",     icon: Building2Icon,        label: "باشگاه‌هایم"  },
+  { to: "/clubs",     icon: Building2Icon,        label: "باشگاه‌ها"  },
   { to: "/bookings",  icon: CalendarCheckIcon,    label: "رزروها"       },
   { to: "/courts",    icon: MapPinIcon,           label: "زمین‌ها"      },
   { to: "/discounts", icon: TagIcon,              label: "تخفیف‌ها"     },
+  { to: "/reviews",   icon: StarIcon,             label: "نظرات"         },
 ];
 
 const ADMIN_EXTRA_NAV = [

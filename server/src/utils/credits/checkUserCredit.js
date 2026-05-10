@@ -1,12 +1,11 @@
 import { db } from "../../db/index.js";
-import { users, models } from "../../db/schema.js";
-import { eq, is } from "drizzle-orm";
-import { getVideoPrice } from "./getVideoPrice.js";
+import { users } from "../../db/schema.js";
+import { eq } from "drizzle-orm";
 
 export async function checkUserHasEnoughCredits(
   userId,
   modelId,
-  videoConfig = null,
+  _unused = null,
   isCharacter = false
 ) {
   try {
@@ -62,60 +61,8 @@ export async function checkUserHasEnoughCredits(
 
     const currentCredits = currentUser.credits || 0;
 
-    if (videoConfig) {
-      // Check if videoConfig is a string and needs parsing
-      let parsedVideoConfig = videoConfig;
-      if (typeof videoConfig === "string") {
-        try {
-          parsedVideoConfig = JSON.parse(videoConfig);
-          console.log("Parsed videoConfig from string:", parsedVideoConfig);
-        } catch (e) {
-          console.log("Failed to parse videoConfig string:", e);
-        }
-      }
-
-      // Extract values properly
-      const duration = parsedVideoConfig.duration;
-      const resolution = parsedVideoConfig.resolution;
-
-      const requiredCredits = getVideoPrice({
-        model: modelId,
-        duration: duration,
-        resolution: resolution,
-      });
-      if (!requiredCredits) {
-        return {
-          success: false,
-          hasEnough: false,
-          message: "Required credits not found",
-        };
-      }
-      const hasEnough = currentCredits >= requiredCredits;
-      return {
-        success: true,
-        hasEnough,
-        userCredits: currentUser.credits,
-        requiredCredits,
-        message: hasEnough ? "User has enough credits" : "اعتبار کافی نمی باشد",
-      };
-    }
-    // Get model information from database
-    const [model] = await db
-      .select()
-      .from(models)
-      .where(eq(models.slug, modelId))
-      .limit(1);
-
-    if (!model) {
-      return {
-        success: false,
-        hasEnough: false,
-        message: `Model ${modelId} not found in database`,
-      };
-    }
-
     const isCharacterBool = isCharacter === true || isCharacter === "true";
-    const requiredCredits = isCharacterBool ? 15 : model.price || 0;
+    const requiredCredits = isCharacterBool ? 15 : 1;
 
     const hasEnough = currentCredits >= requiredCredits;
 

@@ -1,0 +1,20 @@
+{
+  "version": "5",
+  "dialect": "pg",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1778142152894,
+      "tag": "0000_overrated_wolf_cub",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1778142757735,
+      "tag": "0001_volatile_thunderbolts",
+      "breakpoints": true
+    }
+  ]
+}

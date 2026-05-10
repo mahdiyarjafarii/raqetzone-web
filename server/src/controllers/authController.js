@@ -38,7 +38,7 @@ export const sendOTPController = async (req, res) => {
     });
 
     // Send SMS
-    if(phone !== "09123456789") {
+    if(false) {
       const smsSent = await sendOTP(phone, code);
       if (!smsSent) return res.status(500).json({ message: 'خطا در ارسال پیامک' });
     }

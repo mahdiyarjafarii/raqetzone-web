@@ -5,9 +5,7 @@ import { log } from "../utils/logger.js";
 import {
   chats,
   messages,
-  gpts,
   messageReactions,
-  models,
 } from "../db/schema.js";
 import {
   streamChatCompletion,
@@ -37,36 +35,11 @@ export const createChatController = async (req, res) => {
 
   try {
     const userId = req.user.id;
-    const { gptId } = req.body;
-
-    // If gptId is provided, verify it exists
-    if (gptId) {
-      const [gpt] = await db
-        .select()
-        .from(gpts)
-        .where(eq(gpts.id, gptId))
-        .limit(1);
-
-      if (!gpt) {
-        const duration = Date.now() - startTime;
-        log.error("❌ CHAT CREATE FAILED - GPT not found", {
-          requestId,
-          userId,
-          gptId,
-          error: "gpt not found",
-          duration: `${duration}ms`,
-          timestamp: new Date().toISOString(),
-        });
-        return res.status(404).json({ message: "GPT یافت نشد" });
-      }
-    }
-
     // Create new chat
     const [chat] = await db
       .insert(chats)
       .values({
         userId,
-        gptId: gptId || null,
         createdAt: new Date(),
         updatedAt: new Date(),
       })
@@ -75,7 +48,6 @@ export const createChatController = async (req, res) => {
     return res.status(201).json({
       chat: {
         id: chat.id,
-        gptId: chat.gptId,
         title: chat.title,
         createdAt: chat.createdAt,
         updatedAt: chat.updatedAt,
@@ -151,41 +123,12 @@ export const getChatMessagesController = async (req, res) => {
       }
     });
 
-    let gpt = null;
-    if (chat.gptId) {
-      gpt = await db
-        .select({
-          id: gpts.id,
-          name: gpts.name,
-          image: gpts.image,
-        })
-        .from(gpts)
-        .where(eq(gpts.id, chat.gptId))
-        .limit(1);
-
-      if (gpt.length > 0) gpt = gpt[0];
-    }
-
-    // Get the last used model from the database
-    let lastUsedModel = null;
-    const lastMessageModel = chatMessages[chatMessages.length - 1]?.model;
-    if (lastMessageModel) {
-      const [modelData] = await db
-        .select()
-        .from(models)
-        .where(eq(models.slug, lastMessageModel))
-        .limit(1);
-      lastUsedModel = modelData || null;
-    }
-
     return res.status(200).json({
       messages: chatMessages.map((msg) => ({
         ...msg,
         attachments: msg.attachments || [],
         reaction: reactionsMap[msg.id] || null,
       })),
-      gpt,
-      lastUsedModel,
     });
   } catch (error) {
     const duration = Date.now() - startTime;
@@ -441,43 +384,9 @@ export const sendMessageController = async (req, res) => {
       chatHistory
     );
 
-    // Get GPT system prompt if chat has a GPT
-    let systemPrompt = null;
-    if (chat.gptId) {
-      const [gpt] = await db
-        .select()
-        .from(gpts)
-        .where(eq(gpts.id, chat.gptId))
-        .limit(1);
+    let systemPrompt = globalSystemPrompt;
 
-      if (gpt) systemPrompt = gpt.systemPrompt;
-    }
-
-    systemPrompt += `\n${globalSystemPrompt}`;
-
-    let [provider] = await db
-      .select()
-      .from(models)
-      .where(eq(models.slug, model))
-      .limit(1);
-
-    if (!provider) {
-      const duration = Date.now() - startTime;
-      log.error("❌ SEND MESSAGE FAILED - Model not found", {
-        requestId,
-        userId,
-        chatId,
-        model,
-        error: "model not found in database",
-        duration: `${duration}ms`,
-        timestamp: new Date().toISOString(),
-      });
-      return res.status(404).json({ message: "مدل یافت نشد" });
-    }
-
-    // this is the system prompt that the model has on the database
-    let modelDBSystemPrompt = provider.systemPrompt;
-    provider = provider.provider.toLowerCase();
+    const provider = model.split("-")[0].toLowerCase();
 
     // Set headers for streaming
     res.setHeader("Content-Type", "text/event-stream");
@@ -501,7 +410,6 @@ export const sendMessageController = async (req, res) => {
         // Send chunk to client in SSE format
         res.write(`data: ${JSON.stringify({ content: chunk })}\n\n`);
       },
-      modelDBSystemPrompt,
     });
 
     // If this was a cached prompt without cached response, cache it now

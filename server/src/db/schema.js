@@ -57,7 +57,6 @@ export const chats = pgTable("chats", {
   userId: uuid("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  gptId: uuid("gpt_id").references(() => gpts.id, { onDelete: "set null" }),
   title: varchar("title", { length: 255 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -75,26 +74,6 @@ export const messages = pgTable("messages", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const gptCategories = pgTable("gpt_categories", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  name: varchar("name", { length: 100 }).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-export const gpts = pgTable("gpts", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  categoryId: uuid("category_id")
-    .notNull()
-    .references(() => gptCategories.id, { onDelete: "cascade" }),
-  name: varchar("name", { length: 255 }).notNull(),
-  description: text("description").notNull(),
-  image: varchar("image", { length: 500 }),
-  systemPrompt: text("system_prompt").notNull(),
-  questions: jsonb("questions").default([]),
-  type: varchar("type", { length: 20 }),
-  index: integer("index"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
 
 export const messageReactions = pgTable("message_reactions", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -108,52 +87,6 @@ export const messageReactions = pgTable("message_reactions", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const models = pgTable("models", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  name: varchar("name", { length: 255 }).notNull(),
-  slug: varchar("slug", { length: 255 }).notNull(),
-  provider: varchar("provider", { length: 100 }).notNull(),
-  type: varchar("type", { length: 20 }).notNull(), // 'chat' or 'image'
-  price: integer("price").notNull().default(1),
-  systemPrompt: text("system_prompt").default(""),
-  description: text("description").default(""),
-});
-
-export const imageGenerations = pgTable("image_generations", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  modelSlug: varchar("model_slug", { length: 255 }).notNull(),
-  prompt: text("prompt").notNull(),
-  config: jsonb("config").default({}), // { aspectRatio, style, generationCount }
-  images: jsonb("images").default([]), // [{ url, downloadedPath, s3Key, s3Url }]
-  errorMessage: text("error_message"), // Error message if generation fails
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-export const videoGenerations = pgTable("video_generations", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  modelSlug: varchar("model_slug", { length: 255 }).notNull(),
-  prompt: text("prompt").notNull(),
-  config: jsonb("config").default({}), // { resolution, aspectRatio, duration }
-  imageReference: text("image_reference"), // URL or path to reference image for video generation
-  status: varchar("status", { length: 20 }).default("queued"), // queued | processing | completed | error
-  progress: integer("progress").default(0), // 0-100
-  errorMessage: text("error_message"), // Error message if status is error
-  videoUrl: text("video_url"), // URL from provider
-  videoPath: varchar("video_path", { length: 500 }), // Local path after download
-  thumbnailPath: varchar("thumbnail_path", { length: 500 }), // Generated thumbnail
-  videoS3Key: varchar("video_s3_key", { length: 500 }), // S3 key for video
-  videoS3Url: text("video_s3_url"), // S3 public URL for video
-  thumbnailS3Key: varchar("thumbnail_s3_key", { length: 500 }), // S3 key for thumbnail
-  thumbnailS3Url: text("thumbnail_s3_url"), // S3 public URL for thumbnail
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
 
 export const transactions = pgTable("transactions", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -293,6 +226,24 @@ export const bookings = pgTable("bookings", {
   index("idx_bookings_status").on(table.status),
 ]);
 
+// ─── Slot Overrides ───────────────────────────────────────────────────────────
+// status: "available" (default) | "blocked" | "booked"
+
+export const slotOverrides = pgTable("slot_overrides", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  courtId: uuid("court_id").notNull().references(() => courts.id, { onDelete: "cascade" }),
+  date: varchar("date", { length: 10 }).notNull(),           // YYYY-MM-DD
+  startTime: varchar("start_time", { length: 5 }).notNull(), // HH:mm
+  endTime: varchar("end_time", { length: 5 }).notNull(),     // HH:mm
+  status: varchar("status", { length: 20 }).notNull().default("available"), // available | blocked | booked
+  price: integer("price"),           // override price in Tomans, null = use court default
+  discountPercent: smallint("discount_percent").default(0), // 0-100
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_slot_overrides_court_date").on(table.courtId, table.date),
+]);
+
 // ─── Home Feed ────────────────────────────────────────────────────────────────
 
 export const promotions = pgTable("promotions", {
@@ -348,4 +299,20 @@ export const notifications = pgTable("notifications", {
   index("idx_notifications_is_read").on(table.isRead),
   index("idx_notifications_type").on(table.type),
   index("idx_notifications_created_at").on(table.createdAt),
+]);
+// ─── Club Reviews ─────────────────────────────────────────────────────────────
+
+export const clubReviews = pgTable("club_reviews", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  clubId: uuid("club_id").notNull().references(() => clubs.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  rating: smallint("rating").notNull(),         // 1-5
+  comment: text("comment"),
+  ownerReply: text("owner_reply"),
+  ownerRepliedAt: timestamp("owner_replied_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_club_reviews_club_id").on(table.clubId),
+  index("idx_club_reviews_user_id").on(table.userId),
 ]);

@@ -48,7 +48,7 @@ export const getCurrentUserController = async (req, res) => {
 export const updateProfileController = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { name, phone, email } = req.body;
+    const { name, phone, email, skillLevel, favoriteSport } = req.body;
 
     // Validate phone if provided
     if (phone && !validateIranianPhone(phone)) {
@@ -92,6 +92,8 @@ export const updateProfileController = async (req, res) => {
         name: name || req.user.name,
         phone: phone || req.user.phone,
         email: email || req.user.email,
+        ...(skillLevel && { skillLevel }),
+        ...(favoriteSport && { favoriteSport }),
         updatedAt: new Date(),
       })
       .where(eq(users.id, userId))
@@ -104,6 +106,8 @@ export const updateProfileController = async (req, res) => {
         name: updatedUser.name,
         email: updatedUser.email,
         image: updatedUser.image,
+        skillLevel: updatedUser.skillLevel,
+        favoriteSport: updatedUser.favoriteSport,
       },
     });
   } catch (error) {

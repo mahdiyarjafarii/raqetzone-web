@@ -1,9 +1,9 @@
 import { eq, and } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { courts, bookings, clubs } from "../db/schema.js";
+import { courts, bookings, clubs, slotOverrides } from "../db/schema.js";
 
 // Build all slot strings for a court on a given date
-function generateSlots(openTime, closeTime, slotDuration, bookedSlots, pricePerHour = 0) {
+function generateSlots(openTime, closeTime, slotDuration, bookedSlots, pricePerHour = 0, overrides = []) {
   const slots = [];
   const [openH, openM] = openTime.split(":").map(Number);
   const [closeH, closeM] = closeTime.split(":").map(Number);
@@ -18,11 +18,30 @@ function generateSlots(openTime, closeTime, slotDuration, bookedSlots, pricePerH
     const start = `${sh}:${sm}`;
     const end = `${eh}:${em}`;
 
-    const isBooked = bookedSlots.some(
-      (b) => b.startTime === start && b.status !== "rejected" && b.status !== "cancelled"
+    const override = overrides.find((o) => o.startTime === start);
+    const isPending = bookedSlots.some(
+      (b) => b.startTime === start && b.status === "pending"
+    );
+    const isBookedByUser = bookedSlots.some(
+      (b) => b.startTime === start && b.status === "approved"
     );
 
-    slots.push({ start, end, isBooked, price: pricePerHour });
+    const overrideStatus = override?.status ?? "available";
+    const effectivePrice = override?.price ?? pricePerHour;
+    const discount = override?.discountPercent ?? 0;
+    const finalPrice = discount > 0 ? Math.round(effectivePrice * (1 - discount / 100)) : effectivePrice;
+
+    slots.push({
+      start,
+      end,
+      isBooked: isBookedByUser || overrideStatus === "blocked" || overrideStatus === "booked",
+      isPending: isPending && !isBookedByUser,
+      isBlocked: overrideStatus === "blocked",
+      isManualBooked: overrideStatus === "booked",
+      price: finalPrice,
+      originalPrice: discount > 0 ? effectivePrice : null,
+      discount,
+    });
   }
   return slots;
 }
@@ -79,12 +98,21 @@ export const getCourtAvailabilityController = async (req, res) => {
       .from(bookings)
       .where(and(eq(bookings.courtId, id), eq(bookings.date, date)));
 
+    let overrides = [];
+    try {
+      overrides = await db
+        .select()
+        .from(slotOverrides)
+        .where(and(eq(slotOverrides.courtId, id), eq(slotOverrides.date, date)));
+    } catch { /* table may not exist yet */ }
+
     const slots = generateSlots(
       court.openTime,
       court.closeTime,
       court.slotDuration,
       bookedSlots,
-      court.pricePerHour
+      court.pricePerHour,
+      overrides,
     );
 
     return res.status(200).json({ date, slots, court });

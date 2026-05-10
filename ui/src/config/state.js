@@ -30,7 +30,7 @@ export const webSearchCapableModel = {
   price: 3,
 };
 
-export const currentUserAtom = atomWithStorage("raqetzone-ai-user", null);
+export const currentUserAtom = atomWithStorage("raqet-ai-user", null);
 // These atoms are now synced with backend Redis storage via useUserPreference hook
 // Using regular atoms instead of atomWithStorage as the source of truth is now the backend
 export const showOnboardingAtom = atom(true);
@@ -61,3 +61,6 @@ export const webSearchEnabledAtom = atom(false);
 // Auth bottom sheet state for web login
 export const showAuthSheetAtom = atom(false);
 export const authCallbacksAtom = atom({ onSuccess: null, onError: null });
+
+// Onboarding — shown once after first login if profile is incomplete
+export const showOnboardingSheetAtom = atom(false);

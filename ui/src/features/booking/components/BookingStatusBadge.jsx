@@ -5,7 +5,7 @@ const STATUS = {
   pending: { label: "در انتظار تأیید", className: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20" },
   approved: { label: "تأیید شده", className: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20" },
   rejected: { label: "رد شده", className: "bg-destructive/10 text-destructive border-destructive/20" },
-  cancelled: { label: "لغو شده", className: "bg-muted text-muted-foreground border-border" },
+  cancelled: { label: "لغو شده", className: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20" },
 };
 
 export default function BookingStatusBadge({ status, size = "sm" }) {

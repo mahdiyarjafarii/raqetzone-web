@@ -7,6 +7,8 @@ import SectionHeader from "./SectionHeader";
 import { useClubs } from "@/features/clubs/hooks/useClubs";
 
 const SPORT_LABELS = { padel: "پادل", tennis: "تنیس", squash: "اسکواش", badminton: "بدمینتون" };
+const BASE = import.meta.env.VITE_API_URL?.replace("/api", "") ?? "http://localhost:3000";
+const imgUrl = (src) => !src ? null : src.startsWith("http") ? src : `${BASE}${src}`;
 const SPORT_COLORS = {
   padel: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
   tennis: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-400",
@@ -20,6 +22,7 @@ function formatPrice(p) {
 
 function ClubCardHome({ club, index }) {
   const [imgError, setImgError] = React.useState(false);
+  const cover = imgUrl(club.coverImage ?? club.images?.[0]);
 
   return (
     <motion.div
@@ -31,9 +34,9 @@ function ClubCardHome({ club, index }) {
         <div className="flex items-center gap-3 bg-card border border-border rounded-2xl overflow-hidden shadow-sm active:scale-[0.99] transition-transform">
           {/* Thumbnail */}
           <div className="w-20 h-20 shrink-0 relative overflow-hidden bg-muted">
-            {!imgError ? (
+            {cover && !imgError ? (
               <img
-                src={`${club.coverImage}&w=160&h=160`}
+                src={cover}
                 alt={club.name}
                 className="w-full h-full object-cover"
                 onError={() => setImgError(true)}

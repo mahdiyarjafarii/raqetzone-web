@@ -13,14 +13,12 @@ export default function useAuth() {
   
   const logIn = (data) => {
     authStorage.storeToken(data.token);
-    localStorage.setItem("myket-ai-user", JSON.stringify(data.user));
-
     setCurrentUser(data.user);
   };
 
   const logOut = async () => {
     authStorage.removeToken();
-    localStorage.removeItem("myket-ai-user");
+    setCurrentUser(null);
     // Clear preference cache on logout
     clearPreferenceCache();
 

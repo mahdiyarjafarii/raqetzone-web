@@ -6,11 +6,7 @@ import { fileURLToPath } from "url";
 import { config } from "./config/env.js";
 import authRoutes from "./routes/auth.js";
 import chatRoutes from "./routes/chat.js";
-import gptRoutes from "./routes/gpts.js";
 import userRoutes from "./routes/user.js";
-import modelRoutes from "./routes/models.js";
-import imageRoutes from "./routes/images.js";
-import videoRoutes from "./routes/videos.js";
 import paymentRoutes from "./routes/payment.js";
 import analyticsRoutes from "./routes/analytics.js";
 import uploadRoutes from "./routes/upload.js";
@@ -23,10 +19,10 @@ import profileRoutes from "./routes/profile.js";
 import notificationRoutes from "./routes/notifications.js";
 import adminRoutes from "./routes/admin.js";
 import clubPanelRoutes from "./routes/clubPanel.js";
+import reviewRoutes from "./routes/reviews.js";
 import publicRoutes from "./routes/public.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
-import "./workers/videoWorker.js";
 import "./jobs/dailyCreditsReset.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -55,11 +51,7 @@ app.use("/api", authRoutes);
 app.use("/api", paymentRoutes);
 app.use("/api", preferenceRoutes);
 app.use("/api", chatRoutes);
-app.use("/api", gptRoutes);
 app.use("/api", userRoutes);
-app.use("/api", modelRoutes);
-app.use("/api", imageRoutes);
-app.use("/api", videoRoutes);
 app.use("/api", analyticsRoutes);
 app.use("/api", uploadRoutes);
 app.use("/api", matchRoutes);
@@ -69,6 +61,7 @@ app.use("/api", homeRoutes);
 app.use("/api", profileRoutes);
 app.use("/api", notificationRoutes);
 app.use("/api", clubPanelRoutes);
+app.use("/api", reviewRoutes);
 app.use("/api", adminRoutes);
 
 // Health check

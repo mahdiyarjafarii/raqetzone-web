@@ -11,52 +11,49 @@ import {
   themeAtom,
   showAuthSheetAtom,
   authCallbacksAtom,
+  showOnboardingSheetAtom,
 } from "./config/state";
 import CheckLogin from "./components/CheckLogin";
 import useAuth from "./auth/useAuth";
 import storage from "@/auth/storage";
+import apiClient from "@/lib/apiClient";
 import ErrorFallback from "./components/ErrorFallback";
 import AuthBottomSheet from "./components/AuthBottomSheet";
+import OnboardingSheet from "./components/OnboardingSheet";
 
 function App() {
-  const { setCurrentUser, handleLoginSuccess } = useAuth();
+  const { setCurrentUser } = useAuth();
 
   const showOverlayLoading = useAtomValue(showOverlayLoadingAtom);
   const [theme, setTheme] = useAtom(themeAtom);
   const [isReady, setIsReady] = useState(false);
   const setShowAuthSheet = useSetAtom(showAuthSheetAtom);
   const setAuthCallbacks = useSetAtom(authCallbacksAtom);
+  const setShowOnboarding = useSetAtom(showOnboardingSheetAtom);
 
-  useEffect(() => {
-    preload();
-  }, []);
-
+  useEffect(() => { preload(); }, []);
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
   }, [theme]);
 
-  const preload = async () => {
-    let currentAiModel = localStorage.getItem("raqetzone-ai-model");
-    if (currentAiModel) {
-      try {
-        currentAiModel = JSON.parse(currentAiModel);
-        if (currentAiModel.slug === "maya")
-          localStorage.removeItem("raqetzone-ai-model");
-      } catch (error) {
-        console.log("error in currentAiModel:", error);
-      }
-    }
+  const checkOnboarding = async () => {
+    try {
+      const { ok, data } = await apiClient.get("/users/me");
+      if (ok && data?.user && !data.user.name) setShowOnboarding(true);
+    } catch {}
+  };
 
+  const preload = async () => {
     const token = storage.getToken();
     const user = storage.getUser();
 
     if (!token || !user) {
       setAuthCallbacks({
-        onSuccess: async () => {
-          await handleLoginSuccess();
+        onSuccess: () => {
           const nextUser = storage.getUser();
           if (nextUser) setCurrentUser(nextUser);
           setIsReady(true);
+          checkOnboarding();
         },
         onError: null,
       });
@@ -66,19 +63,14 @@ function App() {
 
     setCurrentUser(user);
     setIsReady(true);
+    checkOnboarding();
   };
 
   const handleError = (error, errorInfo) => {
-    // Log error to console for debugging
     console.error("Error caught by ErrorBoundary:", error, errorInfo);
-
-    // You can also send error to your logging service here
-    // Example: logErrorToService(error, errorInfo);
   };
 
   const handleReset = () => {
-    // Optional: Clear any problematic state
-    // You can add custom reset logic here
     window.location.reload();
   };
 
@@ -98,9 +90,8 @@ function App() {
       onReset={handleReset}
     >
       <RouterProvider router={router} />
-
+      <OnboardingSheet />
       <Toaster />
-      <AuthBottomSheet />
       <LoadingOverlay
         spinner
         active={showOverlayLoading}

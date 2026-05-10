@@ -1,6 +1,6 @@
 import { jwtDecode } from "jwt-decode";
 
-const key = "myket-ai-auth-token";
+const key = "raqet-ai-auth-token";
 
 const storeToken = (token) => {
   if(typeof window == 'undefined') return;

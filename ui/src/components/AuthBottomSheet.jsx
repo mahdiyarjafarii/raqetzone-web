@@ -25,7 +25,7 @@ import useAuth from "@/auth/useAuth";
 
 import "react-spring-bottom-sheet/dist/style.css";
 
-const WEB_AUTH_KEY = "myket-ai-web-auth";
+const WEB_AUTH_KEY = "raqet-ai-web-auth";
 
 // Helper functions for web auth storage
 export const getWebAuthData = () => {
@@ -126,13 +126,6 @@ const AuthBottomSheet = () => {
     setIsSubmitting(false);
 
     if (!ok) return toast.error(data?.message || "کد نامعتبر است");
-
-    // Save web auth data
-    setWebAuthData({
-      phone,
-      verified: true,
-      verifiedAt: new Date().toISOString(),
-    });
 
     logIn(data);
 

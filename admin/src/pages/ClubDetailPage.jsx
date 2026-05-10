@@ -3,7 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   ArrowRightIcon, PlusIcon, PencilIcon, TrashIcon,
-  ToggleLeftIcon, ToggleRightIcon, PhoneIcon, ClockIcon,
+  ToggleLeftIcon, ToggleRightIcon, PhoneIcon, ClockIcon, CalendarDaysIcon,
+  MapPinIcon,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import apiClient from "@/lib/apiClient";
@@ -12,7 +13,10 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
+import CourtSlotsModal from "@/components/CourtSlotsModal";
 import { fmt, cn } from "@/lib/utils";
+
+const API_BASE = import.meta.env.VITE_API_URL?.replace("/api", "") ?? "http://localhost:3000";
 
 const SPORTS   = ["padel","tennis","squash","badminton","ping-pong"];
 const SURFACES = ["artificial","clay","hard","grass"];
@@ -79,6 +83,7 @@ export default function ClubDetailPage() {
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
+  const [slotsTarget, setSlotsTarget] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
 
@@ -162,20 +167,73 @@ export default function ClubDetailPage() {
 
       {/* Club info banner */}
       {club && (
-        <div className="mx-6 mt-2 mb-0 rounded-2xl border border-border bg-card p-4 flex items-center gap-4">
-          <div className="flex-1 min-w-0">
-            <p className="font-bold text-foreground">{club.name}</p>
-            <p className="text-muted-foreground text-xs mt-0.5 truncate">{club.address}</p>
-          </div>
-          {club.phone && (
-            <div className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
-              <PhoneIcon className="w-3.5 h-3.5" />
-              <span dir="ltr">{club.phone}</span>
+        <div className="mx-6 mt-2 mb-0 rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
+          <div className="flex h-36">
+            {/* Cover image / placeholder */}
+            {(() => {
+              const raw = club.images?.[0];
+              if (raw) {
+                const src = raw.startsWith("http") ? raw : `${API_BASE}${raw}`;
+                return (
+                  <div className="relative w-48 shrink-0 overflow-hidden rounded-r-xl">
+                    <img src={src} alt={club.name} className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-gradient-to-l from-black/40 to-transparent" />
+                  </div>
+                );
+              }
+              return (
+                <div className="w-48 shrink-0 rounded-r-xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center">
+                  <span className="text-5xl">🏟️</span>
+                </div>
+              );
+            })()}
+
+            {/* Info */}
+            <div className="flex-1 min-w-0 px-5 py-4 flex flex-col justify-between">
+              {/* Top: name + active badge */}
+              <div className="flex items-start justify-between gap-2">
+                <h2 className="font-bold text-foreground text-lg leading-tight">{club.name}</h2>
+                <Badge variant={club.isActive ? "success" : "muted"} className="shrink-0">
+                  {club.isActive ? "فعال" : "غیرفعال"}
+                </Badge>
+              </div>
+
+              {/* Middle: address, phone, hours */}
+              <div className="flex flex-col gap-1.5 mt-2">
+                {club.address && (
+                  <div className="flex items-start gap-1.5 text-xs text-muted-foreground">
+                    <MapPinIcon className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                    <span className="line-clamp-1">{club.address}</span>
+                  </div>
+                )}
+                <div className="flex items-center gap-4">
+                  {club.phone && (
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                      <PhoneIcon className="w-3.5 h-3.5 shrink-0" />
+                      <span dir="ltr">{club.phone}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <ClockIcon className="w-3.5 h-3.5 shrink-0" />
+                    <span dir="ltr">{club.openTime}–{club.closeTime}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom: sport chips + amenity count */}
+              <div className="flex items-center gap-2 flex-wrap mt-2">
+                {club.sportTypes?.map(s => (
+                  <span key={s} className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                    {SPORT_LABELS[s] ?? s}
+                  </span>
+                ))}
+                {club.amenities?.length > 0 && (
+                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                    {club.amenities.length} امکانات
+                  </span>
+                )}
+              </div>
             </div>
-          )}
-          <div className="flex items-center gap-1 text-xs text-muted-foreground shrink-0">
-            <ClockIcon className="w-3.5 h-3.5" />
-            {club.openTime}–{club.closeTime}
           </div>
         </div>
       )}
@@ -232,6 +290,9 @@ export default function ClubDetailPage() {
                       <Button size="sm" variant="outline" onClick={()=>{ setEditTarget(c); setForm(prefill(c)); }}>
                         <PencilIcon className="w-3.5 h-3.5"/>
                       </Button>
+                      <Button size="sm" variant="outline" onClick={()=>setSlotsTarget(c)} title="مدیریت سانس‌ها">
+                        <CalendarDaysIcon className="w-3.5 h-3.5"/>
+                      </Button>
                       <Button size="sm" variant="ghost" onClick={()=>toggleActive(c)}>
                         {c.isActive
                           ? <ToggleRightIcon className="w-4 h-4 text-emerald-500"/>
@@ -249,6 +310,8 @@ export default function ClubDetailPage() {
           </table>
         </div>
       </div>
+
+      <CourtSlotsModal open={!!slotsTarget} onClose={()=>setSlotsTarget(null)} court={slotsTarget} />
 
       <Modal open={createOpen} onClose={()=>setCreateOpen(false)} title="افزودن زمین جدید" size="lg">
         <CourtForm form={form} setForm={setForm} onSubmit={handleCreate} loading={saving} submitLabel="ایجاد زمین"/>
