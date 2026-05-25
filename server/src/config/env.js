@@ -15,10 +15,9 @@ export const config = {
   perplexityApiKey: process.env.PERPLEXITY_API_KEY,
   openRouterApiKey: process.env.OPEN_ROUTER_API_KEY,
   falAiApiKey: process.env.FAL_KEY,
-  smsir: {
-    apiKey: process.env.SMSIR_API_KEY,
-    lineNumber: process.env.SMSIR_LINE_NUMBER,
-    templateId: process.env.SMSIR_TEMPLATE_ID,
+  kavenegar: {
+    apiKey: process.env.KAVENEGAR_API_KEY,
+    sender: process.env.KAVENEGAR_SENDER,
   },
   google: {
     clientId: process.env.GOOGLE_CLIENT_ID,

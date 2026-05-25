@@ -21,6 +21,7 @@ import adminRoutes from "./routes/admin.js";
 import clubPanelRoutes from "./routes/clubPanel.js";
 import reviewRoutes from "./routes/reviews.js";
 import publicRoutes from "./routes/public.js";
+import tournamentRoutes from "./routes/tournaments.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
 import "./jobs/dailyCreditsReset.js";
@@ -62,6 +63,7 @@ app.use("/api", profileRoutes);
 app.use("/api", notificationRoutes);
 app.use("/api", clubPanelRoutes);
 app.use("/api", reviewRoutes);
+app.use("/api", tournamentRoutes);
 app.use("/api", adminRoutes);
 
 // Health check

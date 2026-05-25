@@ -300,6 +300,43 @@ export const notifications = pgTable("notifications", {
   index("idx_notifications_type").on(table.type),
   index("idx_notifications_created_at").on(table.createdAt),
 ]);
+// ─── Club Tournaments ─────────────────────────────────────────────────────────
+
+export const tournaments = pgTable("tournaments", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  clubId: uuid("club_id").references(() => clubs.id, { onDelete: "cascade" }),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  entryFee: integer("entry_fee").notNull().default(0),          // Tomans; 0 = free
+  maxParticipants: smallint("max_participants").notNull().default(16),
+  registrationDeadline: timestamp("registration_deadline").notNull(),
+  startDate: timestamp("start_date").notNull(),
+  endDate: timestamp("end_date").notNull(),
+  minLevel: smallint("min_level").notNull().default(1),          // 1–10
+  sportType: varchar("sport_type", { length: 50 }).notNull().default("padel"),
+  prize: text("prize"),
+  rules: text("rules"),
+  status: varchar("status", { length: 20 }).notNull().default("open"), // open | full | closed | completed
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_tournaments_club_id").on(table.clubId),
+  index("idx_tournaments_status").on(table.status),
+  index("idx_tournaments_start_date").on(table.startDate),
+  index("idx_tournaments_sport_type").on(table.sportType),
+]);
+
+export const tournamentRegistrations = pgTable("tournament_registrations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tournamentId: uuid("tournament_id").notNull().references(() => tournaments.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  paymentStatus: varchar("payment_status", { length: 20 }).notNull().default("pending"), // pending | paid | failed
+  registeredAt: timestamp("registered_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_tournament_reg_tournament_id").on(table.tournamentId),
+  index("idx_tournament_reg_user_id").on(table.userId),
+]);
+
 // ─── Club Reviews ─────────────────────────────────────────────────────────────
 
 export const clubReviews = pgTable("club_reviews", {

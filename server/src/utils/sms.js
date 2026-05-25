@@ -1,10 +1,9 @@
-import { Smsir } from 'smsir-js';
+import Kavenegar from 'kavenegar';
 
-const apiKey = process.env.SMSIR_API_KEY;
-const lineNumber = process.env.SMSIR_LINE_NUMBER;
-const templateId = parseInt(process.env.SMSIR_TEMPLATE_ID);
+const apiKey = process.env.KAVENEGAR_API_KEY;
+const sender = process.env.KAVENEGAR_SENDER;
 
-const smsir = new Smsir(apiKey, lineNumber);
+const kavenegar = apiKey ? Kavenegar.KavenegarApi({ apikey: apiKey }) : null;
 
 /**
  * Generate a random 4-digit OTP code
@@ -21,15 +20,30 @@ export const generateOTP = () => {
  * @returns {Promise<boolean>} Success status
  */
 export const sendOTP = async (phone, code) => {
+  console.log(phone)
+  console.log(code)
   try {
-    const parameters = [
-      {
-        name: 'Code',
-        value: code,
-      },
-    ];
+    if (!kavenegar || !sender) {
+      console.error('SMS sending error: Kavenegar configuration is missing');
+      return false;
+    }
 
-    await smsir.SendVerifyCode(phone, templateId, parameters);
+    await new Promise((resolve, reject) => {
+      kavenegar.Send(
+        {
+          message: `کد تایید راکت زون: ${code}`,
+          sender,
+          receptor: phone,
+        },
+        (response, status) => {
+          if (status >= 200 && status < 300) return resolve(response);
+          const error = new Error(`Kavenegar send failed with status ${status}: ${JSON.stringify(response)}`);
+          error.response = response;
+          error.status = status;
+          return reject(error);
+        }
+      );
+    });
     return true;
   } catch (error) {
     console.error('SMS sending error:', error);

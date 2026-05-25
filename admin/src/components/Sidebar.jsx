@@ -11,18 +11,18 @@ import { cn } from "@/lib/utils";
 import { adminUserAtom, adminTokenAtom } from "@/store/authStore";
 
 const CLUB_OWNER_NAV = [
-  { to: "/",          icon: LayoutDashboardIcon, label: "داشبورد"      },
-  { to: "/clubs",     icon: Building2Icon,        label: "باشگاه‌ها"  },
-  { to: "/bookings",  icon: CalendarCheckIcon,    label: "رزروها"       },
-  { to: "/courts",    icon: MapPinIcon,           label: "زمین‌ها"      },
-  { to: "/discounts", icon: TagIcon,              label: "تخفیف‌ها"     },
-  { to: "/reviews",   icon: StarIcon,             label: "نظرات"         },
+  { to: "/",            icon: LayoutDashboardIcon, label: "داشبورد"      },
+  { to: "/clubs",       icon: Building2Icon,        label: "باشگاه‌ها"  },
+  { to: "/bookings",    icon: CalendarCheckIcon,    label: "رزروها"       },
+  { to: "/courts",      icon: MapPinIcon,           label: "زمین‌ها"      },
+  { to: "/tournaments", icon: TrophyIcon,           label: "تورنومنت‌ها"  },
+  { to: "/discounts",   icon: TagIcon,              label: "تخفیف‌ها"     },
+  { to: "/reviews",     icon: StarIcon,             label: "نظرات"         },
 ];
 
 const ADMIN_EXTRA_NAV = [
-  { to: "/tournaments", icon: TrophyIcon,    label: "تورنومنت‌ها" },
-  { to: "/analytics",   icon: BarChart3Icon, label: "آنالیتیکس"  },
-  { to: "/users",       icon: UsersIcon,     label: "کاربران"     },
+  { to: "/analytics", icon: BarChart3Icon, label: "آنالیتیکس" },
+  { to: "/users",     icon: UsersIcon,     label: "کاربران"    },
 ];
 
 function NavItem({ to, icon: Icon, label }) {
