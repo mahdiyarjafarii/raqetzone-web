@@ -306,6 +306,13 @@ export const approveClubBookingController = async (req, res) => {
       return res.status(403).json({ message: "دسترسی غیر مجاز" });
     }
 
+    const [court] = await db
+      .select({ name: courts.name, managerPhone: courts.managerPhone, clubName: clubs.name })
+      .from(courts)
+      .leftJoin(clubs, eq(courts.clubId, clubs.id))
+      .where(eq(courts.id, booking.courtId))
+      .limit(1);
+
     const [updated] = await db
       .update(bookings)
       .set({ status: "approved", adminNote: adminNote || null, updatedAt: new Date() })
@@ -325,12 +332,19 @@ export const approveClubBookingController = async (req, res) => {
       await db.insert(slotOverrides).values({ courtId: booking.courtId, date: booking.date, startTime: booking.startTime, endTime: booking.endTime, status: "booked" });
     }
 
+    const trackingCode = booking.trackingCode;
     sendNotification(booking.userId, {
       title: "رزرو شما تأیید شد ✅",
-      message: `رزرو زمین برای ${booking.date} ساعت ${booking.startTime} تأیید شد. به موقع حاضر باشید!`,
+      message: `رزرو زمین برای ${booking.date} ساعت ${booking.startTime} تأیید شد. به موقع حاضر باشید!${trackingCode ? ` کد پیگیری: ${trackingCode}` : ""}`,
       type: "BOOKING",
       isPinned: true,
-      metadata: { bookingId: id, date: booking.date, startTime: booking.startTime, ctaHref: "/mybooking", ctaLabel: "مشاهده رزروها" },
+      metadata: { bookingId: id, date: booking.date, startTime: booking.startTime, trackingCode, ctaHref: trackingCode ? `/booking/track/${trackingCode}` : "/mybooking", ctaLabel: "مشاهده رزرو" },
+      smsText: (() => {
+        const courtInfo = court?.clubName ? `زمین ${court.name} باشگاه ${court.clubName}` : `زمین ${court?.name ?? ""}`;
+        const manager = court?.managerPhone ? ` تلفن مدیر زمین: ${court.managerPhone}.` : "";
+        const code = trackingCode ? ` کد پیگیری: ${trackingCode}.` : "";
+        return `پلتفرم رکت‌زون: رزرو ${courtInfo} برای ${booking.date} ساعت ${booking.startTime} تایید شد.${code}${manager} به امید دیدار مجدد!`;
+      })(),
     }).catch(() => {});
 
     return res.json({ booking: updated });
@@ -369,6 +383,7 @@ export const rejectClubBookingController = async (req, res) => {
       message: `متأسفانه رزرو شما برای ${booking.date} ساعت ${booking.startTime} رد شد.${adminNote ? ` دلیل: ${adminNote}` : ""}`,
       type: "BOOKING",
       metadata: { bookingId: id, ctaHref: "/mybooking", ctaLabel: "مشاهده رزروها" },
+      smsText: `پلتفرم رکت‌زون: رزرو شما برای ${booking.date} ساعت ${booking.startTime} رد شد.${adminNote ? ` دلیل: ${adminNote}` : ""}`,
     }).catch(() => {});
 
     return res.json({ booking: updated });

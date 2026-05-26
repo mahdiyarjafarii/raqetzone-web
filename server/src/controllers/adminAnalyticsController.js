@@ -195,13 +195,16 @@ export const approveBookingController = async (req, res) => {
 
     const [updated] = await db.update(bookings).set({ status: "approved", adminNote: adminNote ?? null, updatedAt: new Date() }).where(eq(bookings.id, id)).returning();
 
-    // Send notification
     const { sendNotification } = await import("../utils/sendNotification.js");
+    const trackingCode = booking.trackingCode;
     sendNotification(booking.userId, {
       title: "رزرو شما تأیید شد ✅",
-      message: `رزرو زمین برای ${booking.date} ساعت ${booking.startTime} تأیید شد.`,
+      message: `رزرو زمین برای ${booking.date} ساعت ${booking.startTime} تأیید شد.${trackingCode ? ` کد پیگیری: ${trackingCode}` : ""}`,
       type: "BOOKING", isPinned: true,
-      metadata: { bookingId: id, ctaHref: "/mybooking", ctaLabel: "مشاهده رزرو" },
+      metadata: { bookingId: id, trackingCode, ctaHref: trackingCode ? `/booking/track/${trackingCode}` : "/mybooking", ctaLabel: "مشاهده رزرو" },
+      smsText: trackingCode
+        ? `پلتفرم رکت‌زون: رزرو شما تایید شد. کد پیگیری: ${trackingCode}. به امید دیدار مجدد!`
+        : `پلتفرم رکت‌زون: رزرو شما برای ${booking.date} ساعت ${booking.startTime} تایید شد. به امید دیدار مجدد!`,
     }).catch(() => {});
 
     return res.status(200).json({ booking: updated });
@@ -227,6 +230,7 @@ export const rejectBookingController = async (req, res) => {
       message: `متأسفانه رزرو ${booking.date} ساعت ${booking.startTime} رد شد.${adminNote ? ` دلیل: ${adminNote}` : ""}`,
       type: "BOOKING",
       metadata: { bookingId: id, ctaHref: "/mybooking", ctaLabel: "مشاهده رزروها" },
+      smsText: `پلتفرم رکت‌زون: رزرو شما برای ${booking.date} ساعت ${booking.startTime} رد شد.${adminNote ? ` دلیل: ${adminNote}` : ""}`,
     }).catch(() => {});
 
     return res.status(200).json({ booking: updated });

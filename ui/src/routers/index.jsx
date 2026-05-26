@@ -21,6 +21,7 @@ const NotificationsPage = lazy(() => import("@/pages/notifications/Notifications
 const ClubsPage = lazy(() => import("@/pages/clubs/ClubsPage"));
 const ClubDetailPage = lazy(() => import("@/pages/clubs/ClubDetailPage"));
 const MyBookingPage = lazy(() => import("@/pages/mybooking/MyBookingPage"));
+const BookingTrackPage = lazy(() => import("@/pages/booking/BookingTrackPage"));
 
 const getSuspensedElement = (Page) => (
   <SuspensedView>
@@ -46,6 +47,7 @@ const router = createBrowserRouter(
       <Route path="clubs" element={getSuspensedElement(ClubsPage)} />
       <Route path="clubs/:clubId" element={getSuspensedElement(ClubDetailPage)} />
       <Route path="mybooking" element={getSuspensedElement(MyBookingPage)} />
+      <Route path="booking/track/:code" element={getSuspensedElement(BookingTrackPage)} />
       <Route path="notifications" element={getSuspensedElement(NotificationsPage)} />
       <Route path="profile" element={getSuspensedElement(ProfilePage)} />
       <Route path="chat/new" element={getSuspensedElement(NewChatPage)} />

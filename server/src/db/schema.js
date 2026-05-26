@@ -215,6 +215,8 @@ export const bookings = pgTable("bookings", {
   durationHours: integer("duration_hours").notNull(),
   totalPrice: integer("total_price").notNull(),
   status: varchar("status", { length: 20 }).notNull().default("pending"), // pending | approved | rejected | cancelled
+  trackingCode: varchar("tracking_code", { length: 20 }).unique(),
+  reminderSent: boolean("reminder_sent").notNull().default(false),
   notes: text("notes"),
   adminNote: text("admin_note"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

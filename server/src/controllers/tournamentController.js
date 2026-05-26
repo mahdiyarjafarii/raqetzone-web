@@ -1,6 +1,7 @@
 import { eq, and, asc, desc, ilike, or, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { tournaments, tournamentRegistrations, users, clubs } from "../db/schema.js";
+import { sendSMS } from "../utils/sms.js";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -280,6 +281,12 @@ export const registerTournamentController = async (req, res) => {
         .set({ status: "full", updatedAt: new Date() })
         .where(eq(tournaments.id, id));
     }
+
+    // SMS confirmation
+    sendSMS(
+      req.user.phone,
+      `رکت‌زون: ثبت‌نام شما در تورنومنت «${tournament.title}» با موفقیت انجام شد 🏆`
+    ).catch(() => {});
 
     return res.status(201).json({ registration, message: "ثبت‌نام با موفقیت انجام شد" });
   } catch (error) {

@@ -25,6 +25,7 @@ import tournamentRoutes from "./routes/tournaments.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
 import "./jobs/dailyCreditsReset.js";
+import "./jobs/bookingReminder.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

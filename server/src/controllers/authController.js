@@ -38,10 +38,8 @@ export const sendOTPController = async (req, res) => {
     });
 
     // Send SMS
-    if(false) {
-      const smsSent = await sendOTP(phone, code);
-      if (!smsSent) return res.status(500).json({ message: 'خطا در ارسال پیامک' });
-    }
+    const smsSent = await sendOTP(phone, code);
+    if (!smsSent) return res.status(500).json({ message: 'خطا در ارسال پیامک' });
 
     return res.status(200).json({
       success: true,

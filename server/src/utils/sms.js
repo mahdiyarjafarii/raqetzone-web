@@ -14,6 +14,35 @@ export const generateOTP = () => {
 };
 
 /**
+ * Send a plain text SMS notification to a user.
+ * @param {string} phone
+ * @param {string} message
+ * @returns {Promise<boolean>}
+ */
+export const sendSMS = async (phone, message) => {
+  if (!phone) return false;
+  try {
+    if (!kavenegar || !sender) {
+      console.warn('SMS skipped: Kavenegar not configured');
+      return false;
+    }
+    await new Promise((resolve, reject) => {
+      kavenegar.Send(
+        { message, sender, receptor: phone },
+        (response, status) => {
+          if (status >= 200 && status < 300) return resolve(response);
+          return reject(new Error(`Kavenegar status ${status}`));
+        }
+      );
+    });
+    return true;
+  } catch (err) {
+    console.error('sendSMS error:', err.message);
+    return false;
+  }
+};
+
+/**
  * Send OTP code via SMS
  * @param {string} phone - Mobile phone number
  * @param {string} code - 6-digit OTP code
