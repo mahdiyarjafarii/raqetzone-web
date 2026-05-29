@@ -1,7 +1,33 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { MapPinIcon, CalendarIcon, UsersIcon, ChevronRightIcon } from "lucide-react";
+import { MapPinIcon, CalendarIcon, UsersIcon, ChevronRightIcon, ClockIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+function useCountdown(targetDate) {
+  const [label, setLabel] = useState("");
+
+  useEffect(() => {
+    function calc() {
+      const diff = new Date(targetDate) - Date.now();
+      if (diff <= 0) { setLabel("شروع شد"); return; }
+      const h = Math.floor(diff / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      if (h >= 24) {
+        const d = Math.floor(h / 24);
+        setLabel(`${d} روز دیگر`);
+      } else if (h > 0) {
+        setLabel(`${h}h ${m}m مانده`);
+      } else {
+        setLabel(`${m} دقیقه مانده`);
+      }
+    }
+    calc();
+    const t = setInterval(calc, 30000);
+    return () => clearInterval(t);
+  }, [targetDate]);
+
+  return label;
+}
 
 const SPORT_ICONS = {
   padel: "🏓",
@@ -47,6 +73,7 @@ export default function MatchCard({ match, onClick, index = 0 }) {
   const isFull = match.status === "full";
   const sportIcon = SPORT_ICONS[match.sportType] ?? "🏅";
   const accentBorder = SPORT_ACCENT[match.sportType] ?? "border-l-primary";
+  const countdown = useCountdown(match.scheduledAt);
 
   return (
     <motion.div
@@ -87,9 +114,17 @@ export default function MatchCard({ match, onClick, index = 0 }) {
 
           {/* Info */}
           <div className="space-y-1.5 mb-4">
-            <div className="flex items-center gap-2 text-muted-foreground text-xs">
-              <CalendarIcon className="w-3.5 h-3.5 shrink-0" />
-              <span>{formatDate(match.scheduledAt)}</span>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-muted-foreground text-xs">
+                <CalendarIcon className="w-3.5 h-3.5 shrink-0" />
+                <span>{formatDate(match.scheduledAt)}</span>
+              </div>
+              {countdown && (
+                <div className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                  <ClockIcon className="w-3 h-3" />
+                  {countdown}
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-2 text-muted-foreground text-xs">
               <MapPinIcon className="w-3.5 h-3.5 shrink-0" />

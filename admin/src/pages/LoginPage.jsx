@@ -33,7 +33,7 @@ export default function LoginPage() {
     e.preventDefault();
     if (!otp) return toast.error("کد تأیید را وارد کنید");
     setLoading(true);
-    const { ok, data } = await apiClient.post("/auth/verify-otp", { phone, code: otp });
+    const { ok, data } = await apiClient.post("/auth/verify-otp", { phone, code: otp, isClubOwner: true });
     setLoading(false);
     if (!ok) return toast.error(data?.message ?? "کد نامعتبر است");
 

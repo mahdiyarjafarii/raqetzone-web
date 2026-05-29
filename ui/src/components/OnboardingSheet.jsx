@@ -1,10 +1,11 @@
 import "react-spring-bottom-sheet/dist/style.css";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { BottomSheet } from "react-spring-bottom-sheet";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAtom } from "jotai";
 import toast from "react-hot-toast";
+import { CameraIcon, UserCircleIcon } from "lucide-react";
 
 import { showOnboardingSheetAtom, currentUserAtom } from "@/config/state";
 import apiClient from "@/lib/apiClient";
@@ -27,13 +28,14 @@ const LEVELS = [
 ];
 
 const DURATIONS = [
-  { value: "60",  label: "۱ ساعت",        emoji: "⏱" },
-  { value: "90",  label: "۱.۵ ساعت",      emoji: "⏱" },
-  { value: "120", label: "۲ ساعت",        emoji: "⏰" },
+  { value: "60",  label: "۱ ساعت",          emoji: "⏱" },
+  { value: "90",  label: "۱.۵ ساعت",        emoji: "⏱" },
+  { value: "120", label: "۲ ساعت",          emoji: "⏰" },
   { value: "180", label: "بیشتر از ۲ ساعت", emoji: "🕐" },
 ];
 
-const TOTAL_STEPS = 5; // welcome, name, sport, level, duration
+// 0=welcome, 1=name, 2=photo, 3=sport, 4=level, 5=duration
+const TOTAL_STEPS = 6;
 
 // ── Steps ─────────────────────────────────────────────────────────────────────
 
@@ -63,7 +65,6 @@ function StepWelcome() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 + i * 0.1 }}
-            className="flex flex-col items-center gap-1"
           >
             <span className="text-xs text-muted-foreground font-medium">{item}</span>
           </motion.div>
@@ -90,6 +91,62 @@ function StepName({ value, onChange }) {
         className="w-full bg-muted border-0 rounded-2xl px-4 py-4 text-center text-lg font-bold text-foreground placeholder:text-muted-foreground placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
         maxLength={40}
       />
+    </div>
+  );
+}
+
+function StepPhoto({ preview, onSelect, uploading }) {
+  const inputRef = useRef(null);
+
+  return (
+    <div className="space-y-6 text-center">
+      <div>
+        <div className="text-5xl mb-4">🤳</div>
+        <h2 className="text-xl font-black text-foreground">عکس پروفایلت رو بزار</h2>
+        <p className="text-muted-foreground text-sm mt-2">
+          بقیه بازیکنا بهتر می‌شناسنت
+        </p>
+      </div>
+
+      <div className="flex flex-col items-center gap-4">
+        {/* Avatar preview */}
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={uploading}
+          className="relative w-28 h-28 rounded-full overflow-hidden border-4 border-dashed border-primary/40 bg-muted flex items-center justify-center active:scale-95 transition-all"
+        >
+          {preview ? (
+            <img src={preview} alt="preview" className="w-full h-full object-cover" />
+          ) : (
+            <UserCircleIcon className="w-16 h-16 text-muted-foreground/40" />
+          )}
+          <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity rounded-full">
+            <CameraIcon className="w-6 h-6 text-white" />
+          </div>
+        </button>
+
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file) onSelect(file);
+          }}
+        />
+
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={uploading}
+          className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-primary/10 text-primary text-sm font-semibold active:scale-95 transition-all"
+        >
+          <CameraIcon className="w-4 h-4" />
+          {uploading ? "در حال آپلود..." : preview ? "عوض کردن عکس" : "انتخاب عکس"}
+        </button>
+      </div>
     </div>
   );
 }
@@ -225,18 +282,37 @@ export default function OnboardingSheet() {
 
   const [step, setStep] = useState(0);
   const [name, setName] = useState("");
+  const [photoPreview, setPhotoPreview] = useState(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
   const [sport, setSport] = useState("padel");
   const [level, setLevel] = useState("beginner");
   const [duration, setDuration] = useState("90");
   const [saving, setSaving] = useState(false);
 
   const isLastStep = step === TOTAL_STEPS - 1;
-  const canNext = step === 1 ? name.trim().length >= 2 : true;
 
-  const btnLabel = () => {
-    if (step === 0) return "شروع کن 🚀";
-    if (isLastStep) return saving ? "در حال ذخیره..." : "بزن بریم! 🎉";
-    return "بعدی";
+  const canNext = () => {
+    if (step === 1) return name.trim().length >= 2;
+    return true;
+  };
+
+  const handlePhotoSelect = async (file) => {
+    const localUrl = URL.createObjectURL(file);
+    setPhotoPreview(localUrl);
+    setPhotoUploading(true);
+    try {
+      const form = new FormData();
+      form.append("image", file);
+      const res = await apiClient.post("/users/upload-image", form);
+      if (!res.ok) {
+        toast.error("خطا در آپلود عکس");
+        setPhotoPreview(null);
+      } else if (res.data?.user) {
+        setCurrentUser(res.data.user);
+      }
+    } finally {
+      setPhotoUploading(false);
+    }
   };
 
   const handleNext = async () => {
@@ -253,6 +329,13 @@ export default function OnboardingSheet() {
     if (data?.user) setCurrentUser(data.user);
     setOpen(false);
     toast.success(`خوش اومدی ${name.trim()} 🎉`);
+  };
+
+  const btnLabel = () => {
+    if (step === 0) return "شروع کن 🚀";
+    if (step === 2) return photoPreview ? "ادامه" : "رد کردن";
+    if (isLastStep) return saving ? "در حال ذخیره..." : "بزن بریم! 🎉";
+    return "بعدی";
   };
 
   return (
@@ -276,19 +359,26 @@ export default function OnboardingSheet() {
           >
             {step === 0 && <StepWelcome />}
             {step === 1 && <StepName value={name} onChange={setName} />}
-            {step === 2 && <StepSport value={sport} onChange={setSport} />}
-            {step === 3 && <StepLevel value={level} onChange={setLevel} />}
-            {step === 4 && <StepDuration value={duration} onChange={setDuration} />}
+            {step === 2 && (
+              <StepPhoto
+                preview={photoPreview}
+                onSelect={handlePhotoSelect}
+                uploading={photoUploading}
+              />
+            )}
+            {step === 3 && <StepSport value={sport} onChange={setSport} />}
+            {step === 4 && <StepLevel value={level} onChange={setLevel} />}
+            {step === 5 && <StepDuration value={duration} onChange={setDuration} />}
           </motion.div>
         </AnimatePresence>
 
         <div className="mt-8 space-y-3">
           <button
             onClick={handleNext}
-            disabled={!canNext || saving}
+            disabled={!canNext() || saving || photoUploading}
             className={cn(
               "w-full h-14 rounded-2xl font-bold text-base transition-all",
-              canNext && !saving
+              canNext() && !saving && !photoUploading
                 ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25 active:scale-[0.98]"
                 : "bg-muted text-muted-foreground cursor-not-allowed"
             )}
@@ -299,7 +389,7 @@ export default function OnboardingSheet() {
           {step > 0 && (
             <button
               onClick={() => setStep(s => s - 1)}
-              disabled={saving}
+              disabled={saving || photoUploading}
               className="w-full h-10 text-sm text-muted-foreground"
             >
               برگشت

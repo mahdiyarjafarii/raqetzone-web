@@ -3,7 +3,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   PlusIcon, TrophyIcon, CalendarIcon, UsersIcon,
   CoinsIcon, StarIcon, XIcon, DownloadIcon,
-  LockIcon, PlayIcon, FlagIcon, ChevronDownIcon,
+  LockIcon, PlayIcon, FlagIcon, ChevronRightIcon,
+  ChevronLeftIcon, CheckIcon, GiftIcon, ShieldCheckIcon,
+  ZapIcon, Trash2Icon,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import apiClient from "@/lib/apiClient";
@@ -15,7 +17,13 @@ import Input from "@/components/ui/Input";
 import { cn } from "@/lib/utils";
 
 const SPORT_ICONS = { padel:"🏓", tennis:"🎾", squash:"🟡", badminton:"🏸", "ping-pong":"🏓" };
-const SPORTS = ["padel","tennis","squash","badminton","ping-pong"];
+const SPORTS = [
+  { value:"padel",     label:"پادل",     icon:"🏓" },
+  { value:"tennis",    label:"تنیس",     icon:"🎾" },
+  { value:"squash",    label:"اسکواش",   icon:"🟡" },
+  { value:"badminton", label:"بدمینتون", icon:"🏸" },
+  { value:"ping-pong", label:"پینگ‌پنگ", icon:"🏓" },
+];
 
 const PHASE_CONFIG = {
   registration: { label:"ثبت‌نام",     badge:"bg-emerald-500/10 text-emerald-600 border-emerald-500/25", dot:"bg-emerald-500" },
@@ -23,12 +31,228 @@ const PHASE_CONFIG = {
   completed:    { label:"پایان یافته", badge:"bg-zinc-500/10    text-zinc-500    border-zinc-500/25",    dot:"bg-zinc-400"    },
 };
 
+const WIZARD_STEPS = [
+  { label:"اطلاعات پایه",   icon:<TrophyIcon className="w-3.5 h-3.5" />   },
+  { label:"زمان‌بندی",      icon:<CalendarIcon className="w-3.5 h-3.5" />  },
+  { label:"شرایط و جوایز", icon:<GiftIcon className="w-3.5 h-3.5" />      },
+];
+
 const emptyForm = {
   title:"", description:"", sportType:"padel",
   isFree: true, entryFee:0, maxParticipants:16,
   registrationDeadline:"", startDate:"", endDate:"",
   minLevel:1, prize:"", rules:"",
 };
+
+const inputClass =
+  "rounded-xl border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-violet-500 transition-colors w-full resize-none";
+
+function WizardField({ label, hint, children }) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-baseline justify-between">
+        <label className="text-xs font-bold text-foreground/70 uppercase tracking-wide">{label}</label>
+        {hint && <span className="text-[10px] text-muted-foreground">{hint}</span>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ─── Wizard Step 1 ────────────────────────────────────────────────────────────
+
+function WStep1({ form, setForm }) {
+  return (
+    <div className="space-y-4">
+      <WizardField label="عنوان تورنومنت *">
+        <input autoFocus className={inputClass} placeholder="مثال: مسابقات پادل بهاره"
+          value={form.title} onChange={e => setForm(p => ({...p, title: e.target.value}))} />
+      </WizardField>
+
+      <WizardField label="توضیحات">
+        <textarea rows={3} className={inputClass} placeholder="توضیح مختصری از تورنومنت..."
+          value={form.description} onChange={e => setForm(p => ({...p, description: e.target.value}))} />
+      </WizardField>
+
+      <WizardField label="نوع ورزش *">
+        <div className="grid grid-cols-5 gap-2">
+          {SPORTS.map(s => (
+            <button key={s.value} type="button"
+              onClick={() => setForm(p => ({...p, sportType: s.value}))}
+              className={cn(
+                "flex flex-col items-center gap-1.5 py-3 rounded-2xl border-2 text-center transition-all",
+                form.sportType === s.value
+                  ? "border-violet-500 bg-violet-500/10"
+                  : "border-border bg-muted/50 hover:border-violet-500/40"
+              )}
+            >
+              <span className="text-2xl leading-none">{s.icon}</span>
+              <span className={cn("text-[9px] font-bold", form.sportType === s.value ? "text-violet-600" : "text-muted-foreground")}>
+                {s.label}
+              </span>
+            </button>
+          ))}
+        </div>
+      </WizardField>
+    </div>
+  );
+}
+
+// ─── Wizard Step 2 ────────────────────────────────────────────────────────────
+
+function WStep2({ form, setForm }) {
+  const deadline = form.registrationDeadline ? new Date(form.registrationDeadline) : null;
+  const start    = form.startDate            ? new Date(form.startDate)            : null;
+  const end      = form.endDate              ? new Date(form.endDate)              : null;
+  const allSet   = !!(deadline && start && end);
+  const valid    = allSet && deadline < start && start < end;
+
+  return (
+    <div className="space-y-4">
+      <WizardField label="مهلت ثبت‌نام *" hint="باید قبل از شروع مسابقه باشد">
+        <input type="datetime-local" className={inputClass}
+          value={form.registrationDeadline} onChange={e => setForm(p => ({...p, registrationDeadline: e.target.value}))} />
+      </WizardField>
+      <WizardField label="تاریخ شروع *">
+        <input type="datetime-local" className={inputClass}
+          value={form.startDate} onChange={e => setForm(p => ({...p, startDate: e.target.value}))} />
+      </WizardField>
+      <WizardField label="تاریخ پایان *">
+        <input type="datetime-local" className={inputClass}
+          value={form.endDate} onChange={e => setForm(p => ({...p, endDate: e.target.value}))} />
+      </WizardField>
+
+      {allSet && (
+        <div className={cn(
+          "rounded-2xl p-4 border space-y-2",
+          valid ? "bg-emerald-500/5 border-emerald-500/20" : "bg-red-500/5 border-red-500/20"
+        )}>
+          <p className={cn("text-xs font-bold flex items-center gap-1.5", valid ? "text-emerald-600" : "text-red-500")}>
+            {valid ? <><CheckIcon className="w-3.5 h-3.5" /> ترتیب تاریخ‌ها صحیح</> : <>⚠️ ترتیب تاریخ‌ها اشتباه است</>}
+          </p>
+          <div className="flex items-center gap-1 text-[10px]">
+            {[
+              { color:"emerald", label:"ثبت‌نام", date:deadline },
+              { color:"blue",    label:"شروع",    date:start    },
+              { color:"violet",  label:"پایان",   date:end      },
+            ].map(({color, label, date}, i) => (
+              <React.Fragment key={label}>
+                <div className="flex flex-col items-center gap-0.5">
+                  <div className={`w-2 h-2 rounded-full bg-${color}-500`} />
+                  <span className={`font-bold text-${color}-600`}>{label}</span>
+                  <span className="text-muted-foreground tabular-nums">
+                    {date?.toLocaleDateString("fa-IR",{month:"short",day:"numeric"})}
+                  </span>
+                </div>
+                {i < 2 && <div className="flex-1 h-0.5 bg-border rounded mb-5" />}
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Wizard Step 3 ────────────────────────────────────────────────────────────
+
+function WStep3({ form, setForm }) {
+  return (
+    <div className="space-y-4">
+      <WizardField label="نوع ورودیه">
+        <div className="grid grid-cols-2 gap-2">
+          {[{v:true,l:"🎁 رایگان",a:"bg-emerald-600 border-emerald-600 text-white"},{v:false,l:"💰 پولی",a:"bg-violet-600 border-violet-600 text-white"}].map(({v,l,a}) => (
+            <button key={String(v)} type="button"
+              onClick={() => setForm(p => ({...p, isFree:v}))}
+              className={cn("py-3 rounded-2xl text-sm font-bold border-2 transition-all",
+                form.isFree === v ? a : "bg-muted border-border text-muted-foreground")}
+            >{l}</button>
+          ))}
+        </div>
+      </WizardField>
+
+      {!form.isFree && (
+        <WizardField label="مبلغ ورودیه (تومان) *">
+          <input type="number" min={1000} step={1000} className={inputClass} placeholder="۵۰۰۰۰"
+            value={form.entryFee} onChange={e => setForm(p => ({...p, entryFee: Number(e.target.value)}))} />
+        </WizardField>
+      )}
+
+      <div className="grid grid-cols-2 gap-3">
+        <WizardField label="ظرفیت" hint={`${form.maxParticipants} نفر`}>
+          <input type="range" min={4} max={128} step={4} className="w-full accent-violet-600"
+            value={form.maxParticipants} onChange={e => setForm(p => ({...p, maxParticipants: Number(e.target.value)}))} />
+        </WizardField>
+        <WizardField label="حداقل سطح" hint={`سطح ${form.minLevel}`}>
+          <input type="range" min={1} max={10} className="w-full accent-amber-500"
+            value={form.minLevel} onChange={e => setForm(p => ({...p, minLevel: Number(e.target.value)}))} />
+        </WizardField>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 text-sm">
+        <div className="flex items-center gap-2 py-2 px-3 rounded-xl bg-violet-500/10 border border-violet-500/20">
+          <UsersIcon className="w-4 h-4 text-violet-500 shrink-0" />
+          <span className="text-violet-600 font-bold">{form.maxParticipants} نفر</span>
+        </div>
+        <div className="flex items-center gap-2 py-2 px-3 rounded-xl bg-amber-500/10 border border-amber-500/20">
+          <ZapIcon className="w-4 h-4 text-amber-500 shrink-0" />
+          <span className="text-amber-600 font-bold">سطح {form.minLevel}+</span>
+        </div>
+      </div>
+
+      <WizardField label="جوایز مسابقه">
+        <div className="relative">
+          <GiftIcon className="absolute right-3 top-3 w-4 h-4 text-amber-500 pointer-events-none" />
+          <textarea rows={3} className={cn(inputClass, "pr-9")} placeholder={"🥇 اول: ...\n🥈 دوم: ...\n🥉 سوم: ..."}
+            value={form.prize} onChange={e => setForm(p => ({...p, prize: e.target.value}))} />
+        </div>
+      </WizardField>
+
+      <WizardField label="قوانین و مقررات">
+        <div className="relative">
+          <ShieldCheckIcon className="absolute right-3 top-3 w-4 h-4 text-blue-500 pointer-events-none" />
+          <textarea rows={3} className={cn(inputClass, "pr-9")} placeholder="قوانین مسابقه، نحوه امتیازدهی و..."
+            value={form.rules} onChange={e => setForm(p => ({...p, rules: e.target.value}))} />
+        </div>
+      </WizardField>
+    </div>
+  );
+}
+
+// ─── Wizard Step Indicator ────────────────────────────────────────────────────
+
+function WizardStepBar({ current }) {
+  return (
+    <div className="flex items-center gap-0 px-1 py-3">
+      {WIZARD_STEPS.map((step, i) => {
+        const done   = i < current;
+        const active = i === current;
+        return (
+          <React.Fragment key={i}>
+            <div className="flex flex-col items-center gap-1">
+              <div className={cn(
+                "w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all",
+                done   ? "bg-emerald-500 border-emerald-500 text-white" :
+                active ? "bg-violet-600  border-violet-600  text-white shadow-md shadow-violet-500/30" :
+                         "bg-muted       border-border       text-muted-foreground"
+              )}>
+                {done ? <CheckIcon className="w-4 h-4" /> : step.icon}
+              </div>
+              <span className={cn("text-[9px] font-bold whitespace-nowrap",
+                active ? "text-violet-600" : done ? "text-emerald-500" : "text-muted-foreground")}>
+                {step.label}
+              </span>
+            </div>
+            {i < WIZARD_STEPS.length - 1 && (
+              <div className={cn("flex-1 h-0.5 mb-4 mx-1 rounded-full transition-all",
+                i < current ? "bg-emerald-500" : "bg-border")} />
+            )}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
 
 // ─── Participants Modal ────────────────────────────────────────────────────────
 
@@ -147,6 +371,45 @@ function ParticipantsModal({ tournament, onClose }) {
   );
 }
 
+// ─── Delete Confirm Modal ─────────────────────────────────────────────────────
+
+function DeleteModal({ tournament, onClose, onDeleted }) {
+  const [loading, setLoading] = useState(false);
+
+  async function handleDelete() {
+    setLoading(true);
+    const { ok, data } = await apiClient.delete(`/tournaments/${tournament.id}`);
+    setLoading(false);
+    if (ok) {
+      toast.success("تورنومنت حذف شد");
+      onDeleted();
+      onClose();
+    } else {
+      toast.error(data?.message ?? "خطا در حذف");
+    }
+  }
+
+  return (
+    <Modal open onClose={onClose} title="حذف تورنومنت" size="sm">
+      <div className="space-y-4">
+        <p className="text-sm text-muted-foreground">
+          آیا از حذف تورنومنت <span className="font-bold text-foreground">«{tournament.title}»</span> مطمئن هستید؟
+          این عمل قابل بازگشت نیست.
+        </p>
+        <div className="flex gap-3">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-border text-sm font-medium text-muted-foreground hover:bg-muted transition-colors">
+            انصراف
+          </button>
+          <button onClick={handleDelete} disabled={loading}
+            className="flex-1 py-2.5 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-700 transition-colors disabled:opacity-60">
+            {loading ? "در حال حذف..." : "بله، حذف شود"}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 // ─── Tournament Card ───────────────────────────────────────────────────────────
 
 function TournamentAdminCard({ tournament, onStatusChange, onViewParticipants, onDelete }) {
@@ -181,10 +444,19 @@ function TournamentAdminCard({ tournament, onStatusChange, onViewParticipants, o
               {tournament.club && <p className="text-[11px] text-muted-foreground">🏢 {tournament.club.name}</p>}
             </div>
           </div>
-          <span className={cn("inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold border shrink-0", phaseCfg.badge)}>
-            <span className={cn("w-1.5 h-1.5 rounded-full", phaseCfg.dot)} />
-            {phaseCfg.label}
-          </span>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className={cn("inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold border", phaseCfg.badge)}>
+              <span className={cn("w-1.5 h-1.5 rounded-full", phaseCfg.dot)} />
+              {phaseCfg.label}
+            </span>
+            <button
+              onClick={onDelete}
+              className="w-6 h-6 rounded-lg bg-red-500/10 hover:bg-red-500/20 flex items-center justify-center transition-colors"
+              title="حذف تورنومنت"
+            >
+              <Trash2Icon className="w-3.5 h-3.5 text-red-500" />
+            </button>
+          </div>
         </div>
 
         {/* Meta */}
@@ -267,9 +539,11 @@ export default function TournamentsPage() {
   const [tournaments, setTournaments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
+  const [wizardStep, setWizardStep] = useState(0);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [participantsModal, setParticipantsModal] = useState(null);
+  const [deleteModal, setDeleteModal] = useState(null);
   const [phaseFilter, setPhaseFilter] = useState(null);
 
   const fetchTournaments = async () => {
@@ -280,11 +554,36 @@ export default function TournamentsPage() {
   };
   useEffect(() => { fetchTournaments(); }, []);
 
-  const handleCreate = async (e) => {
-    e.preventDefault();
-    if (!form.title || !form.registrationDeadline || !form.startDate || !form.endDate) {
-      return toast.error("فیلدهای الزامی را پر کنید");
+  function openCreate() {
+    setForm(emptyForm);
+    setWizardStep(0);
+    setCreateOpen(true);
+  }
+
+  function validateWizardStep() {
+    if (wizardStep === 0) {
+      if (!form.title.trim()) { toast.error("عنوان الزامی است"); return false; }
     }
+    if (wizardStep === 1) {
+      if (!form.registrationDeadline || !form.startDate || !form.endDate) {
+        toast.error("همه تاریخ‌ها الزامی هستند"); return false;
+      }
+      if (new Date(form.registrationDeadline) >= new Date(form.startDate)) {
+        toast.error("مهلت ثبت‌نام باید قبل از شروع باشد"); return false;
+      }
+      if (new Date(form.startDate) >= new Date(form.endDate)) {
+        toast.error("تاریخ شروع باید قبل از پایان باشد"); return false;
+      }
+    }
+    return true;
+  }
+
+  function nextWizardStep() {
+    if (!validateWizardStep()) return;
+    if (wizardStep < WIZARD_STEPS.length - 1) setWizardStep(s => s + 1);
+  }
+
+  const handleCreate = async () => {
     setSaving(true);
     const { ok, data } = await apiClient.post("/tournaments", {
       ...form,
@@ -295,7 +594,7 @@ export default function TournamentsPage() {
     setSaving(false);
     if (!ok) return toast.error(data?.message ?? "خطا");
     toast.success("تورنومنت ایجاد شد 🏆");
-    setCreateOpen(false); setForm(emptyForm);
+    setCreateOpen(false);
     fetchTournaments();
   };
 
@@ -307,13 +606,14 @@ export default function TournamentsPage() {
   ];
 
   const filtered = phaseFilter ? tournaments.filter(t => t.phase === phaseFilter) : tournaments;
+  const isLast = wizardStep === WIZARD_STEPS.length - 1;
 
   return (
     <div dir="rtl">
       <PageHeader
         title="مدیریت تورنومنت‌ها"
         description={`${tournaments.length} تورنومنت`}
-        actions={<Button onClick={() => setCreateOpen(true)}><PlusIcon className="w-4 h-4" />تورنومنت جدید</Button>}
+        actions={<Button onClick={openCreate}><PlusIcon className="w-4 h-4" />تورنومنت جدید</Button>}
       />
 
       {/* Phase tabs */}
@@ -352,7 +652,7 @@ export default function TournamentsPage() {
               tournament={t}
               onStatusChange={fetchTournaments}
               onViewParticipants={() => setParticipantsModal(t)}
-              onDelete={() => {}}
+              onDelete={() => setDeleteModal(t)}
             />
           ))
         )}
@@ -366,73 +666,88 @@ export default function TournamentsPage() {
         />
       )}
 
-      {/* Create modal */}
-      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="ایجاد تورنومنت جدید" size="lg">
-        <form onSubmit={handleCreate} className="space-y-3 max-h-[65vh] overflow-y-auto pl-1">
-          <Input label="عنوان *" value={form.title} onChange={e=>setForm(p=>({...p,title:e.target.value}))} required />
+      {/* Delete modal */}
+      {deleteModal && (
+        <DeleteModal
+          tournament={deleteModal}
+          onClose={() => setDeleteModal(null)}
+          onDeleted={fetchTournaments}
+        />
+      )}
 
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-muted-foreground">توضیحات</label>
-            <textarea rows={2} value={form.description} onChange={e=>setForm(p=>({...p,description:e.target.value}))}
-              className="rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none resize-none" />
-          </div>
-
-          {/* Sport */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-muted-foreground">نوع ورزش</label>
-            <div className="flex flex-wrap gap-1.5">
-              {SPORTS.map(s => (
-                <button key={s} type="button"
-                  onClick={() => setForm(p => ({...p, sportType:s}))}
-                  className={cn("px-3 py-1 rounded-xl text-xs font-medium border transition-all",
-                    form.sportType === s ? "bg-violet-600 text-white border-violet-600" : "bg-muted border-border text-muted-foreground")}
-                >{s}</button>
-              ))}
+      {/* Create modal — multi-step wizard */}
+      <Modal
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        title={null}
+        size="lg"
+      >
+        <div className="space-y-0">
+          {/* Wizard header */}
+          <div className="flex items-center justify-between mb-1">
+            <div>
+              <h2 className="font-black text-lg text-foreground">ایجاد تورنومنت</h2>
+              <p className="text-xs text-muted-foreground">مرحله {wizardStep + 1} از {WIZARD_STEPS.length}</p>
             </div>
           </div>
 
-          {/* Free/Paid */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-muted-foreground">نوع ورودیه</label>
-            <div className="flex gap-2">
-              {[{v:true,l:"🎁 رایگان"},{v:false,l:"💰 پولی"}].map(({v,l}) => (
-                <button key={String(v)} type="button"
-                  onClick={() => setForm(p => ({...p, isFree:v}))}
-                  className={cn("flex-1 py-2 rounded-xl text-sm font-semibold border transition-all",
-                    form.isFree === v ? (v ? "bg-emerald-600 text-white border-emerald-600" : "bg-violet-600 text-white border-violet-600") : "bg-muted border-border text-muted-foreground")}
-                >{l}</button>
-              ))}
-            </div>
-          </div>
-          {!form.isFree && (
-            <Input label="مبلغ ورودیه (تومان) *" type="number" min={1000} value={form.entryFee} onChange={e=>setForm(p=>({...p,entryFee:e.target.value}))} />
-          )}
-
-          <div className="grid grid-cols-2 gap-3">
-            <Input label="حداکثر شرکت‌کننده" type="number" min={2} value={form.maxParticipants} onChange={e=>setForm(p=>({...p,maxParticipants:e.target.value}))} />
-            <Input label="حداقل سطح (۱-۱۰)" type="number" min={1} max={10} value={form.minLevel} onChange={e=>setForm(p=>({...p,minLevel:e.target.value}))} />
+          {/* Progress bar */}
+          <div className="h-1 bg-muted rounded-full overflow-hidden mb-4">
+            <motion.div
+              className="h-full bg-gradient-to-r from-violet-600 to-indigo-500 rounded-full"
+              animate={{ width: `${((wizardStep + 1) / WIZARD_STEPS.length) * 100}%` }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
+            />
           </div>
 
-          <Input label="مهلت ثبت‌نام *" type="datetime-local" value={form.registrationDeadline} onChange={e=>setForm(p=>({...p,registrationDeadline:e.target.value}))} required />
-          <Input label="تاریخ شروع *" type="datetime-local" value={form.startDate} onChange={e=>setForm(p=>({...p,startDate:e.target.value}))} required />
-          <Input label="تاریخ پایان *" type="datetime-local" value={form.endDate} onChange={e=>setForm(p=>({...p,endDate:e.target.value}))} required />
+          <WizardStepBar current={wizardStep} />
 
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-muted-foreground">جوایز</label>
-            <textarea rows={2} placeholder={"🥇 اول: ...\n🥈 دوم: ..."} value={form.prize} onChange={e=>setForm(p=>({...p,prize:e.target.value}))}
-              className="rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none resize-none" />
+          {/* Step content */}
+          <div className="max-h-[50vh] overflow-y-auto py-2 pl-1">
+            <AnimatePresence mode="wait">
+              {wizardStep === 0 && (
+                <motion.div key="ws1" initial={{opacity:0,x:20}} animate={{opacity:1,x:0}} exit={{opacity:0,x:-20}} transition={{duration:0.2}}>
+                  <WStep1 form={form} setForm={setForm} />
+                </motion.div>
+              )}
+              {wizardStep === 1 && (
+                <motion.div key="ws2" initial={{opacity:0,x:20}} animate={{opacity:1,x:0}} exit={{opacity:0,x:-20}} transition={{duration:0.2}}>
+                  <WStep2 form={form} setForm={setForm} />
+                </motion.div>
+              )}
+              {wizardStep === 2 && (
+                <motion.div key="ws3" initial={{opacity:0,x:20}} animate={{opacity:1,x:0}} exit={{opacity:0,x:-20}} transition={{duration:0.2}}>
+                  <WStep3 form={form} setForm={setForm} />
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-muted-foreground">قوانین</label>
-            <textarea rows={3} value={form.rules} onChange={e=>setForm(p=>({...p,rules:e.target.value}))}
-              className="rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none resize-none" />
+          {/* Wizard nav */}
+          <div className="flex gap-3 pt-4 border-t border-border mt-2">
+            {wizardStep > 0 && (
+              <button
+                type="button"
+                onClick={() => setWizardStep(s => s - 1)}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:bg-muted transition-colors"
+              >
+                <ChevronRightIcon className="w-4 h-4" /> قبلی
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={isLast ? handleCreate : nextWizardStep}
+              disabled={saving}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-sm font-bold shadow-md shadow-violet-500/20 disabled:opacity-60 transition-all"
+            >
+              {saving ? "در حال ایجاد..." : isLast ? (
+                <><TrophyIcon className="w-4 h-4" /> ایجاد تورنومنت</>
+              ) : (
+                <>بعدی <ChevronLeftIcon className="w-4 h-4" /></>
+              )}
+            </button>
           </div>
-
-          <Button type="submit" disabled={saving} className="w-full">
-            {saving ? "در حال ایجاد..." : "ایجاد تورنومنت 🏆"}
-          </Button>
-        </form>
+        </div>
       </Modal>
     </div>
   );

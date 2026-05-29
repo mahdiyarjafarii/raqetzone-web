@@ -339,6 +339,43 @@ export const tournamentRegistrations = pgTable("tournament_registrations", {
   index("idx_tournament_reg_user_id").on(table.userId),
 ]);
 
+// ─── Discount Codes ───────────────────────────────────────────────────────────
+
+export const discountCodes = pgTable("discount_codes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  clubId: uuid("club_id").notNull().references(() => clubs.id, { onDelete: "cascade" }),
+  code: varchar("code", { length: 50 }).notNull().unique(),
+  discountType: varchar("discount_type", { length: 10 }).notNull().default("percent"), // percent | fixed
+  discountValue: integer("discount_value").notNull(), // percent: 1-100, fixed: Tomans
+  maxUses: integer("max_uses"), // null = unlimited
+  usedCount: integer("used_count").notNull().default(0),
+  perUserLimit: smallint("per_user_limit").notNull().default(1), // how many times one user can use
+  minBookingPrice: integer("min_booking_price").default(0), // minimum booking price to apply
+  expiresAt: timestamp("expires_at"), // null = never expires
+  isActive: boolean("is_active").notNull().default(true),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_discount_codes_club_id").on(table.clubId),
+  index("idx_discount_codes_code").on(table.code),
+  index("idx_discount_codes_is_active").on(table.isActive),
+  index("idx_discount_codes_expires_at").on(table.expiresAt),
+]);
+
+export const discountCodeUsages = pgTable("discount_code_usages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  discountCodeId: uuid("discount_code_id").notNull().references(() => discountCodes.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  bookingId: uuid("booking_id").references(() => bookings.id, { onDelete: "set null" }),
+  discountAmount: integer("discount_amount").notNull(), // actual Tomans saved
+  usedAt: timestamp("used_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_discount_usages_code_id").on(table.discountCodeId),
+  index("idx_discount_usages_user_id").on(table.userId),
+  index("idx_discount_usages_booking_id").on(table.bookingId),
+]);
+
 // ─── Club Reviews ─────────────────────────────────────────────────────────────
 
 export const clubReviews = pgTable("club_reviews", {

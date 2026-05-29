@@ -22,7 +22,7 @@ export default function GreetingHeader({ user }) {
       >
         
         <h1 className="text-1xl font-black text-foreground leading-snug">
-         امروز کدوم زمین رو برات رزور کنم ؟
+         امروز کدوم زمین رو برات اجاره کنم ؟
         </h1>
       </motion.div>
 

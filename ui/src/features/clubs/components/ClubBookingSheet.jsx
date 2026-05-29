@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { BottomSheet } from "react-spring-bottom-sheet";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRightIcon, CalendarIcon, ClockIcon, BanknoteIcon, CheckCircle2Icon, ClipboardListIcon } from "lucide-react";
+import { ArrowRightIcon, CalendarIcon, ClockIcon, BanknoteIcon, CheckCircle2Icon, ClipboardListIcon, TicketIcon, XCircleIcon, CheckCircleIcon, LoaderIcon } from "lucide-react";
 import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -226,16 +226,43 @@ function DateSlotsStep({ court, selectedDate, onDateChange, slots, slotsLoading,
 
 // ── Booking Summary ───────────────────────────────────────────────────────────
 
-function BookingSummaryStep({ court, date, slot, onConfirm, onBack, submitting }) {
+function BookingSummaryStep({ court, date, slot, clubId, onConfirm, onBack, submitting }) {
   const [notes, setNotes] = useState("");
+  const [discountInput, setDiscountInput] = useState("");
+  const [discountState, setDiscountState] = useState(null); // null | { valid, discountAmount, finalPrice, discountValue, discountType, discountCodeId, error }
+  const [validating, setValidating] = useState(false);
 
   const startMin = slot.start.split(":").reduce((acc, v, i) => acc + (i === 0 ? +v * 60 : +v), 0);
   const endMin = slot.end.split(":").reduce((acc, v, i) => acc + (i === 0 ? +v * 60 : +v), 0);
   const durationHours = (endMin - startMin) / 60;
   const pricePerHour = slot.price ?? court.pricePerHour;
-  const totalPrice = Math.round(pricePerHour * durationHours);
+  const baseTotal = Math.round(pricePerHour * durationHours);
   const originalTotal = slot.originalPrice ? Math.round(slot.originalPrice * durationHours) : null;
-  const tax = Math.round(totalPrice * 0.09);
+
+  const voucherDiscount = discountState?.valid ? discountState.discountAmount : 0;
+  const afterVoucher = Math.max(0, baseTotal - voucherDiscount);
+  const tax = Math.round(afterVoucher * 0.09);
+  const finalTotal = afterVoucher + tax;
+
+  const handleValidate = async () => {
+    const code = discountInput.trim().toUpperCase();
+    if (!code) return;
+    setValidating(true);
+    setDiscountState(null);
+    const res = await bookingService.validateDiscount(code, clubId, baseTotal);
+    setValidating(false);
+    if (res.ok) {
+      setDiscountState({ valid: true, ...res.data, code });
+      toast.success(`کد تخفیف اعمال شد — ${formatPrice(res.data.discountAmount)} تومان تخفیف`);
+    } else {
+      setDiscountState({ valid: false, error: res.data?.message ?? "کد معتبر نیست" });
+    }
+  };
+
+  const handleRemoveDiscount = () => {
+    setDiscountState(null);
+    setDiscountInput("");
+  };
 
   return (
     <div className="space-y-4">
@@ -254,8 +281,14 @@ function BookingSummaryStep({ court, date, slot, onConfirm, onBack, submitting }
             { icon: <ClockIcon className="w-4 h-4" />, label: "زمان", value: `${slot.start} – ${slot.end}` },
             { icon: <ClockIcon className="w-4 h-4" />, label: "مدت", value: `${durationHours} ساعت` },
             originalTotal ? { icon: <BanknoteIcon className="w-4 h-4" />, label: "قیمت اصلی", value: formatPrice(originalTotal) + " ت", strike: true } : null,
-            originalTotal ? { icon: <BanknoteIcon className="w-4 h-4" />, label: `تخفیف (${slot.discount}٪)`, value: `- ${formatPrice(originalTotal - totalPrice)} ت`, discount: true } : null,
-            { icon: <BanknoteIcon className="w-4 h-4" />, label: "اجاره", value: `${formatPrice(totalPrice)} ت` },
+            originalTotal ? { icon: <BanknoteIcon className="w-4 h-4" />, label: `تخفیف اسلات (${slot.discount}٪)`, value: `- ${formatPrice(originalTotal - baseTotal)} ت`, discount: true } : null,
+            { icon: <BanknoteIcon className="w-4 h-4" />, label: "اجاره", value: `${formatPrice(baseTotal)} ت` },
+            voucherDiscount > 0 ? {
+              icon: <TicketIcon className="w-4 h-4" />,
+              label: `کد تخفیف (${discountState.code})`,
+              value: `- ${formatPrice(voucherDiscount)} ت`,
+              discount: true,
+            } : null,
             { icon: <BanknoteIcon className="w-4 h-4" />, label: "مالیات (۹٪)", value: `${formatPrice(tax)} ت` },
           ].filter(Boolean).map((row, i) => (
             <div key={i} className="flex items-center justify-between px-4 py-3 gap-3">
@@ -264,7 +297,7 @@ function BookingSummaryStep({ court, date, slot, onConfirm, onBack, submitting }
                 <span>{row.label}</span>
               </div>
               <span className={cn("text-sm font-medium",
-                row.strike ? "text-muted-foreground line-through" : row.discount ? "text-emerald-600" : "text-foreground"
+                row.strike ? "text-muted-foreground line-through" : row.discount ? "text-emerald-600 dark:text-emerald-400" : "text-foreground"
               )}>{row.value}</span>
             </div>
           ))}
@@ -272,11 +305,78 @@ function BookingSummaryStep({ court, date, slot, onConfirm, onBack, submitting }
 
         <div className="flex items-center justify-between px-4 py-4 bg-primary/5 border-t-2 border-primary/20">
           <span className="text-primary font-bold text-sm">مبلغ نهایی</span>
-          <span className="text-primary font-black text-xl">
-            {formatPrice(totalPrice + tax)} <span className="text-sm font-medium">تومان</span>
-          </span>
+          <div className="text-right">
+            {voucherDiscount > 0 && (
+              <p className="text-xs text-muted-foreground line-through leading-none mb-0.5">
+                {formatPrice(Math.round(baseTotal * 1.09))} ت
+              </p>
+            )}
+            <span className="text-primary font-black text-xl">
+              {formatPrice(finalTotal)} <span className="text-sm font-medium">تومان</span>
+            </span>
+          </div>
         </div>
       </div>
+
+      {/* Discount code input */}
+      {discountState?.valid ? (
+        <div className="flex items-center gap-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 px-4 py-3">
+          <CheckCircleIcon className="w-5 h-5 text-emerald-500 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-bold text-emerald-700 dark:text-emerald-400">
+              کد <span className="font-mono tracking-wider">{discountState.code}</span> اعمال شد
+            </p>
+            <p className="text-xs text-emerald-600/70 dark:text-emerald-400/70 mt-0.5">
+              {discountState.discountType === "percent"
+                ? `${discountState.discountValue}٪`
+                : `${formatPrice(discountState.discountValue)} تومان`} تخفیف — صرفه‌جویی {formatPrice(voucherDiscount)} تومان
+            </p>
+          </div>
+          <button onClick={handleRemoveDiscount} className="p-1 rounded-lg text-emerald-600/60 hover:text-red-500 transition-colors">
+            <XCircleIcon className="w-4 h-4" />
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-1.5">
+          <label className="text-xs text-muted-foreground font-medium flex items-center gap-1.5">
+            <TicketIcon className="w-3.5 h-3.5" />
+            کد تخفیف دارید؟
+          </label>
+          <div className="flex gap-2">
+            <input
+              value={discountInput}
+              onChange={(e) => {
+                setDiscountInput(e.target.value.toUpperCase());
+                if (discountState?.valid === false) setDiscountState(null);
+              }}
+              onKeyDown={(e) => e.key === "Enter" && handleValidate()}
+              placeholder="کد تخفیف را وارد کنید"
+              className={cn(
+                "flex-1 h-11 rounded-xl border bg-background px-3 text-sm font-mono tracking-widest text-foreground placeholder:font-sans placeholder:tracking-normal focus:outline-none focus:ring-2 transition-colors",
+                discountState?.valid === false
+                  ? "border-red-400 focus:ring-red-400/30"
+                  : "border-input focus:ring-ring/30"
+              )}
+            />
+            <button
+              type="button"
+              onClick={handleValidate}
+              disabled={!discountInput.trim() || validating}
+              className="h-11 px-4 rounded-xl bg-primary/10 text-primary text-sm font-bold hover:bg-primary/20 disabled:opacity-40 transition-colors flex items-center gap-1.5"
+            >
+              {validating
+                ? <LoaderIcon className="w-4 h-4 animate-spin" />
+                : "اعمال"}
+            </button>
+          </div>
+          {discountState?.valid === false && (
+            <p className="text-xs text-red-500 flex items-center gap-1">
+              <XCircleIcon className="w-3.5 h-3.5 shrink-0" />
+              {discountState.error}
+            </p>
+          )}
+        </div>
+      )}
 
       <div>
         <label className="text-xs text-muted-foreground mb-2 block">یادداشت (اختیاری)</label>
@@ -297,7 +397,11 @@ function BookingSummaryStep({ court, date, slot, onConfirm, onBack, submitting }
         <Button variant="outline" onClick={onBack} disabled={submitting} className="rounded-xl">
           بازگشت
         </Button>
-        <Button onClick={() => onConfirm(notes)} disabled={submitting} className="flex-1 rounded-xl font-bold text-sm h-12">
+        <Button
+          onClick={() => onConfirm(notes, discountState?.valid ? discountState.code : undefined)}
+          disabled={submitting}
+          className="flex-1 rounded-xl font-bold text-sm h-12"
+        >
           {submitting ? "در حال ثبت..." : "تأیید و ثبت رزرو"}
         </Button>
       </div>
@@ -439,7 +543,7 @@ export default function ClubBookingSheet({ open, onClose, club, initialCourt = n
       .finally(() => setSlotsLoading(false));
   }, [selectedCourt, selectedDate, step]);
 
-  const handleConfirm = async (notes) => {
+  const handleConfirm = async (notes, discountCode) => {
     if (!selectedCourt || !selectedDate || !selectedSlot) return;
     setSubmitting(true);
     try {
@@ -449,6 +553,7 @@ export default function ClubBookingSheet({ open, onClose, club, initialCourt = n
         startTime: selectedSlot.start,
         endTime: selectedSlot.end,
         notes,
+        ...(discountCode ? { discountCode } : {}),
       });
       if (res.ok) {
         setCreatedBooking({ ...res.data.booking, court: selectedCourt, date: selectedDate, startTime: selectedSlot.start, endTime: selectedSlot.end });
@@ -524,6 +629,7 @@ export default function ClubBookingSheet({ open, onClose, club, initialCourt = n
                 court={selectedCourt}
                 date={selectedDate}
                 slot={selectedSlot}
+                clubId={club?.id}
                 onConfirm={handleConfirm}
                 onBack={() => setStep("booking")}
                 submitting={submitting}

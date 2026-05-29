@@ -169,6 +169,25 @@ export const createTournamentController = async (req, res) => {
   }
 };
 
+// ─── Delete Tournament ────────────────────────────────────────────────────────
+
+export const deleteTournamentController = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [tournament] = await db.select().from(tournaments).where(eq(tournaments.id, id)).limit(1);
+    if (!tournament) return res.status(404).json({ message: "تورنومنت یافت نشد" });
+
+    await db.delete(tournamentRegistrations).where(eq(tournamentRegistrations.tournamentId, id));
+    await db.delete(tournaments).where(eq(tournaments.id, id));
+
+    return res.status(200).json({ message: "تورنومنت حذف شد" });
+  } catch (error) {
+    console.error("deleteTournament error:", error);
+    return res.status(500).json({ message: "خطای سرور" });
+  }
+};
+
 // ─── Update Tournament ────────────────────────────────────────────────────────
 
 export const updateTournamentController = async (req, res) => {

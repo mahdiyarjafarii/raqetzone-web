@@ -6,6 +6,8 @@ export const bookingService = {
   getAvailability: (courtId, date) =>
     apiClient.get(`/courts/${courtId}/availability`, { date }),
 
+  validateDiscount: (code, clubId, bookingPrice) =>
+    apiClient.post("/bookings/validate-discount", { code, clubId, bookingPrice }),
   createBooking: (data) => apiClient.post("/bookings", data),
   getMyBookings: () => apiClient.get("/bookings/my"),
   cancelBooking: (id) => apiClient.patch(`/bookings/${id}/cancel`),

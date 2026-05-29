@@ -1,6 +1,7 @@
-import { eq, and, asc, desc, gte } from "drizzle-orm";
+import { eq, and, asc, desc, gte, inArray } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { matches, matchParticipants, users } from "../db/schema.js";
+import { sendSMS } from "../utils/sms.js";
 
 const SPORT_TYPES = ["padel", "tennis", "squash", "badminton", "ping-pong"];
 
@@ -114,6 +115,12 @@ export const joinMatchController = async (req, res) => {
       return res.status(400).json({ message: "این تیم پر است" });
     }
 
+    // Fetch existing participants (before insert) to notify them
+    const existingParticipants = await db
+      .select({ userId: matchParticipants.userId })
+      .from(matchParticipants)
+      .where(eq(matchParticipants.matchId, id));
+
     await db.insert(matchParticipants).values({ matchId: id, userId, team });
 
     // Check if match is now full and update status
@@ -129,10 +136,32 @@ export const joinMatchController = async (req, res) => {
         .where(eq(matches.id, id));
     }
 
-    const enriched = await enrichMatch({ ...match });
     // Re-fetch to get fresh status
     const [updated] = await db.select().from(matches).where(eq(matches.id, id)).limit(1);
     const result = await enrichMatch(updated);
+
+    // Send SMS to existing participants (skip if nobody was there — first joiner edge case)
+    if (existingParticipants.length > 0) {
+      const joiner = await db
+        .select({ name: users.name, phone: users.phone })
+        .from(users)
+        .where(eq(users.id, userId))
+        .limit(1)
+        .then((r) => r[0]);
+
+      const otherIds = existingParticipants.map((p) => p.userId);
+      const otherUsers = await db
+        .select({ phone: users.phone, name: users.name })
+        .from(users)
+        .where(inArray(users.id, otherIds));
+
+      const smsText =
+        `${joiner?.name ?? "یک بازیکن"} به بازی «${match.title}» پیوست 🎮\n` +
+        `تیم: ${team === "A" ? "آبی" : "بنفش"}\n` +
+        `شماره: ${joiner?.phone ?? "-"}`;
+
+      await Promise.allSettled(otherUsers.map((u) => sendSMS(u.phone, smsText)));
+    }
 
     return res.status(200).json({ match: result });
   } catch (error) {

@@ -5,6 +5,7 @@ import {
   getTournamentByIdController,
   createTournamentController,
   updateTournamentController,
+  deleteTournamentController,
   registerTournamentController,
   unregisterTournamentController,
   getTournamentParticipantsController,
@@ -24,6 +25,7 @@ router.delete("/tournaments/:id/register", authMiddleware, unregisterTournamentC
 // Club owner or admin — create/update/view participants
 router.post("/tournaments", authMiddleware, createTournamentController);
 router.patch("/tournaments/:id", authMiddleware, updateTournamentController);
+router.delete("/tournaments/:id", authMiddleware, deleteTournamentController);
 router.get("/tournaments/:id/participants", authMiddleware, getTournamentParticipantsController);
 
 // Club panel

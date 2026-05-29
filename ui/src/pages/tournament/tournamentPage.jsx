@@ -24,7 +24,7 @@ import TournamentListSection from "@/features/tournaments/components/TournamentL
 import { cn } from "@/lib/utils";
 
 const MAIN_TABS = [
-  { value: "matchmaking", label: "بازی‌سازی", icon: <ZapIcon className="w-3.5 h-3.5" /> },
+  { value: "matchmaking", label: "بازی‌ها", icon: <ZapIcon className="w-3.5 h-3.5" /> },
   { value: "tournaments", label: "تورنومنت", icon: <TrophyIcon className="w-3.5 h-3.5" /> },
 ];
 

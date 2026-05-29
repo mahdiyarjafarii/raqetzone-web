@@ -1,6 +1,6 @@
-import { eq, and, desc, inArray, count, sum, gte, lte } from "drizzle-orm";
+import { eq, and, desc, inArray, count, sum, gte, lte, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { clubs, courts, bookings, users, slotOverrides } from "../db/schema.js";
+import { clubs, courts, bookings, users, slotOverrides, tournaments, tournamentRegistrations } from "../db/schema.js";
 import { sendNotification } from "../utils/sendNotification.js";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -399,39 +399,126 @@ export const getClubStatsController = async (req, res) => {
   try {
     const ownerId = ownerFilter(req);
 
-    // Clubs count
     const ownerClubs = ownerId
       ? await db.select().from(clubs).where(eq(clubs.ownerId, ownerId))
       : await db.select().from(clubs);
 
     const clubIds = ownerClubs.map(c => c.id);
     if (clubIds.length === 0) {
-      return res.json({ stats: { totalClubs: 0, totalCourts: 0, totalBookings: 0, pendingBookings: 0, approvedBookings: 0, totalRevenue: 0 } });
+      return res.json({
+        stats: {
+          totalClubs: 0, totalCourts: 0, activeCourts: 0,
+          totalBookings: 0, pendingBookings: 0, approvedBookings: 0,
+          cancelledBookings: 0, totalRevenue: 0, thisMonthRevenue: 0,
+          thisMonthBookings: 0, uniqueUsers: 0,
+        },
+        dailyStats: [], courtUtilization: [], peakHours: [], recentBookings: [],
+      });
     }
 
     const ownerCourts = await db.select().from(courts).where(inArray(courts.clubId, clubIds));
     const courtIds = ownerCourts.map(c => c.id);
 
-    let totalBookings = 0, pendingBookings = 0, approvedBookings = 0, totalRevenue = 0;
+    const now = new Date();
+    const todayStr = now.toISOString().split("T")[0];
+    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+    const thirtyDaysAgo = new Date(now); thirtyDaysAgo.setDate(now.getDate() - 29);
+    const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split("T")[0];
 
+    let allBookings = [];
     if (courtIds.length > 0) {
-      const allBookings = await db.select().from(bookings).where(inArray(bookings.courtId, courtIds));
-      totalBookings = allBookings.length;
-      pendingBookings = allBookings.filter(b => b.status === "pending").length;
-      approvedBookings = allBookings.filter(b => b.status === "approved").length;
-      totalRevenue = allBookings.filter(b => b.status === "approved").reduce((s, b) => s + b.totalPrice, 0);
+      allBookings = await db
+        .select({
+          id: bookings.id,
+          courtId: bookings.courtId,
+          userId: bookings.userId,
+          date: bookings.date,
+          startTime: bookings.startTime,
+          totalPrice: bookings.totalPrice,
+          status: bookings.status,
+          createdAt: bookings.createdAt,
+        })
+        .from(bookings)
+        .where(inArray(bookings.courtId, courtIds))
+        .orderBy(desc(bookings.createdAt));
     }
+
+    const approved = allBookings.filter(b => b.status === "approved");
+    const pending  = allBookings.filter(b => b.status === "pending");
+    const cancelled = allBookings.filter(b => b.status === "cancelled" || b.status === "rejected");
+    const thisMonth = allBookings.filter(b => b.date >= monthStart);
+    const uniqueUsers = new Set(allBookings.map(b => b.userId)).size;
+
+    // ── daily stats (last 30 days) ──────────────────────────────────────────
+    const dailyMap = {};
+    for (let i = 0; i < 30; i++) {
+      const d = new Date(thirtyDaysAgo); d.setDate(thirtyDaysAgo.getDate() + i);
+      dailyMap[d.toISOString().split("T")[0]] = { bookings: 0, revenue: 0 };
+    }
+    allBookings
+      .filter(b => b.date >= thirtyDaysAgoStr && b.date <= todayStr)
+      .forEach(b => {
+        if (!dailyMap[b.date]) return;
+        dailyMap[b.date].bookings++;
+        if (b.status === "approved") dailyMap[b.date].revenue += b.totalPrice;
+      });
+    const dailyStats = Object.entries(dailyMap).map(([date, v]) => ({ date, ...v }));
+
+    // ── court utilization ──────────────────────────────────────────────────
+    const courtBookingCount = {};
+    const courtRevenueMap = {};
+    approved.forEach(b => {
+      courtBookingCount[b.courtId] = (courtBookingCount[b.courtId] ?? 0) + 1;
+      courtRevenueMap[b.courtId]   = (courtRevenueMap[b.courtId]   ?? 0) + b.totalPrice;
+    });
+    const courtUtilization = ownerCourts.map(c => ({
+      name:     c.name,
+      bookings: courtBookingCount[c.id] ?? 0,
+      revenue:  courtRevenueMap[c.id]   ?? 0,
+    })).sort((a, b) => b.bookings - a.bookings);
+
+    // ── peak hours ────────────────────────────────────────────────────────
+    const hourCount = {};
+    approved.forEach(b => {
+      const h = (b.startTime ?? "00:00").slice(0, 2);
+      hourCount[h] = (hourCount[h] ?? 0) + 1;
+    });
+    const peakHours = Array.from({ length: 17 }, (_, i) => {
+      const h = String(i + 7).padStart(2, "0");
+      return { hour: `${h}:00`, count: hourCount[h] ?? 0 };
+    });
+
+    // ── recent bookings ───────────────────────────────────────────────────
+    const recentBookings = allBookings.slice(0, 5).map(b => {
+      const court = ownerCourts.find(c => c.id === b.courtId);
+      return {
+        id: b.id,
+        courtName: court?.name ?? "—",
+        date: b.date,
+        startTime: b.startTime,
+        totalPrice: b.totalPrice,
+        status: b.status,
+      };
+    });
 
     return res.json({
       stats: {
-        totalClubs: ownerClubs.length,
-        activeCourts: ownerCourts.filter(c => c.isActive).length,
-        totalCourts: ownerCourts.length,
-        totalBookings,
-        pendingBookings,
-        approvedBookings,
-        totalRevenue,
+        totalClubs:       ownerClubs.length,
+        totalCourts:      ownerCourts.length,
+        activeCourts:     ownerCourts.filter(c => c.isActive).length,
+        totalBookings:    allBookings.length,
+        pendingBookings:  pending.length,
+        approvedBookings: approved.length,
+        cancelledBookings: cancelled.length,
+        totalRevenue:     approved.reduce((s, b) => s + b.totalPrice, 0),
+        thisMonthRevenue: thisMonth.filter(b => b.status === "approved").reduce((s, b) => s + b.totalPrice, 0),
+        thisMonthBookings: thisMonth.length,
+        uniqueUsers,
       },
+      dailyStats,
+      courtUtilization,
+      peakHours,
+      recentBookings,
     });
   } catch (error) {
     console.error("getClubStats error:", error);
@@ -499,6 +586,94 @@ export const upsertSlotOverrideController = async (req, res) => {
     }
   } catch (error) {
     console.error("upsertSlotOverride error:", error);
+    return res.status(500).json({ message: "خطای سرور" });
+  }
+};
+
+// ── Club Customers ────────────────────────────────────────────────────────────
+
+export const getClubCustomersController = async (req, res) => {
+  try {
+    const ownerId = ownerFilter(req);
+
+    const ownerClubs = ownerId
+      ? await db.select({ id: clubs.id }).from(clubs).where(eq(clubs.ownerId, ownerId))
+      : await db.select({ id: clubs.id }).from(clubs);
+
+    const clubIds = ownerClubs.map(c => c.id);
+    if (clubIds.length === 0) return res.json({ customers: [] });
+
+    const ownerCourts = await db.select({ id: courts.id }).from(courts).where(inArray(courts.clubId, clubIds));
+    const courtIds = ownerCourts.map(c => c.id);
+
+    // users who booked a court
+    const bookingRows = courtIds.length > 0
+      ? await db
+          .select({
+            userId:    bookings.userId,
+            lastDate:  sql`max(${bookings.date})`,
+            bookCount: sql`count(*)`,
+            totalSpent: sql`sum(case when ${bookings.status} = 'approved' then ${bookings.totalPrice} else 0 end)`,
+          })
+          .from(bookings)
+          .where(inArray(bookings.courtId, courtIds))
+          .groupBy(bookings.userId)
+      : [];
+
+    // users who registered in a tournament of these clubs
+    const clubTournaments = clubIds.length > 0
+      ? await db.select({ id: tournaments.id }).from(tournaments).where(inArray(tournaments.clubId, clubIds))
+      : [];
+    const tournamentIds = clubTournaments.map(t => t.id);
+
+    const tournamentRows = tournamentIds.length > 0
+      ? await db
+          .select({ userId: tournamentRegistrations.userId })
+          .from(tournamentRegistrations)
+          .where(inArray(tournamentRegistrations.tournamentId, tournamentIds))
+      : [];
+
+    // merge user ids
+    const userMap = {};
+    for (const r of bookingRows) {
+      userMap[r.userId] = {
+        bookCount:  Number(r.bookCount),
+        totalSpent: Number(r.totalSpent),
+        lastDate:   r.lastDate,
+        fromTournament: false,
+      };
+    }
+    for (const r of tournamentRows) {
+      if (!userMap[r.userId]) {
+        userMap[r.userId] = { bookCount: 0, totalSpent: 0, lastDate: null, fromTournament: true };
+      } else {
+        userMap[r.userId].fromTournament = true;
+      }
+    }
+
+    const allUserIds = Object.keys(userMap);
+    if (allUserIds.length === 0) return res.json({ customers: [] });
+
+    const userRows = await db
+      .select({ id: users.id, name: users.name, phone: users.phone, image: users.image, createdAt: users.createdAt })
+      .from(users)
+      .where(inArray(users.id, allUserIds));
+
+    const customers = userRows.map(u => ({
+      id:            u.id,
+      name:          u.name,
+      phone:         u.phone,
+      image:         u.image,
+      memberSince:   u.createdAt,
+      bookCount:     userMap[u.id]?.bookCount  ?? 0,
+      totalSpent:    userMap[u.id]?.totalSpent ?? 0,
+      lastVisit:     userMap[u.id]?.lastDate   ?? null,
+      fromTournament: userMap[u.id]?.fromTournament ?? false,
+    })).sort((a, b) => b.bookCount - a.bookCount);
+
+    return res.json({ customers });
+  } catch (error) {
+    console.error("getClubCustomers error:", error);
     return res.status(500).json({ message: "خطای سرور" });
   }
 };

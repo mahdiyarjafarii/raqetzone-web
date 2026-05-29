@@ -23,7 +23,7 @@ const AMENITY_LABELS = { parking:"پارکینگ", locker:"رختکن", shower:"
 const SPORT_LABELS   = { padel:"پادل", tennis:"تنیس", squash:"اسکواش", badminton:"بدمینتون", "ping-pong":"پینگ‌پنگ" };
 
 const emptyClub = {
-  name: "", description: "", address: "", phone: "",
+  name: "", description: "", address: "",
   sportTypes: [], amenities: [], images: [],
   openTime: "07:00", closeTime: "23:00",
 };
@@ -120,76 +120,162 @@ function ImageUploader({ images, onChange }) {
   );
 }
 
+const CREATE_STEPS = [
+  { id: 1, label: "تصاویر",       desc: "عکس‌های باشگاه" },
+  { id: 2, label: "اطلاعات",      desc: "نام و آدرس"     },
+  { id: 3, label: "ورزش و ساعت",  desc: "نوع ورزش"       },
+  { id: 4, label: "امکانات",      desc: "خدمات جانبی"    },
+];
+
+function StepIndicator({ current, steps }) {
+  return (
+    <div className="flex items-center gap-1 mb-6">
+      {steps.map((s, i) => (
+        <React.Fragment key={s.id}>
+          <div className="flex flex-col items-center gap-1 flex-1">
+            <div className={cn(
+              "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all",
+              current === s.id
+                ? "bg-primary text-primary-foreground shadow-md shadow-primary/30 scale-110"
+                : current > s.id
+                  ? "bg-emerald-500 text-white"
+                  : "bg-muted text-muted-foreground"
+            )}>
+              {current > s.id ? "✓" : s.id}
+            </div>
+            <span className={cn(
+              "text-[10px] font-medium hidden sm:block",
+              current === s.id ? "text-primary" : "text-muted-foreground"
+            )}>{s.label}</span>
+          </div>
+          {i < steps.length - 1 && (
+            <div className={cn(
+              "h-0.5 flex-1 rounded-full transition-all mb-4",
+              current > s.id ? "bg-emerald-400" : "bg-muted"
+            )} />
+          )}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+}
+
 function ClubForm({ form, setForm, onSubmit, loading, submitLabel, isEdit = false }) {
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
-  const [step, setStep] = useState(isEdit ? 2 : 1);
-  const hasImages = form.images?.length > 0;
+  const [step, setStep] = useState(1);
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onSubmit();
-  };
+  const next = () => setStep(s => s + 1);
+  const prev = () => setStep(s => s - 1);
 
-  if (step === 1) {
+  if (isEdit) {
     return (
-      <div className="space-y-5">
-        <div className="text-center">
-          <p className="text-sm text-muted-foreground">تصاویری که معرف باشگاه شما هستند را آپلود کنید</p>
+      <form onSubmit={e => { e.preventDefault(); onSubmit(); }} className="space-y-4">
+        <div className="grid grid-cols-1 gap-3">
+          <Input label="نام باشگاه *" value={form.name} onChange={e => f("name", e.target.value)} required />
+          <Input label="آدرس کامل *" value={form.address} onChange={e => f("address", e.target.value)} required />
         </div>
+        <div>
+          <label className="text-xs font-medium text-muted-foreground block mb-1">توضیحات</label>
+          <textarea value={form.description} onChange={e => f("description", e.target.value)} rows={2}
+            className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none resize-none" />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Input label="ساعت باز شدن" type="time" value={form.openTime} onChange={e => f("openTime", e.target.value)} />
+          <Input label="ساعت بستن" type="time" value={form.closeTime} onChange={e => f("closeTime", e.target.value)} />
+        </div>
+        <MultiCheck label="ورزش‌های ارائه شده" options={SPORTS} labelMap={SPORT_LABELS} value={form.sportTypes} onChange={v => f("sportTypes", v)} />
+        <MultiCheck label="امکانات" options={AMENITIES} labelMap={AMENITY_LABELS} value={form.amenities} onChange={v => f("amenities", v)} />
         <ImageUploader images={form.images ?? []} onChange={v => f("images", v)} />
-        {hasImages && (
-          <p className="text-xs text-emerald-600 text-center">{form.images.length} تصویر آپلود شد ✓</p>
-        )}
-        <Button
-          type="button"
-          disabled={!hasImages}
-          onClick={() => setStep(2)}
-          className="w-full"
-        >
-          مرحله بعد — اطلاعات باشگاه
+        <Button type="submit" disabled={loading} className="w-full">
+          {loading ? "در حال ذخیره..." : submitLabel}
         </Button>
-      </div>
+      </form>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      {/* Step indicator */}
-      {!isEdit && (
-        <div className="flex items-center gap-2 mb-1">
-          <button type="button" onClick={() => setStep(1)} className="text-xs text-primary underline underline-offset-2">
-            ← بازگشت به تصاویر
-          </button>
-          <span className="text-xs text-muted-foreground mr-auto">{form.images?.length} تصویر آپلود شده</span>
-        </div>
+    <div className="space-y-4">
+      <StepIndicator current={step} steps={CREATE_STEPS} />
+
+      {step === 1 && (
+        <motion.div key="s1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
+          <div className="text-center pb-1">
+            <p className="text-sm font-semibold text-foreground">تصاویر باشگاه</p>
+            <p className="text-xs text-muted-foreground mt-0.5">عکس‌هایی که معرف فضای باشگاه شما هستند را آپلود کنید</p>
+          </div>
+          <ImageUploader images={form.images ?? []} onChange={v => f("images", v)} />
+          {form.images?.length > 0 && (
+            <p className="text-xs text-emerald-600 text-center font-medium">{form.images.length} تصویر آپلود شد ✓</p>
+          )}
+          <Button type="button" disabled={!form.images?.length} onClick={next} className="w-full">
+            مرحله بعد ←
+          </Button>
+        </motion.div>
       )}
-      <div className="grid grid-cols-2 gap-3">
-        <Input label="نام باشگاه *" value={form.name} onChange={e => f("name", e.target.value)} required />
-        <Input label="شماره تماس" type="tel" value={form.phone} onChange={e => f("phone", e.target.value)} dir="ltr" />
-      </div>
-      <Input label="آدرس کامل *" value={form.address} onChange={e => f("address", e.target.value)} required />
-      <div>
-        <label className="text-xs font-medium text-muted-foreground block mb-1">توضیحات</label>
-        <textarea
-          value={form.description}
-          onChange={e => f("description", e.target.value)}
-          rows={2}
-          className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none resize-none"
-        />
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <Input label="ساعت باز شدن" type="time" value={form.openTime} onChange={e => f("openTime", e.target.value)} />
-        <Input label="ساعت بستن" type="time" value={form.closeTime} onChange={e => f("closeTime", e.target.value)} />
-      </div>
-      <MultiCheck label="ورزش‌های ارائه شده" options={SPORTS} labelMap={SPORT_LABELS} value={form.sportTypes} onChange={v => f("sportTypes", v)} />
-      <MultiCheck label="امکانات" options={AMENITIES} labelMap={AMENITY_LABELS} value={form.amenities} onChange={v => f("amenities", v)} />
-      {isEdit && (
-        <ImageUploader images={form.images ?? []} onChange={v => f("images", v)} />
+
+      {step === 2 && (
+        <motion.div key="s2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-3">
+          <div className="text-center pb-1">
+            <p className="text-sm font-semibold text-foreground">اطلاعات اصلی باشگاه</p>
+            <p className="text-xs text-muted-foreground mt-0.5">نام و آدرس باشگاه خود را وارد کنید</p>
+          </div>
+          <Input label="نام باشگاه *" value={form.name} onChange={e => f("name", e.target.value)} />
+          <Input label="آدرس کامل *" value={form.address} onChange={e => f("address", e.target.value)} />
+          <div>
+            <label className="text-xs font-medium text-muted-foreground block mb-1">توضیحات (اختیاری)</label>
+            <textarea value={form.description} onChange={e => f("description", e.target.value)} rows={3}
+              placeholder="یه معرفی کوتاه از باشگاهتون بنویسید..."
+              className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none resize-none placeholder:text-muted-foreground/50" />
+          </div>
+          <div className="flex gap-2 pt-1">
+            <Button type="button" variant="outline" onClick={prev} className="flex-1">← قبلی</Button>
+            <Button type="button" disabled={!form.name || !form.address} onClick={next} className="flex-1">بعدی ←</Button>
+          </div>
+        </motion.div>
       )}
-      <Button type="submit" disabled={loading} className="w-full">
-        {loading ? "در حال ذخیره..." : submitLabel}
-      </Button>
-    </form>
+
+      {step === 3 && (
+        <motion.div key="s3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
+          <div className="text-center pb-1">
+            <p className="text-sm font-semibold text-foreground">ورزش‌ها و ساعت کاری</p>
+            <p className="text-xs text-muted-foreground mt-0.5">مشخص کنید چه ورزش‌هایی ارائه می‌دهید</p>
+          </div>
+          <MultiCheck label="ورزش‌های ارائه شده *" options={SPORTS} labelMap={SPORT_LABELS} value={form.sportTypes} onChange={v => f("sportTypes", v)} />
+          <div className="grid grid-cols-2 gap-3 pt-1">
+            <Input label="ساعت باز شدن" type="time" value={form.openTime} onChange={e => f("openTime", e.target.value)} />
+            <Input label="ساعت بستن" type="time" value={form.closeTime} onChange={e => f("closeTime", e.target.value)} />
+          </div>
+          <div className="flex gap-2 pt-1">
+            <Button type="button" variant="outline" onClick={prev} className="flex-1">← قبلی</Button>
+            <Button type="button" disabled={!form.sportTypes?.length} onClick={next} className="flex-1">بعدی ←</Button>
+          </div>
+        </motion.div>
+      )}
+
+      {step === 4 && (
+        <motion.div key="s4" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
+          <div className="text-center pb-1">
+            <p className="text-sm font-semibold text-foreground">امکانات جانبی</p>
+            <p className="text-xs text-muted-foreground mt-0.5">امکاناتی که در باشگاه شما موجود است را انتخاب کنید</p>
+          </div>
+          <MultiCheck label="امکانات" options={AMENITIES} labelMap={AMENITY_LABELS} value={form.amenities} onChange={v => f("amenities", v)} />
+          <div className="rounded-xl bg-muted/40 border border-border p-3 text-xs text-muted-foreground space-y-1">
+            <p className="font-semibold text-foreground text-sm">خلاصه باشگاه:</p>
+            <p>📛 {form.name}</p>
+            <p>📍 {form.address}</p>
+            <p>🕐 {form.openTime} تا {form.closeTime}</p>
+            <p>🏓 {form.sportTypes.map(s => SPORT_LABELS[s]).join("، ")}</p>
+            <p>🖼️ {form.images?.length} تصویر</p>
+          </div>
+          <div className="flex gap-2 pt-1">
+            <Button type="button" variant="outline" onClick={prev} className="flex-1">← قبلی</Button>
+            <Button type="button" onClick={onSubmit} disabled={loading} className="flex-1">
+              {loading ? "در حال ثبت..." : submitLabel}
+            </Button>
+          </div>
+        </motion.div>
+      )}
+    </div>
   );
 }
 
@@ -415,7 +501,7 @@ export default function ClubsPage() {
         )}
       </div>
 
-      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="ثبت باشگاه جدید — مرحله ۱ از ۲" size="lg">
+      <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="ثبت باشگاه جدید" size="lg">
         <ClubForm form={form} setForm={setForm} onSubmit={handleCreate} loading={saving} submitLabel="ثبت باشگاه" />
       </Modal>
       <Modal open={!!editTarget} onClose={() => setEditTarget(null)} title="ویرایش باشگاه" size="lg">

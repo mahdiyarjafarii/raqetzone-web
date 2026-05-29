@@ -19,14 +19,8 @@ export const clubOwnerMiddleware = async (req, res, next) => {
 
     if (!user) return res.status(401).json({ message: 'کاربر یافت نشد' });
 
-    // Auto-promote: هر کاربر authenticated که به پنل باشگاه دسترسی داره
-    // اگه هنوز isClubOwner نشده، الان ست می‌کنیم
     if (!user.isClubOwner && !user.isAdmin) {
-      await db
-        .update(users)
-        .set({ isClubOwner: true })
-        .where(eq(users.id, user.id));
-      user.isClubOwner = true;
+      return res.status(403).json({ message: 'دسترسی فقط برای صاحبان باشگاه مجاز است' });
     }
 
     req.user = user;

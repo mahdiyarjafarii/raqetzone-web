@@ -102,6 +102,6 @@ export async function sendWelcomeNotification(userId) {
       ctaHref:  "/mybooking",
       ctaLabel: "رزرو اول رو ثبت کن",
     },
-    smsText: false, // welcome is in-app only
+    smsText: "به راکت‌زون خوش اومدی! 🎾 اولین رزرو زمینت رو با ۲۰٪ تخفیف انجام بده. کد تخفیفت: WELCOME20",
   });
 }

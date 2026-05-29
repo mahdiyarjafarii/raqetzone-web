@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { useAtom, useAtomValue } from "jotai";
 import {
   LayoutDashboardIcon, CalendarCheckIcon,
-  Building2Icon, MapPinIcon,
+  Building2Icon, UserCircle2Icon,
   TrophyIcon, BarChart3Icon, UsersIcon,
   LogOutIcon, TagIcon, ShieldCheckIcon, StarIcon,
 } from "lucide-react";
@@ -14,9 +14,9 @@ const CLUB_OWNER_NAV = [
   { to: "/",            icon: LayoutDashboardIcon, label: "داشبورد"      },
   { to: "/clubs",       icon: Building2Icon,        label: "باشگاه‌ها"  },
   { to: "/bookings",    icon: CalendarCheckIcon,    label: "رزروها"       },
-  { to: "/courts",      icon: MapPinIcon,           label: "زمین‌ها"      },
   { to: "/tournaments", icon: TrophyIcon,           label: "تورنومنت‌ها"  },
   { to: "/discounts",   icon: TagIcon,              label: "تخفیف‌ها"     },
+  { to: "/customers",   icon: UserCircle2Icon,      label: "مشتریان"       },
   { to: "/reviews",     icon: StarIcon,             label: "نظرات"         },
 ];
 

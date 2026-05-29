@@ -44,13 +44,20 @@ const STATUS_CONFIG = {
   booked:    { label: "رزرو شده",    bg: "bg-orange-500/10 border-orange-500/40 text-orange-600",      icon: UserCheckIcon },
 };
 
-// Mini form that appears when a slot is clicked
-function SlotEditForm({ slot, override, courtPrice, onSave, onClose }) {
+// Edit panel shown below the grid
+function SlotEditPanel({ slot, override, courtPrice, onSave, onClose }) {
   const current = override ?? { status: "available", price: null, discountPercent: 0 };
   const [status, setStatus] = useState(current.status);
   const [price, setPrice] = useState(current.price ?? "");
   const [discount, setDiscount] = useState(current.discountPercent ?? 0);
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setStatus(current.status);
+    setPrice(current.price ?? "");
+    setDiscount(current.discountPercent ?? 0);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slot?.start, override]);
 
   const effectivePrice = price !== "" ? Number(price) : courtPrice;
   const finalPrice = discount > 0 ? Math.round(effectivePrice * (1 - discount / 100)) : effectivePrice;
@@ -63,70 +70,96 @@ function SlotEditForm({ slot, override, courtPrice, onSave, onClose }) {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 6 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: 6 }}
-      className="absolute z-10 top-full mt-1 left-0 right-0 bg-card border border-border rounded-xl shadow-xl p-3 min-w-[220px]"
+      exit={{ opacity: 0, y: 10 }}
+      className="mt-4 rounded-2xl border border-primary/30 bg-card shadow-lg overflow-hidden"
     >
-      <div className="flex items-center justify-between mb-2">
-        <p className="text-xs font-bold text-foreground">{slot.start} – {slot.end}</p>
-        <button onClick={onClose} className="p-0.5 rounded hover:bg-muted">
-          <XIcon className="w-3.5 h-3.5 text-muted-foreground" />
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-3 bg-primary/5 border-b border-primary/20">
+        <div className="flex items-center gap-2">
+          <div className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+          <p className="text-sm font-bold text-foreground">
+            ویرایش سانس <span dir="ltr" className="font-mono text-primary">{slot.start} – {slot.end}</span>
+          </p>
+        </div>
+        <button onClick={onClose} className="p-1 rounded-lg hover:bg-muted transition-colors">
+          <XIcon className="w-4 h-4 text-muted-foreground" />
         </button>
       </div>
 
-      {/* Status */}
-      <div className="flex gap-1.5 mb-3">
-        {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
-          <button
-            key={key}
-            onClick={() => setStatus(key)}
-            className={cn(
-              "flex-1 text-[10px] font-semibold py-1.5 rounded-lg border transition-all",
-              status === key ? cfg.bg : "bg-muted border-border text-muted-foreground"
-            )}
-          >
-            {cfg.label}
-          </button>
-        ))}
-      </div>
-
-      {/* Price override */}
-      <div className="mb-2">
-        <label className="text-[10px] text-muted-foreground mb-1 block">قیمت (تومان) — خالی = پیش‌فرض زمین</label>
-        <input
-          type="number"
-          value={price}
-          onChange={e => setPrice(e.target.value)}
-          placeholder={String(courtPrice)}
-          className="w-full h-8 rounded-lg border border-input bg-background px-2 text-xs focus:outline-none"
-        />
-      </div>
-
-      {/* Discount */}
-      <div className="mb-3">
-        <label className="text-[10px] text-muted-foreground mb-1 block">تخفیف (%)</label>
-        <input
-          type="number"
-          min="0"
-          max="100"
-          value={discount}
-          onChange={e => setDiscount(e.target.value)}
-          className="w-full h-8 rounded-lg border border-input bg-background px-2 text-xs focus:outline-none"
-        />
-      </div>
-
-      {/* Preview */}
-      {discount > 0 && (
-        <div className="text-[10px] text-muted-foreground mb-2 bg-muted rounded-lg px-2 py-1.5">
-          قیمت نهایی: <span className="text-primary font-bold">{fmt(finalPrice)} ت</span>
-          {" "}(از {fmt(effectivePrice)} ت)
+      <div className="p-4 space-y-4">
+        {/* Status */}
+        <div>
+          <p className="text-xs font-medium text-muted-foreground mb-2">وضعیت سانس</p>
+          <div className="flex gap-2">
+            {Object.entries(STATUS_CONFIG).map(([key, cfg]) => {
+              const Icon = cfg.icon;
+              return (
+                <button
+                  key={key}
+                  onClick={() => setStatus(key)}
+                  className={cn(
+                    "flex-1 flex flex-col items-center gap-1 py-2.5 rounded-xl border text-xs font-semibold transition-all",
+                    status === key ? cfg.bg + " scale-105 shadow-sm" : "bg-muted border-border text-muted-foreground hover:border-primary/40"
+                  )}
+                >
+                  <Icon className="w-4 h-4" />
+                  {cfg.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
-      )}
 
-      <Button size="sm" className="w-full text-xs" disabled={saving} onClick={handleSave}>
-        {saving ? "ذخیره..." : "ذخیره"}
-      </Button>
+        {/* Price + Discount in a row */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs font-medium text-muted-foreground block mb-1.5">
+              قیمت (تومان)
+              <span className="font-normal mr-1 text-[10px]">خالی = پیش‌فرض</span>
+            </label>
+            <input
+              type="number"
+              value={price}
+              onChange={e => setPrice(e.target.value)}
+              placeholder={String(courtPrice)}
+              className="w-full h-9 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-muted-foreground block mb-1.5">تخفیف (%)</label>
+            <input
+              type="number"
+              min="0"
+              max="100"
+              value={discount}
+              onChange={e => setDiscount(e.target.value)}
+              className="w-full h-9 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+            />
+          </div>
+        </div>
+
+        {/* Price preview */}
+        <div className="rounded-xl bg-muted/50 px-4 py-2.5 flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">قیمت نهایی سانس:</span>
+          <div className="flex items-center gap-2">
+            {discount > 0 && (
+              <span className="text-xs line-through text-muted-foreground">{fmt(effectivePrice)} ت</span>
+            )}
+            <span className="text-sm font-black text-primary">{fmt(finalPrice)} تومان</span>
+            {discount > 0 && (
+              <span className="text-[10px] bg-primary/10 text-primary font-bold px-1.5 py-0.5 rounded-full">
+                {discount}٪ تخفیف
+              </span>
+            )}
+          </div>
+        </div>
+
+        <Button className="w-full" disabled={saving} onClick={handleSave}>
+          {saving ? "در حال ذخیره..." : "ذخیره تغییرات"}
+        </Button>
+      </div>
     </motion.div>
   );
 }
@@ -230,27 +263,28 @@ export default function CourtSlotsModal({ open, onClose, court }) {
           <span className="text-xs">openTime: {openTime} | closeTime: {closeTime} | duration: {slotDuration}min</span>
         </p>
       ) : (
-        <div className="grid grid-cols-4 gap-2">
-          {slots.map((slot) => {
-            const key = `${selectedDay}|${slot.start}`;
-            const override = overridesMap[key];
-            const status = override?.status ?? "available";
-            const cfg = STATUS_CONFIG[status];
-            const Icon = cfg.icon;
-            const displayPrice = override?.price ?? courtPrice;
-            const discount = override?.discountPercent ?? 0;
-            const finalPrice = discount > 0 ? Math.round(displayPrice * (1 - discount / 100)) : displayPrice;
-            const isActive = activeSlot?.start === slot.start;
+        <>
+          <div className="grid grid-cols-4 gap-2">
+            {slots.map((slot) => {
+              const key = `${selectedDay}|${slot.start}`;
+              const override = overridesMap[key];
+              const status = override?.status ?? "available";
+              const cfg = STATUS_CONFIG[status];
+              const Icon = cfg.icon;
+              const displayPrice = override?.price ?? courtPrice;
+              const discount = override?.discountPercent ?? 0;
+              const finalPrice = discount > 0 ? Math.round(displayPrice * (1 - discount / 100)) : displayPrice;
+              const isActive = activeSlot?.start === slot.start;
 
-            return (
-              <div key={slot.start} className="relative">
+              return (
                 <motion.button
+                  key={slot.start}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => setActiveSlot(isActive ? null : slot)}
                   className={cn(
                     "w-full flex flex-col items-center justify-center h-16 rounded-xl border text-xs font-medium transition-all",
                     cfg.bg,
-                    isActive && "ring-2 ring-primary ring-offset-1"
+                    isActive && "ring-2 ring-primary ring-offset-1 scale-105"
                   )}
                 >
                   <Icon className="w-3 h-3 mb-0.5" />
@@ -264,22 +298,22 @@ export default function CourtSlotsModal({ open, onClose, court }) {
                     <span className="text-[9px] text-primary font-bold">{fmt(finalPrice)}ت</span>
                   )}
                 </motion.button>
+              );
+            })}
+          </div>
 
-                <AnimatePresence>
-                  {isActive && (
-                    <SlotEditForm
-                      slot={slot}
-                      override={override}
-                      courtPrice={courtPrice}
-                      onSave={(vals) => handleSave(slot, vals)}
-                      onClose={() => setActiveSlot(null)}
-                    />
-                  )}
-                </AnimatePresence>
-              </div>
-            );
-          })}
-        </div>
+          <AnimatePresence>
+            {activeSlot && (
+              <SlotEditPanel
+                slot={activeSlot}
+                override={overridesMap[`${selectedDay}|${activeSlot.start}`]}
+                courtPrice={courtPrice}
+                onSave={(vals) => handleSave(activeSlot, vals)}
+                onClose={() => setActiveSlot(null)}
+              />
+            )}
+          </AnimatePresence>
+        </>
       )}
     </Modal>
   );

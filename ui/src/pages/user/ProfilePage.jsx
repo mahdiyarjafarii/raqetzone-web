@@ -1,101 +1,119 @@
 import "react-spring-bottom-sheet/dist/style.css";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useAtom, useSetAtom } from "jotai";
-import toast from "react-hot-toast";
 import { motion } from "framer-motion";
-import { GemIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
+import { Link } from "react-router-dom";
+import toast from "react-hot-toast";
+import {
+  PencilIcon, CameraIcon, ChevronRightIcon,
+  SwordsIcon, TrophyIcon, TrendingUpIcon,
+  GemIcon, ChevronDownIcon, ChevronUpIcon,
+} from "lucide-react";
 
 import useAuth from "@/auth/useAuth";
 import apiClient from "@/lib/apiClient";
 import { showPricingSheetAtom, pricingSheetTriggerSourceAtom, currentUserAtom } from "@/config/state";
+import { useProfileData } from "@/features/profile/hooks/useProfileData";
+import { profileService } from "@/features/profile/services/profileService";
+import EditProfileSheet from "@/features/profile/components/EditProfileSheet";
+import RecentMatchesList from "@/features/profile/components/RecentMatchesList";
+import { cn } from "@/lib/utils";
 
-// Sports identity imports
-import { useProfileData }       from "@/features/profile/hooks/useProfileData";
-import { profileService }       from "@/features/profile/services/profileService";
-import ProfileHeader            from "@/features/profile/components/ProfileHeader";
-import LevelSystem              from "@/features/profile/components/LevelSystem";
-import StatsGrid                from "@/features/profile/components/StatsGrid";
-import PerformanceCharts        from "@/features/profile/components/PerformanceCharts";
-import RecentMatchesList        from "@/features/profile/components/RecentMatchesList";
-import EditProfileSheet         from "@/features/profile/components/EditProfileSheet";
-import ProfileSkeleton          from "@/features/profile/components/ProfileSkeleton";
+// ─── helpers ────────────────────────────────────────────────────────────────
 
-// ─── Payment section helpers (kept intact) ───────────────────────────────────
-
-const planNames   = { basic: "اشتراک پلاس", premium: "اشتراک پریمیوم", pro: "اشتراک حرفه‌ای" };
-const periodLabels = { monthly: "۱ ماهه", quarterly: "۳ ماهه", halfYearly: "۶ ماهه", yearly: "۱۲ ماهه" };
-const statusLabels = { pending: "در انتظار", completed: "موفق", failed: "ناموفق" };
-const statusClasses = {
-  pending:   "bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-200",
-  completed: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-200",
-  failed:    "bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-200",
+const SKILL_CONFIG = {
+  beginner:     { label: "مبتدی",    color: "bg-emerald-500/15 text-emerald-600" },
+  intermediate: { label: "متوسط",    color: "bg-blue-500/15 text-blue-600" },
+  advanced:     { label: "پیشرفته",  color: "bg-violet-500/15 text-violet-600" },
+  pro:          { label: "حرفه‌ای",  color: "bg-amber-500/15 text-amber-600" },
 };
-
-const formatNumber = (v) => {
-  if (v == null || isNaN(v)) return "-";
-  return new Intl.NumberFormat("fa-IR").format(v);
+const SPORT_ICON = { padel: "🏓", tennis: "🎾", squash: "🟡", badminton: "🏸" };
+const PLAN_NAMES = { basic: "پلاس", premium: "پریمیوم", pro: "حرفه‌ای" };
+const PERIOD_LABELS = { monthly: "۱ ماهه", quarterly: "۳ ماهه", halfYearly: "۶ ماهه", yearly: "۱۲ ماهه" };
+const STATUS_LABEL = { pending: "در انتظار", completed: "موفق", failed: "ناموفق" };
+const STATUS_CLS = {
+  pending:   "bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300",
+  completed: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300",
+  failed:    "bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300",
 };
-const formatDate = (v) => {
+const fmt = (v) => v == null ? "-" : new Intl.NumberFormat("fa-IR").format(v);
+const fmtDate = (v) => {
   if (!v) return "-";
   try { return new Intl.DateTimeFormat("fa-IR", { year: "numeric", month: "long", day: "numeric" }).format(new Date(v)); }
   catch { return "-"; }
 };
 
-function SectionLabel({ children }) {
-  return <h3 className="text-sm font-bold text-foreground px-1">{children}</h3>;
+// ─── sub-components ─────────────────────────────────────────────────────────
+
+function StatPill({ icon: Icon, value, label, color }) {
+  return (
+    <div className="flex-1 flex flex-col items-center gap-1 py-3">
+      <span className={cn("text-xl font-black", color)}>{value ?? "—"}</span>
+      <span className="text-[11px] text-muted-foreground">{label}</span>
+    </div>
+  );
 }
 
-function Divider() {
-  return <div className="h-px bg-border mx-0" />;
+function XpBar({ levelData }) {
+  if (!levelData) return null;
+  const { current, progressPct, rank, progressXp, neededXp } = levelData;
+  return (
+    <div className="space-y-1.5">
+      <div className="flex justify-between items-center text-xs">
+        <span className="font-semibold text-foreground">سطح {current}</span>
+        <span className="text-muted-foreground">{fmt(progressXp)} / {fmt(neededXp)} XP</span>
+      </div>
+      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+        <motion.div
+          initial={{ width: 0 }}
+          animate={{ width: `${progressPct}%` }}
+          transition={{ duration: 0.8, delay: 0.3 }}
+          className="h-full rounded-full"
+          style={{ background: `linear-gradient(90deg, ${rank?.gradient?.[0] ?? "#6366f1"}, ${rank?.gradient?.[1] ?? "#8b5cf6"})` }}
+        />
+      </div>
+    </div>
+  );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+// ─── main ────────────────────────────────────────────────────────────────────
 
 export default function ProfilePage() {
-  const { currentUser, getUserImage }   = useAuth();
-  const [, setCurrentUser]              = useAtom(currentUserAtom);
-  const setShowPricingSheet             = useSetAtom(showPricingSheetAtom);
-  const setPricingSheetTriggerSource    = useSetAtom(pricingSheetTriggerSourceAtom);
+  const { currentUser, getUserImage } = useAuth();
+  const [, setCurrentUser] = useAtom(currentUserAtom);
+  const setShowPricingSheet = useSetAtom(showPricingSheetAtom);
+  const setPricingTrigger = useSetAtom(pricingSheetTriggerSourceAtom);
 
-  // Sports profile data
-  const { data: profileData, loading: profileLoading, refetch, setData } = useProfileData();
+  const { data: profileData, loading, setData } = useProfileData();
   const [editOpen, setEditOpen] = useState(false);
-
-  // Payment data (existing logic kept intact)
-  const [payments, setPayments]                 = useState([]);
-  const [isLoadingPayments, setIsLoadingPayments] = useState(false);
-  const [showAllPayments, setShowAllPayments]    = useState(false);
-
-  const hasEverPurchased = useMemo(() => payments.some((p) => p.status === "completed"), [payments]);
-  const completedPayments = useMemo(() => payments.filter((p) => p.status === "completed"), [payments]);
-  const lastCompletedPayment = completedPayments[0];
-  const activePlanTitle = hasEverPurchased
-    ? [planNames[currentUser?.subscriptionType], periodLabels[lastCompletedPayment?.period]].filter(Boolean).join(" ")
-    : "";
+  const [showAllPayments, setShowAllPayments] = useState(false);
+  const [payments, setPayments] = useState([]);
+  const [paymentsLoading, setPaymentsLoading] = useState(false);
+  const fileRef = useRef(null);
 
   useEffect(() => {
     if (!currentUser) return;
-    let mounted = true;
-    const fetch = async () => {
-      setIsLoadingPayments(true);
-      const { ok, data } = await apiClient.get("/payment/history");
-      if (!mounted) return;
+    let alive = true;
+    setPaymentsLoading(true);
+    apiClient.get("/payment/history").then(({ ok, data }) => {
+      if (!alive) return;
       if (ok) setPayments(data?.payments ?? []);
-      else toast.error("دریافت تاریخچه خرید با خطا روبه‌رو شد");
-      setIsLoadingPayments(false);
-    };
-    fetch();
-    return () => { mounted = false; };
+      setPaymentsLoading(false);
+    });
+    return () => { alive = false; };
   }, [currentUser]);
+
+  const hasEverPurchased = useMemo(() => payments.some((p) => p.status === "completed"), [payments]);
+  const lastCompleted = useMemo(() => payments.find((p) => p.status === "completed"), [payments]);
 
   const handleImageUpload = async (file) => {
     const res = await profileService.uploadImage(file);
     if (res.ok) {
       setCurrentUser((prev) => ({ ...prev, image: res.data.user.image }));
-      toast.success("تصویر پروفایل به‌روز شد");
+      toast.success("عکس پروفایل به‌روز شد");
     } else {
-      toast.error("خطا در آپلود تصویر");
+      toast.error("خطا در آپلود عکس");
     }
   };
 
@@ -104,164 +122,213 @@ export default function ProfilePage() {
     setData((prev) => prev ? { ...prev, user: { ...prev.user, ...updatedUser } } : prev);
   };
 
+  const user = profileData?.user ?? currentUser;
+  const stats = profileData?.stats;
+  const skill = SKILL_CONFIG[user?.skillLevel] ?? SKILL_CONFIG.beginner;
   const displayedPayments = showAllPayments ? payments : payments.slice(0, 3);
 
-  // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-background text-foreground pb-24">
+    <div className="min-h-screen bg-background text-foreground pb-28">
 
-      {/* ── Sports Identity ── */}
-      {profileLoading ? (
-        <ProfileSkeleton />
-      ) : (
-        <>
-          {/* Profile Header */}
-          <ProfileHeader
-            user={profileData?.user ?? currentUser}
-            rank={profileData?.level?.rank}
-            onEditClick={() => setEditOpen(true)}
-            onImageUpload={handleImageUpload}
-          />
+      {/* ── Hero ──────────────────────────────────────────────────────── */}
+      <div className="relative px-5 pt-10 pb-6">
+        {/* subtle gradient bg */}
+        <div
+          className="absolute inset-x-0 top-0 h-48 pointer-events-none opacity-[0.07]"
+          style={{ background: `linear-gradient(160deg, ${profileData?.level?.rank?.gradient?.[0] ?? "#6366f1"}, ${profileData?.level?.rank?.gradient?.[1] ?? "#8b5cf6"})` }}
+        />
 
-          <div className="space-y-4 pb-2">
-            {/* Level / XP */}
-            {profileData?.level && (
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-                <LevelSystem levelData={profileData.level} />
-              </motion.div>
-            )}
+        {/* edit button */}
+        <button
+          onClick={() => setEditOpen(true)}
+          className="absolute top-5 left-5 z-10 w-9 h-9 rounded-full bg-muted flex items-center justify-center"
+        >
+          <PencilIcon className="w-4 h-4 text-muted-foreground" />
+        </button>
 
-            {/* Stats */}
-            {profileData?.stats && (
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
-                <div className="px-4 mb-2"><SectionLabel>📊 آمار بازی</SectionLabel></div>
-                <StatsGrid stats={profileData.stats} />
-              </motion.div>
-            )}
+        {/* avatar */}
+        <div className="relative w-fit mx-auto mb-4">
+          {loading ? (
+            <div className="w-24 h-24 rounded-full bg-muted animate-pulse" />
+          ) : (
+            <motion.img
+              initial={{ scale: 0.85, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ type: "spring", stiffness: 200 }}
+              src={getUserImage(user?.image)}
+              alt={user?.name}
+              className="w-24 h-24 rounded-full object-cover border-2 border-border shadow-md"
+            />
+          )}
+          <button
+            onClick={() => fileRef.current?.click()}
+            className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-md"
+          >
+            <CameraIcon className="w-3.5 h-3.5" />
+          </button>
+          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageUpload(f); }} />
+        </div>
 
-            {/* Charts */}
-            {profileData && (
-              <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-                <div className="px-4 mb-2"><SectionLabel>📈 عملکرد</SectionLabel></div>
-                <PerformanceCharts
-                  stats={profileData.stats}
-                  weeklyActivity={profileData.weeklyActivity}
-                />
-              </motion.div>
-            )}
-
-            {/* Recent matches */}
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
-              <div className="px-4 mb-2"><SectionLabel>⚔️ بازی‌های اخیر</SectionLabel></div>
-              <div className="px-4">
-                <RecentMatchesList
-                  matches={profileData?.recentMatches ?? []}
-                  loading={profileLoading}
-                />
-              </div>
-            </motion.div>
+        {/* name + badges */}
+        {loading ? (
+          <div className="space-y-2 flex flex-col items-center">
+            <div className="h-6 w-32 rounded-xl bg-muted animate-pulse" />
+            <div className="h-4 w-20 rounded-xl bg-muted animate-pulse" />
           </div>
+        ) : (
+          <div className="text-center space-y-2">
+            <h1 className="text-2xl font-black text-foreground">{user?.name ?? user?.phone ?? "بازیکن"}</h1>
+            <div className="flex items-center justify-center gap-2 flex-wrap">
+              <span className={cn("text-xs px-3 py-1 rounded-full font-semibold", skill.color)}>
+                {skill.label}
+              </span>
+              {user?.favoriteSport && (
+                <span className="text-xs px-3 py-1 rounded-full bg-muted text-muted-foreground font-medium">
+                  {SPORT_ICON[user.favoriteSport]} {user.favoriteSport}
+                </span>
+              )}
+            </div>
+            {user?.bio && (
+              <p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">{user.bio}</p>
+            )}
+          </div>
+        )}
 
-          <Divider />
-        </>
+        {/* XP bar */}
+        {profileData?.level && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="mt-5"
+          >
+            <XpBar levelData={profileData.level} />
+          </motion.div>
+        )}
+      </div>
+
+      {/* ── Stats ─────────────────────────────────────────────────────── */}
+      {stats && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="mx-5 rounded-2xl bg-card border border-border overflow-hidden"
+        >
+          <div className="flex divide-x divide-x-reverse divide-border">
+            <StatPill icon={SwordsIcon} value={stats.totalMatches} label="کل بازی‌ها" color="text-foreground" />
+            <StatPill icon={TrophyIcon} value={stats.wins} label="برد" color="text-emerald-500" />
+            <StatPill icon={TrendingUpIcon} value={stats.winRate != null ? `${stats.winRate}%` : null} label="نرخ برد" color="text-primary" />
+          </div>
+        </motion.div>
       )}
 
-      {/* ── Subscription Section (kept intact) ── */}
-      <div className="px-4 pt-4 space-y-4 pb-4">
-        <SectionLabel>💎 اشتراک</SectionLabel>
+      {/* ── Recent matches ────────────────────────────────────────────── */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.22 }}
+        className="mt-6 px-5"
+      >
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-bold text-foreground">بازی‌های اخیر</h2>
+          <Link to="/tournament" className="text-xs text-primary flex items-center gap-0.5">
+            همه <ChevronRightIcon className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+        <RecentMatchesList matches={profileData?.recentMatches ?? []} loading={loading} />
+      </motion.div>
 
-        {!currentUser || isLoadingPayments ? (
-          <div className="space-y-3 animate-pulse">
-            <div className="h-28 rounded-2xl bg-muted" />
-            <div className="h-40 rounded-2xl bg-muted" />
-          </div>
+      {/* ── Subscription ──────────────────────────────────────────────── */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.28 }}
+        className="mt-6 px-5 space-y-3"
+      >
+        <h2 className="text-sm font-bold text-foreground">اشتراک</h2>
+
+        {paymentsLoading ? (
+          <div className="h-28 rounded-2xl bg-muted animate-pulse" />
         ) : hasEverPurchased ? (
           <>
+            {/* active plan card */}
             <div className="rounded-2xl bg-primary/5 border border-primary/20 p-4 space-y-3">
-              <div className="flex items-start justify-between gap-2">
-                <h4 className="font-bold">{activePlanTitle}</h4>
-                <div className="flex items-center gap-0.5 text-sm text-primary">
-                  <span>{formatNumber(currentUser?.credits?.remaining ?? currentUser?.credits ?? 0)}</span>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-bold text-sm text-foreground">
+                    اشتراک {PLAN_NAMES[currentUser?.subscriptionType] ?? currentUser?.subscriptionType}
+                    {lastCompleted?.period ? ` · ${PERIOD_LABELS[lastCompleted.period] ?? lastCompleted.period}` : ""}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">انقضا: {fmtDate(currentUser?.subscriptionEndDate)}</p>
+                </div>
+                <div className="flex items-center gap-1 text-primary font-bold">
+                  <span className="text-base">{fmt(currentUser?.credits?.remaining ?? currentUser?.credits ?? 0)}</span>
                   <GemIcon className="w-4 h-4" />
                 </div>
               </div>
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>خرید: {formatDate(lastCompletedPayment?.createdAt)}</span>
-                <span>انقضا: {formatDate(currentUser?.subscriptionEndDate)}</span>
-              </div>
               <button
-                onClick={() => { setPricingSheetTriggerSource("profile_page"); setShowPricingSheet(true); }}
-                className="w-full py-3 rounded-xl bg-[#ef1871] text-white font-bold text-sm"
+                onClick={() => { setPricingTrigger("profile_page"); setShowPricingSheet(true); }}
+                className="w-full py-2.5 rounded-xl bg-[#ef1871] text-white font-bold text-sm"
               >
                 تمدید اشتراک
               </button>
             </div>
 
-            <div className="rounded-2xl border border-border bg-card p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <p className="text-sm font-semibold">اشتراک‌های خریداری شده</p>
-                {payments.length > 0 && (
-                  <span className="text-xs text-muted-foreground">{formatNumber(payments.length)} خرید</span>
+            {/* payment history */}
+            {payments.length > 0 && (
+              <div className="rounded-2xl border border-border bg-card overflow-hidden">
+                <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+                  <p className="text-sm font-semibold">تاریخچه خرید</p>
+                  <span className="text-xs text-muted-foreground">{payments.length} خرید</span>
+                </div>
+                <div className="divide-y divide-border">
+                  {displayedPayments.map((p) => (
+                    <div key={p.id} className="px-4 py-3 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {PLAN_NAMES[p.type] ?? p.type} · {PERIOD_LABELS[p.period] ?? p.period}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{fmtDate(p.createdAt)}</p>
+                      </div>
+                      <span className={cn("text-[11px] font-semibold px-2.5 py-1 rounded-full shrink-0", STATUS_CLS[p.status] ?? "bg-muted text-muted-foreground")}>
+                        {STATUS_LABEL[p.status] ?? p.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                {payments.length > 3 && (
+                  <button
+                    onClick={() => setShowAllPayments((v) => !v)}
+                    className="w-full flex items-center justify-center gap-1.5 text-xs text-muted-foreground py-3 border-t border-border"
+                  >
+                    {showAllPayments
+                      ? <><ChevronUpIcon className="w-3.5 h-3.5" /> کمتر</>
+                      : <><ChevronDownIcon className="w-3.5 h-3.5" /> {payments.length - 3} خرید دیگر</>}
+                  </button>
                 )}
               </div>
-
-              {payments.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-3">هنوز خریدی ثبت نشده است.</p>
-              ) : (
-                <>
-                  <div className="space-y-2">
-                    {displayedPayments.map((payment) => (
-                      <div key={payment.id} className="rounded-xl border border-border p-3 space-y-1.5">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-sm font-semibold">
-                            {planNames[payment.type] ?? `اشتراک ${payment.type}`}{" "}
-                            {periodLabels[payment.period] ?? payment.period}
-                          </p>
-                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusClasses[payment.status] ?? "bg-muted text-muted-foreground"}`}>
-                            {statusLabels[payment.status] ?? "نامشخص"}
-                          </span>
-                        </div>
-                        <div className="text-xs text-muted-foreground space-y-0.5">
-                          <p>تاریخ خرید: {formatDate(payment.createdAt)}</p>
-                          <p>مبلغ: {formatNumber(payment.amount / 10)} تومان</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {payments.length > 3 && (
-                    <button
-                      onClick={() => setShowAllPayments((v) => !v)}
-                      className="w-full flex items-center justify-center gap-1.5 text-xs text-muted-foreground py-1.5"
-                    >
-                      {showAllPayments ? <><ChevronUpIcon className="w-3.5 h-3.5" /> کمتر نشان بده</> : <><ChevronDownIcon className="w-3.5 h-3.5" /> همه خریدها ({payments.length})</>}
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
+            )}
           </>
         ) : (
           <div className="rounded-2xl border border-border bg-card p-5 text-center space-y-3">
-            <p className="font-bold">اشتراکی خریداری نشده</p>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              با خرید اشتراک پلاس به امکانات بیشتر دسترسی داشته باشید.
-            </p>
+            <p className="font-bold text-sm">هنوز اشتراکی نداری</p>
+            <p className="text-xs text-muted-foreground leading-relaxed">با اشتراک پلاس به امکانات بیشتری دسترسی داشته باش</p>
             <button
-              onClick={() => { setPricingSheetTriggerSource("profile_page"); setShowPricingSheet(true); }}
+              onClick={() => { setPricingTrigger("profile_page"); setShowPricingSheet(true); }}
               className="w-full py-3 rounded-xl bg-[#ef1871] text-white font-bold text-sm"
             >
               خرید اشتراک
             </button>
           </div>
         )}
-      </div>
+      </motion.div>
 
       {/* Edit sheet */}
       <EditProfileSheet
         open={editOpen}
         onClose={() => setEditOpen(false)}
-        user={profileData?.user ?? currentUser}
+        user={user}
         onSaved={handleProfileSaved}
       />
     </div>

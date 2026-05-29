@@ -1,6 +1,6 @@
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, count } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { bookings, courts, clubs, users } from "../db/schema.js";
+import { bookings, courts, clubs, users, discountCodes, discountCodeUsages } from "../db/schema.js";
 import { sendNotification } from "../utils/sendNotification.js";
 import { sendSMS } from "../utils/sms.js";
 
@@ -21,7 +21,7 @@ function timeToMinutes(t) {
 export const createBookingController = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { courtId, date, startTime, endTime, notes } = req.body;
+    const { courtId, date, startTime, endTime, notes, discountCode } = req.body;
 
     if (!courtId || !date || !startTime || !endTime) {
       return res.status(400).json({ message: "اطلاعات ناقص است" });
@@ -79,14 +79,59 @@ export const createBookingController = async (req, res) => {
     }
 
     const durationHours = (endMin - startMin) / 60;
-    const totalPrice = Math.round(court.pricePerHour * durationHours);
+    const basePrice = Math.round(court.pricePerHour * durationHours);
 
+    // Apply discount code if provided
+    let discountCodeRow = null;
+    let discountAmount = 0;
+    if (discountCode) {
+      [discountCodeRow] = await db
+        .select()
+        .from(discountCodes)
+        .where(and(eq(discountCodes.code, discountCode.toUpperCase().trim()), eq(discountCodes.isActive, true)))
+        .limit(1);
+
+      if (discountCodeRow) {
+        const now = new Date();
+        const expired = discountCodeRow.expiresAt && now > new Date(discountCodeRow.expiresAt);
+        const maxedOut = discountCodeRow.maxUses !== null && discountCodeRow.usedCount >= discountCodeRow.maxUses;
+        const belowMin = discountCodeRow.minBookingPrice && basePrice < discountCodeRow.minBookingPrice;
+
+        if (!expired && !maxedOut && !belowMin) {
+          const [userUsageCount] = await db
+            .select({ cnt: count() })
+            .from(discountCodeUsages)
+            .where(and(eq(discountCodeUsages.discountCodeId, discountCodeRow.id), eq(discountCodeUsages.userId, userId)));
+
+          if ((userUsageCount?.cnt ?? 0) < discountCodeRow.perUserLimit) {
+            discountAmount = discountCodeRow.discountType === "percent"
+              ? Math.round(basePrice * discountCodeRow.discountValue / 100)
+              : Math.min(discountCodeRow.discountValue, basePrice);
+          }
+        }
+      }
+    }
+
+    const totalPrice = Math.max(0, basePrice - discountAmount);
     const trackingCode = generateTrackingCode();
 
     const [booking] = await db
       .insert(bookings)
       .values({ userId, courtId, date, startTime, endTime, durationHours, totalPrice, notes, trackingCode })
       .returning();
+
+    // Record discount usage
+    if (discountCodeRow && discountAmount > 0) {
+      await db.insert(discountCodeUsages).values({
+        discountCodeId: discountCodeRow.id,
+        userId,
+        bookingId: booking.id,
+        discountAmount,
+      });
+      await db.update(discountCodes)
+        .set({ usedCount: discountCodeRow.usedCount + 1, updatedAt: new Date() })
+        .where(eq(discountCodes.id, discountCodeRow.id));
+    }
 
     const courtFullName = court.clubName ? `زمین ${court.name} باشگاه ${court.clubName}` : `زمین ${court.name}`;
 

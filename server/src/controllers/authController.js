@@ -56,7 +56,7 @@ export const sendOTPController = async (req, res) => {
  */
 export const verifyOTPController = async (req, res) => {
   try {
-    const { phone, code } = req.body;
+    const { phone, code, isClubOwner = false } = req.body;
 
     if (!phone || !code) {
       return res.status(400).json({ message: 'شماره تلفن و کد الزامی است' });
@@ -107,17 +107,18 @@ export const verifyOTPController = async (req, res) => {
         .insert(users)
         .values({
           phone,
+          isClubOwner: !!isClubOwner,
           createdAt: new Date(),
           updatedAt: new Date(),
         })
         .returning();
-      // Fire-and-forget welcome notification for new users
-      sendWelcomeNotification(user.id).catch(() => {});
+      if (!isClubOwner) sendWelcomeNotification(user.id).catch(() => {});
     } else {
-      // Update user's updatedAt
+      const updateData = { updatedAt: new Date() };
+      if (isClubOwner && !user.isClubOwner) updateData.isClubOwner = true;
       [user] = await db
         .update(users)
-        .set({ updatedAt: new Date() })
+        .set(updateData)
         .where(eq(users.id, user.id))
         .returning();
     }

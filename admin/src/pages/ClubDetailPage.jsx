@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
@@ -29,49 +29,184 @@ const emptyForm = {
   pricePerHour:"", openTime:"", closeTime:"", slotDuration:"60", description:"", managerPhone:"",
 };
 
-function CourtForm({ form, setForm, onSubmit, loading, submitLabel }) {
-  const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
+const COURT_STEPS = [
+  { id: 1, label: "هویت",   desc: "نام و نوع" },
+  { id: 2, label: "قیمت",   desc: "ساعت و قیمت" },
+  { id: 3, label: "تنظیمات", desc: "اسلات و توضیح" },
+];
+
+function CourtStepIndicator({ current }) {
   return (
-    <form onSubmit={onSubmit} className="space-y-3">
-      <div className="grid grid-cols-2 gap-3">
-        <Input label="نام زمین *" value={form.name} onChange={e=>f("name",e.target.value)} required />
-        <Input label="موقعیت (نمایشی)" value={form.location} onChange={e=>f("location",e.target.value)} />
-      </div>
-      <Input label="آدرس" value={form.address} onChange={e=>f("address",e.target.value)} />
-      <div className="grid grid-cols-2 gap-3">
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-muted-foreground">نوع ورزش</label>
-          <select value={form.sportType} onChange={e=>f("sportType",e.target.value)}
-            className="h-9 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none">
-            {SPORTS.map(s=><option key={s} value={s}>{SPORT_ICONS[s]} {SPORT_LABELS[s]??s}</option>)}
-          </select>
+    <div className="flex items-center gap-1 mb-6">
+      {COURT_STEPS.map((s, i) => (
+        <React.Fragment key={s.id}>
+          <div className="flex flex-col items-center gap-1 flex-1">
+            <div className={cn(
+              "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all",
+              current === s.id
+                ? "bg-primary text-primary-foreground shadow-md shadow-primary/30 scale-110"
+                : current > s.id
+                  ? "bg-emerald-500 text-white"
+                  : "bg-muted text-muted-foreground"
+            )}>
+              {current > s.id ? "✓" : s.id}
+            </div>
+            <span className={cn(
+              "text-[10px] font-medium",
+              current === s.id ? "text-primary" : "text-muted-foreground"
+            )}>{s.label}</span>
+          </div>
+          {i < COURT_STEPS.length - 1 && (
+            <div className={cn(
+              "h-0.5 flex-1 rounded-full transition-all mb-4",
+              current > s.id ? "bg-emerald-400" : "bg-muted"
+            )} />
+          )}
+        </React.Fragment>
+      ))}
+    </div>
+  );
+}
+
+function CourtForm({ form, setForm, onSubmit, loading, submitLabel, isEdit = false }) {
+  const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
+  const [step, setStep] = useState(1);
+  const next = () => setStep(s => s + 1);
+  const prev = () => setStep(s => s - 1);
+
+  if (isEdit) {
+    return (
+      <form onSubmit={onSubmit} className="space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <Input label="نام زمین *" value={form.name} onChange={e=>f("name",e.target.value)} required />
+          <Input label="موقعیت (نمایشی)" value={form.location} onChange={e=>f("location",e.target.value)} />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-muted-foreground">نوع ورزش</label>
+            <select value={form.sportType} onChange={e=>f("sportType",e.target.value)}
+              className="h-9 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none">
+              {SPORTS.map(s=><option key={s} value={s}>{SPORT_ICONS[s]} {SPORT_LABELS[s]??s}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-muted-foreground">نوع سطح</label>
+            <select value={form.surfaceType} onChange={e=>f("surfaceType",e.target.value)}
+              className="h-9 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none">
+              {SURFACES.map(s=><option key={s} value={s}>{SURFACE_LABELS[s]??s}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          <Input label="قیمت/ساعت (ت) *" type="number" value={form.pricePerHour} onChange={e=>f("pricePerHour",e.target.value)} required />
+          <Input label="باز شدن" type="time" value={form.openTime} onChange={e=>f("openTime",e.target.value)} />
+          <Input label="بستن" type="time" value={form.closeTime} onChange={e=>f("closeTime",e.target.value)} />
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <Input label="مدت اسلات (دقیقه)" type="number" value={form.slotDuration} onChange={e=>f("slotDuration",e.target.value)} />
+          <Input label="شماره مدیر" type="tel" value={form.managerPhone} onChange={e=>f("managerPhone",e.target.value)} dir="ltr" />
         </div>
         <div className="flex flex-col gap-1">
-          <label className="text-xs font-medium text-muted-foreground">نوع سطح</label>
-          <select value={form.surfaceType} onChange={e=>f("surfaceType",e.target.value)}
-            className="h-9 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none">
-            {SURFACES.map(s=><option key={s} value={s}>{SURFACE_LABELS[s]??s}</option>)}
-          </select>
+          <label className="text-xs font-medium text-muted-foreground">توضیحات</label>
+          <textarea value={form.description} onChange={e=>f("description",e.target.value)} rows={2}
+            className="rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none resize-none" />
         </div>
-      </div>
-      <div className="grid grid-cols-3 gap-3">
-        <Input label="قیمت/ساعت (ت) *" type="number" value={form.pricePerHour} onChange={e=>f("pricePerHour",e.target.value)} required />
-        <Input label="باز شدن" type="time" value={form.openTime} onChange={e=>f("openTime",e.target.value)} />
-        <Input label="بستن" type="time" value={form.closeTime} onChange={e=>f("closeTime",e.target.value)} />
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <Input label="مدت اسلات (دقیقه)" type="number" value={form.slotDuration} onChange={e=>f("slotDuration",e.target.value)} />
-        <Input label="شماره مدیر" type="tel" value={form.managerPhone} onChange={e=>f("managerPhone",e.target.value)} dir="ltr" />
-      </div>
-      <div className="flex flex-col gap-1">
-        <label className="text-xs font-medium text-muted-foreground">توضیحات</label>
-        <textarea value={form.description} onChange={e=>f("description",e.target.value)} rows={2}
-          className="rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none resize-none" />
-      </div>
-      <Button type="submit" disabled={loading} className="w-full">
-        {loading ? "در حال ذخیره..." : submitLabel}
-      </Button>
-    </form>
+        <Button type="submit" disabled={loading} className="w-full">
+          {loading ? "در حال ذخیره..." : submitLabel}
+        </Button>
+      </form>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <CourtStepIndicator current={step} />
+
+      {step === 1 && (
+        <motion.div key="cs1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
+          <div className="text-center pb-1">
+            <p className="text-sm font-semibold text-foreground">اطلاعات اصلی زمین</p>
+            <p className="text-xs text-muted-foreground mt-0.5">نام و نوع ورزش این زمین را مشخص کنید</p>
+          </div>
+          <Input label="نام زمین *" value={form.name} onChange={e=>f("name",e.target.value)} placeholder="مثلاً: زمین پادل ۱" />
+          <Input label="موقعیت (نمایشی)" value={form.location} onChange={e=>f("location",e.target.value)} placeholder="مثلاً: طبقه اول" />
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-muted-foreground">نوع ورزش</label>
+              <select value={form.sportType} onChange={e=>f("sportType",e.target.value)}
+                className="h-9 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none">
+                {SPORTS.map(s=><option key={s} value={s}>{SPORT_ICONS[s]} {SPORT_LABELS[s]??s}</option>)}
+              </select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-muted-foreground">نوع سطح</label>
+              <select value={form.surfaceType} onChange={e=>f("surfaceType",e.target.value)}
+                className="h-9 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none">
+                {SURFACES.map(s=><option key={s} value={s}>{SURFACE_LABELS[s]??s}</option>)}
+              </select>
+            </div>
+          </div>
+          <Button type="button" disabled={!form.name} onClick={next} className="w-full">بعدی ←</Button>
+        </motion.div>
+      )}
+
+      {step === 2 && (
+        <motion.div key="cs2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
+          <div className="text-center pb-1">
+            <p className="text-sm font-semibold text-foreground">قیمت و ساعت کاری</p>
+            <p className="text-xs text-muted-foreground mt-0.5">قیمت رزرو و ساعت فعالیت این زمین را وارد کنید</p>
+          </div>
+          <Input label="قیمت به ازای هر ساعت (تومان) *" type="number" value={form.pricePerHour}
+            onChange={e=>f("pricePerHour",e.target.value)} placeholder="مثلاً: 500000" />
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="ساعت باز شدن" type="time" value={form.openTime} onChange={e=>f("openTime",e.target.value)} />
+            <Input label="ساعت بستن" type="time" value={form.closeTime} onChange={e=>f("closeTime",e.target.value)} />
+          </div>
+          {form.pricePerHour && (
+            <div className="rounded-xl bg-primary/5 border border-primary/20 p-3 text-center">
+              <p className="text-xs text-muted-foreground">قیمت رزرو هر ساعت</p>
+              <p className="text-lg font-black text-primary">{Number(form.pricePerHour).toLocaleString("fa-IR")} تومان</p>
+            </div>
+          )}
+          <div className="flex gap-2 pt-1">
+            <Button type="button" variant="outline" onClick={prev} className="flex-1">← قبلی</Button>
+            <Button type="button" disabled={!form.pricePerHour} onClick={next} className="flex-1">بعدی ←</Button>
+          </div>
+        </motion.div>
+      )}
+
+      {step === 3 && (
+        <motion.div key="cs3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
+          <div className="text-center pb-1">
+            <p className="text-sm font-semibold text-foreground">تنظیمات اضافی</p>
+            <p className="text-xs text-muted-foreground mt-0.5">مدت هر اسلات و اطلاعات تکمیلی را وارد کنید</p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Input label="مدت هر اسلات (دقیقه)" type="number" value={form.slotDuration} onChange={e=>f("slotDuration",e.target.value)} />
+            <Input label="شماره مدیر زمین" type="tel" value={form.managerPhone} onChange={e=>f("managerPhone",e.target.value)} dir="ltr" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-muted-foreground">توضیحات (اختیاری)</label>
+            <textarea value={form.description} onChange={e=>f("description",e.target.value)} rows={3}
+              placeholder="ویژگی‌های خاص این زمین..."
+              className="rounded-xl border border-input bg-background px-3 py-2 text-sm focus:outline-none resize-none placeholder:text-muted-foreground/50" />
+          </div>
+          <div className="rounded-xl bg-muted/40 border border-border p-3 text-xs text-muted-foreground space-y-1">
+            <p className="font-semibold text-foreground text-sm">خلاصه زمین:</p>
+            <p>🏓 {form.name} — {SPORT_LABELS[form.sportType] ?? form.sportType}</p>
+            <p>💰 {Number(form.pricePerHour).toLocaleString("fa-IR")} تومان/ساعت</p>
+            <p>🕐 {form.openTime} تا {form.closeTime}</p>
+            <p>⏱️ اسلات {form.slotDuration} دقیقه‌ای</p>
+          </div>
+          <div className="flex gap-2 pt-1">
+            <Button type="button" variant="outline" onClick={prev} className="flex-1">← قبلی</Button>
+            <Button type="button" onClick={onSubmit} disabled={loading} className="flex-1">
+              {loading ? "در حال ثبت..." : submitLabel}
+            </Button>
+          </div>
+        </motion.div>
+      )}
+    </div>
   );
 }
 
@@ -314,10 +449,10 @@ export default function ClubDetailPage() {
       <CourtSlotsModal open={!!slotsTarget} onClose={()=>setSlotsTarget(null)} court={slotsTarget} />
 
       <Modal open={createOpen} onClose={()=>setCreateOpen(false)} title="افزودن زمین جدید" size="lg">
-        <CourtForm form={form} setForm={setForm} onSubmit={handleCreate} loading={saving} submitLabel="ایجاد زمین"/>
+        <CourtForm form={form} setForm={setForm} onSubmit={handleCreate} loading={saving} submitLabel="ثبت زمین" />
       </Modal>
       <Modal open={!!editTarget} onClose={()=>setEditTarget(null)} title="ویرایش زمین" size="lg">
-        <CourtForm form={form} setForm={setForm} onSubmit={handleEdit} loading={saving} submitLabel="ذخیره تغییرات"/>
+        <CourtForm form={form} setForm={setForm} onSubmit={handleEdit} loading={saving} submitLabel="ذخیره تغییرات" isEdit />
       </Modal>
     </div>
   );

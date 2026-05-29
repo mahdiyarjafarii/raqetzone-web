@@ -15,6 +15,13 @@
       "when": 1778142757735,
       "tag": "0001_volatile_thunderbolts",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1780059001901,
+      "tag": "0002_classy_lyja",
+      "breakpoints": true
     }
   ]
 }

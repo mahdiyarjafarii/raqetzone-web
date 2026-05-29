@@ -37,20 +37,20 @@ function PhaseSteps({ phase }) {
           <React.Fragment key={p}>
             <div className="flex flex-col items-center gap-1">
               <div className={cn(
-                "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all",
+                "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all shadow-sm",
                 done   ? "bg-emerald-500 border-emerald-500 text-white" :
                 active ? "bg-blue-500   border-blue-500   text-white" :
-                         "bg-muted      border-border      text-muted-foreground"
+                         "bg-white/85   border-white/70   text-slate-600"
               )}>
                 {done ? <CheckIcon className="w-3.5 h-3.5" /> : i + 1}
               </div>
               <span className={cn(
-                "text-[10px] font-medium",
-                active ? "text-foreground" : done ? "text-emerald-500" : "text-muted-foreground"
+                "text-[10px] font-semibold",
+                active ? "text-white" : done ? "text-emerald-300" : "text-white/70"
               )}>{PHASE_LABELS[p]}</span>
             </div>
             {i < PHASES.length - 1 && (
-              <div className={cn("flex-1 h-0.5 mb-4 mx-1 rounded-full", i < currentIdx ? "bg-emerald-500" : "bg-border")} />
+              <div className={cn("flex-1 h-0.5 mb-4 mx-1 rounded-full", i < currentIdx ? "bg-emerald-400" : "bg-white/35")} />
             )}
           </React.Fragment>
         );
@@ -245,46 +245,47 @@ export default function TournamentDetailSheet() {
             key="sheet"
             initial={{ y:"100%" }} animate={{ y:0 }} exit={{ y:"100%" }}
             transition={{ type:"spring", damping:32, stiffness:320 }}
-            className="fixed bottom-0 left-0 right-0 z-50 bg-background rounded-t-[28px] max-h-[92vh] flex flex-col overflow-hidden"
+            className="fixed bottom-0 left-0 right-0 z-50 bg-background rounded-t-[28px] max-h-[92vh] flex flex-col overflow-hidden shadow-2xl shadow-black/30"
           >
             {/* Drag pill */}
-            <div className="flex justify-center pt-3 shrink-0">
-              <div className="w-9 h-1 rounded-full bg-muted" />
+            <div className="absolute top-3 left-1/2 z-20 -translate-x-1/2">
+              <div className="w-10 h-1 rounded-full bg-white/70 shadow-sm" />
             </div>
 
             {/* Hero header */}
-            <div className="relative shrink-0 overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-violet-950/60 via-indigo-950/40 to-background" />
+            <div className="relative shrink-0 overflow-hidden rounded-t-[28px]">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(139,92,246,0.95),transparent_42%),linear-gradient(135deg,#24115f_0%,#4c1d95_45%,#312e81_100%)]" />
+              <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-background via-background/45 to-transparent" />
               <button
                 onClick={() => setOpen(false)}
-                className="absolute top-4 left-4 z-10 w-8 h-8 rounded-full bg-white/10 backdrop-blur-sm border border-white/10 flex items-center justify-center"
+                className="absolute top-5 left-4 z-10 w-9 h-9 rounded-full bg-white/18 backdrop-blur-md border border-white/25 flex items-center justify-center shadow-sm"
               >
-                <XIcon className="w-4 h-4 text-white/80" />
+                <XIcon className="w-[18px] h-[18px] text-white" />
               </button>
 
-              <div className="relative px-5 pt-5 pb-5">
+              <div className="relative px-5 pt-11 pb-6">
                 <div className="flex items-start gap-3 mb-3">
-                  <div className="w-14 h-14 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center text-3xl shrink-0">
+                  <div className="w-14 h-14 rounded-2xl bg-white/18 border border-white/25 flex items-center justify-center text-3xl shrink-0 shadow-lg shadow-black/10 backdrop-blur-md">
                     {SPORT_ICONS[tournament.sportType] ?? "🏅"}
                   </div>
                   <div className="flex-1 min-w-0 pt-1">
-                    <h2 className="font-black text-xl text-white leading-tight line-clamp-2">{tournament.title}</h2>
-                    {tournament.club && <p className="text-white/60 text-xs mt-1">🏢 {tournament.club.name}</p>}
+                    <h2 className="font-black text-xl text-white leading-tight line-clamp-2 drop-shadow-sm">{tournament.title}</h2>
+                    {tournament.club && <p className="text-white/75 text-xs mt-1">🏢 {tournament.club.name}</p>}
                   </div>
                 </div>
 
                 {/* Badges */}
                 <div className="flex flex-wrap gap-2 mb-4">
-                  <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border", phaseCfg.badge)}>
+                  <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border backdrop-blur-md", phaseCfg.badge)}>
                     <span className={cn("w-1.5 h-1.5 rounded-full", phaseCfg.dot)} />
                     {phaseCfg.label}
                   </span>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-white/10 border border-white/15 text-white/80">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-white/18 border border-white/25 text-white backdrop-blur-md">
                     <CoinsIcon className="w-3 h-3" />
                     {isFree ? "رایگان" : `${tournament.entryFee.toLocaleString("fa-IR")} تومان`}
                   </span>
                   {tournament.minLevel > 1 && (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold bg-amber-500/20 border border-amber-500/30 text-amber-300">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-400/20 border border-amber-300/40 text-amber-100 backdrop-blur-md">
                       <StarIcon className="w-3 h-3" />سطح {tournament.minLevel}+
                     </span>
                   )}
@@ -295,11 +296,11 @@ export default function TournamentDetailSheet() {
 
                 {/* Capacity */}
                 <div className="mt-4">
-                  <div className="flex justify-between text-[11px] text-white/50 mb-1.5">
+                  <div className="flex justify-between text-[11px] text-white/80 mb-1.5">
                     <span className="flex items-center gap-1"><UsersIcon className="w-3 h-3" />{tournament.registeredCount} ثبت‌نام</span>
                     <span>{tournament.maxParticipants - tournament.registeredCount} جای خالی</span>
                   </div>
-                  <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+                  <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
                     <motion.div
                       initial={{ width:0 }}
                       animate={{ width:`${Math.min(fillRatio*100,100)}%` }}

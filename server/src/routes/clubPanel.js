@@ -18,10 +18,19 @@ import {
   getClubStatsController,
   getSlotOverridesController,
   upsertSlotOverrideController,
+  getClubCustomersController,
 } from "../controllers/clubPanelController.js";
+import {
+  getDiscountCodesController,
+  createDiscountCodeController,
+  updateDiscountCodeController,
+  deleteDiscountCodeController,
+  getDiscountCodeUsagesController,
+  sendSmsCampaignController,
+} from "../controllers/discountController.js";
 
 const router = Router();
-router.use(clubOwnerMiddleware);
+router.use("/club-panel", clubOwnerMiddleware);
 
 // Image upload (local storage)
 router.post("/club-panel/upload-image", clubImageUpload.single("image"), (req, res) => {
@@ -48,6 +57,17 @@ router.delete("/club-panel/courts/:courtId",                 deleteClubCourtCont
 // Slot overrides
 router.get("/club-panel/courts/:courtId/slot-overrides",     getSlotOverridesController);
 router.post("/club-panel/courts/:courtId/slot-overrides",    upsertSlotOverrideController);
+
+// Customers
+router.get("/club-panel/customers",                          getClubCustomersController);
+
+// Discount codes
+router.get("/club-panel/clubs/:clubId/discount-codes",                     getDiscountCodesController);
+router.post("/club-panel/clubs/:clubId/discount-codes",                    createDiscountCodeController);
+router.patch("/club-panel/clubs/:clubId/discount-codes/:codeId",           updateDiscountCodeController);
+router.delete("/club-panel/clubs/:clubId/discount-codes/:codeId",          deleteDiscountCodeController);
+router.get("/club-panel/clubs/:clubId/discount-codes/:codeId/usages",      getDiscountCodeUsagesController);
+router.post("/club-panel/clubs/:clubId/sms-campaign",                      sendSmsCampaignController);
 
 // Bookings
 router.get("/club-panel/bookings",                           getClubBookingsController);
