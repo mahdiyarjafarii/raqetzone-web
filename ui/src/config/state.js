@@ -64,3 +64,6 @@ export const authCallbacksAtom = atom({ onSuccess: null, onError: null });
 
 // Onboarding — shown once after first login if profile is incomplete
 export const showOnboardingSheetAtom = atom(false);
+
+// Direct messaging unread count
+export const unreadDmCountAtom = atom(0);

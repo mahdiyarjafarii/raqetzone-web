@@ -2,10 +2,12 @@ import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   XIcon, TrophyIcon, SwordsIcon, TrendingUpIcon,
-  StarIcon, ZapIcon, CalendarIcon,
+  StarIcon, ZapIcon, CalendarIcon, MessageCircleIcon,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import apiClient from "@/lib/apiClient";
+import useAuth from "@/auth/useAuth";
 
 const SKILL_CONFIG = {
   beginner:     { label: "مبتدی",   color: "bg-emerald-500/15 text-emerald-600 border-emerald-500/30" },
@@ -58,6 +60,9 @@ function XpBar({ level }) {
 export default function UserProfileSheet({ userId, name, image: initialImage, onClose }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+  const { currentUser } = useAuth();
+  const isSelf = currentUser?.id === userId;
 
   useEffect(() => {
     if (!userId) return;
@@ -224,6 +229,25 @@ export default function UserProfileSheet({ userId, name, image: initialImage, on
             <div className="px-5 pb-6 space-y-3">
               <div className="h-20 rounded-2xl bg-muted animate-pulse" />
               <div className="h-12 rounded-2xl bg-muted animate-pulse" />
+            </div>
+          )}
+
+          {/* Message button */}
+          {!loading && !isSelf && currentUser && (
+            <div className="px-5 pb-8">
+              <button
+                onClick={async () => {
+                  const { ok, data } = await apiClient.post("/dm/conversations", { targetUserId: userId });
+                  if (ok) {
+                    onClose();
+                    navigate(`/messages/${data.conversation.id}`);
+                  }
+                }}
+                className="w-full h-13 rounded-2xl bg-[#ef1871] text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-pink-500/25 active:scale-[0.98] transition-transform"
+              >
+                <MessageCircleIcon className="w-5 h-5" />
+                ارسال پیام
+              </button>
             </div>
           )}
         </div>

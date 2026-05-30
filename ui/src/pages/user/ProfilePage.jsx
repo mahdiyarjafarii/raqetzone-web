@@ -9,6 +9,7 @@ import {
   PencilIcon, CameraIcon, ChevronRightIcon,
   SwordsIcon, TrophyIcon, TrendingUpIcon,
   GemIcon, ChevronDownIcon, ChevronUpIcon,
+  MessageCircleIcon,
 } from "lucide-react";
 
 import useAuth from "@/auth/useAuth";
@@ -229,6 +230,27 @@ export default function ProfilePage() {
           </div>
         </motion.div>
       )}
+
+      {/* ── Messages ──────────────────────────────────────────────────── */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.18 }}
+        className="mt-5 px-4"
+      >
+        <Link
+          to="/messages"
+          className="flex items-center justify-between bg-white/90 dark:bg-card border border-black/[0.06] dark:border-border rounded-2xl px-4 py-3.5 shadow-sm active:scale-[0.98] transition-transform"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-[#ef1871]/10 flex items-center justify-center">
+              <MessageCircleIcon className="w-4 h-4 text-[#ef1871]" />
+            </div>
+            <span className="font-bold text-sm text-foreground">پیام‌های من</span>
+          </div>
+          <ChevronRightIcon className="w-4 h-4 text-muted-foreground" />
+        </Link>
+      </motion.div>
 
       {/* ── Recent matches ────────────────────────────────────────────── */}
       <motion.div

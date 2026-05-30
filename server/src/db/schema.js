@@ -376,6 +376,33 @@ export const discountCodeUsages = pgTable("discount_code_usages", {
   index("idx_discount_usages_booking_id").on(table.bookingId),
 ]);
 
+// ─── Direct Messaging ─────────────────────────────────────────────────────────
+
+export const directConversations = pgTable("direct_conversations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  participantAId: uuid("participant_a_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  participantBId: uuid("participant_b_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  lastMessageAt: timestamp("last_message_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_direct_conv_a").on(table.participantAId),
+  index("idx_direct_conv_b").on(table.participantBId),
+  index("idx_direct_conv_last_msg").on(table.lastMessageAt),
+]);
+
+export const directMessages = pgTable("direct_messages", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  conversationId: uuid("conversation_id").notNull().references(() => directConversations.id, { onDelete: "cascade" }),
+  senderId: uuid("sender_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  content: text("content").notNull(),
+  readAt: timestamp("read_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_direct_msg_conv_id").on(table.conversationId),
+  index("idx_direct_msg_sender_id").on(table.senderId),
+  index("idx_direct_msg_created_at").on(table.createdAt),
+]);
+
 // ─── Club Reviews ─────────────────────────────────────────────────────────────
 
 export const clubReviews = pgTable("club_reviews", {

@@ -42,6 +42,7 @@ import { fetchBatchPreferences } from "@/hooks/useUserPreference";
 import apiClient from "@/lib/apiClient";
 import PREFERENCE_KEYS from "@/config/preferenceKeys";
 import authStorage from "@/auth/storage";
+import useSocket from "@/hooks/useSocket";
 
 let prevPathname = "";
 
@@ -49,6 +50,7 @@ function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   const { currentUser, logOut } = useAuth();
+  useSocket();
   const [gemHint, setGemHintAtom] = useAtom(gemHintAtom);
   const [theme, setTheme] = useAtom(themeAtom);
   const setUsageHintAtom = useSetAtom(usageHintAtom);
@@ -106,7 +108,8 @@ function Layout() {
     prevPathname = location.pathname;
   }, [location.pathname]);
 
-  const isChatPage = location.pathname.startsWith("/chat");
+  const isDirectMessagePage = /^\/messages\/[^/]+$/.test(location.pathname);
+  const isChatPage = location.pathname.startsWith("/chat") || isDirectMessagePage;
   const isVideoGeneratePage = location.pathname === "/video-generate";
   const isImageGeneratePage = location.pathname === "/image-generate";
 
@@ -181,7 +184,7 @@ function Layout() {
         </div>
       )}
 
-      <header className="fixed top-0 left-0 right-0 z-1 flex justify-center bg-background ">
+      {!isDirectMessagePage && <header className="fixed top-0 left-0 right-0 z-1 flex justify-center bg-background ">
         <div className="w-full md:w-120 flex items-center justify-between p-2 border-b border-border">
           <div className="flex items-center gap-2">
          
@@ -310,9 +313,9 @@ function Layout() {
             </DropdownMenu>
           </div>
         </div>
-      </header>
+      </header>}
 
-      <div className="h-12 w-screen md:w-120" />
+      {!isDirectMessagePage && <div className="h-12 w-screen md:w-120" />}
 
       <main
         className={cn(

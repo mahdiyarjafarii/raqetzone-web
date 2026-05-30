@@ -2,6 +2,9 @@ import express from "express";
 import cors from "cors";
 import path from "path";
 import { fileURLToPath } from "url";
+import { createServer } from "http";
+import { Server as SocketServer } from "socket.io";
+import jwt from "jsonwebtoken";
 
 import { config } from "./config/env.js";
 import authRoutes from "./routes/auth.js";
@@ -22,6 +25,7 @@ import clubPanelRoutes from "./routes/clubPanel.js";
 import reviewRoutes from "./routes/reviews.js";
 import publicRoutes from "./routes/public.js";
 import tournamentRoutes from "./routes/tournaments.js";
+import directMessagesRoutes from "./routes/directMessages.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
 import "./jobs/dailyCreditsReset.js";
@@ -31,6 +35,44 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+const httpServer = createServer(app);
+
+export const io = new SocketServer(httpServer, {
+  cors: { origin: "*", credentials: true },
+});
+
+const onlineUserSockets = new Map();
+
+export function isUserOnline(userId) {
+  return (onlineUserSockets.get(userId) ?? 0) > 0;
+}
+
+io.use((socket, next) => {
+  const token = socket.handshake.auth?.token || socket.handshake.headers?.["x-auth-token"];
+  if (!token) return next(new Error("unauthorized"));
+  try {
+    const decoded = jwt.verify(token, config.jwtSecret);
+    socket.userId = decoded.userId;
+    next();
+  } catch {
+    next(new Error("unauthorized"));
+  }
+});
+
+io.on("connection", (socket) => {
+  socket.join(`user:${socket.userId}`);
+  onlineUserSockets.set(socket.userId, (onlineUserSockets.get(socket.userId) ?? 0) + 1);
+  io.emit("presence_changed", { userId: socket.userId, isOnline: true });
+  socket.on("disconnect", () => {
+    const count = (onlineUserSockets.get(socket.userId) ?? 1) - 1;
+    if (count <= 0) {
+      onlineUserSockets.delete(socket.userId);
+      io.emit("presence_changed", { userId: socket.userId, isOnline: false });
+    } else {
+      onlineUserSockets.set(socket.userId, count);
+    }
+  });
+});
 
 app.use(
   cors({
@@ -65,6 +107,7 @@ app.use("/api", notificationRoutes);
 app.use("/api", clubPanelRoutes);
 app.use("/api", reviewRoutes);
 app.use("/api", tournamentRoutes);
+app.use("/api/dm", directMessagesRoutes);
 app.use("/api", adminRoutes);
 
 // Health check
@@ -77,7 +120,7 @@ app.use(errorHandler);
 
 // Start server
 const PORT = config.port;
-app.listen(PORT, () => {
+httpServer.listen(PORT, () => {
   console.log(`✅ Server is running on http://localhost:${PORT}`);
   console.log(`✅ Frontend URL: ${config.frontendUrl}`);
 });
