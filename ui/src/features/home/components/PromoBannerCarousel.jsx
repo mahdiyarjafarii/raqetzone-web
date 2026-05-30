@@ -9,7 +9,7 @@ import "swiper/css/pagination";
 
 function SkeletonBanner() {
   return (
-    <div className="mx-4 h-40 rounded-2xl bg-muted animate-pulse" />
+    <div className="mx-4 h-44 rounded-3xl bg-muted animate-pulse" />
   );
 }
 
@@ -17,25 +17,42 @@ export default function PromoBannerCarousel({ promotions = [], loading }) {
   const FALLBACK_PROMOS = [
     {
       id: "fallback-clubs",
-      title: "رزرو زمین",
-      subtitle: "مجموعه‌های برتر پادل، تنیس و اسکواش در تهران",
-      badgeText: "جدید",
+      eyebrow: "رزرو سریع",
+      title: "زمین نزدیکت رو پیدا کن",
+      subtitle: "بین مجموعه‌های برتر پادل، تنیس و اسکواش انتخاب کن و زمان مناسب رو رزرو کن.",
+      badgeText: "پیشنهاد امروز",
+      metric: "از ۳ دقیقه",
       emoji: "🏓",
-      ctaText: "رزرو کن",
+      ctaText: "شروع رزرو",
       ctaHref: "/clubs",
-      gradientFrom: "#2B0FD9",
-      gradientTo: "#6B3FFF",
+      gradientFrom: "#24115F",
+      gradientTo: "#6D28D9",
     },
     {
       id: "fallback-booking",
-      title: "بازی امشب",
-      subtitle: "زمین‌های موجود برای امشب را ببین و همین الان رزرو کن",
-      badgeText: "موجود",
+      eyebrow: "بازی دوستانه",
+      title: "امشب تنها بازی نکن",
+      subtitle: "بازی‌های باز رو ببین، تیم انتخاب کن و با بازیکن‌های نزدیکت هماهنگ شو.",
+      badgeText: "جای خالی",
+      metric: "تیم‌های فعال",
       emoji: "🎾",
-      ctaText: "مشاهده",
-      ctaHref: "/mybooking",
-      gradientFrom: "#059669",
+      ctaText: "پیوستن",
+      ctaHref: "/tournament",
+      gradientFrom: "#047857",
       gradientTo: "#0891B2",
+    },
+    {
+      id: "fallback-ai",
+      eyebrow: "دستیار هوشمند",
+      title: "برنامه بازی بهتر بچین",
+      subtitle: "برای انتخاب زمین، زمان مناسب و پیشنهاد بازی از دستیار رکت‌زون کمک بگیر.",
+      badgeText: "AI",
+      metric: "پیشنهاد شخصی",
+      emoji: "✨",
+      ctaText: "باز کردن",
+      ctaHref: "/ai",
+      gradientFrom: "#BE185D",
+      gradientTo: "#4338CA",
     },
   ];
 
@@ -51,42 +68,53 @@ export default function PromoBannerCarousel({ promotions = [], loading }) {
     >
       <Swiper
         modules={[Autoplay, Pagination]}
-        spaceBetween={0}
+        spaceBetween={12}
         slidesPerView={1}
         loop={items.length > 1}
         autoplay={{ delay: 4000, disableOnInteraction: false }}
         pagination={{ clickable: true, bulletActiveClass: "swiper-pagination-bullet-active !bg-white !opacity-100 !w-4", bulletClass: "swiper-pagination-bullet !h-1.5 !w-1.5 !rounded-full !bg-white/50 !opacity-100 !transition-all" }}
-        className="rounded-3xl overflow-hidden shadow-sm [&_.swiper-pagination]:!bottom-3 [&_.swiper-pagination-bullet]:!mx-0.5"
+        className="overflow-visible [&_.swiper-pagination]:!bottom-3 [&_.swiper-pagination-bullet]:!mx-0.5"
       >
         {items.map((promo) => (
           <SwiperSlide key={promo.id}>
             <div
-              className="relative h-44 flex flex-col justify-between overflow-hidden px-5 pb-10 pt-5"
+              className="relative h-48 flex flex-col justify-between overflow-hidden rounded-[32px] px-5 pb-10 pt-5 shadow-xl shadow-slate-300/40 dark:shadow-black/20"
               style={{
                 background: `linear-gradient(135deg, ${promo.gradientFrom}, ${promo.gradientTo})`,
               }}
             >
-              {/* Decorative circle */}
-              <div className="absolute -right-10 -top-10 h-36 w-36 rounded-full bg-white/10 blur-sm" />
-              <div className="absolute -left-8 bottom-0 h-24 w-24 rounded-full bg-white/5 blur-md" />
+              <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-white/12 blur-sm" />
+              <div className="absolute left-6 top-8 h-20 w-20 rounded-full bg-white/8 blur-xl" />
+              <div className="absolute -left-10 bottom-0 h-28 w-28 rounded-full bg-white/8 blur-md" />
+              <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/24 to-transparent" />
+              <div className="absolute left-5 top-5 text-6xl opacity-20 rotate-[-12deg]">{promo.emoji}</div>
 
               {/* Badge */}
               {promo.badgeText && (
-                <span className="self-start bg-white/15 backdrop-blur-md text-white text-[10px] font-bold px-3 py-1 rounded-full border border-white/20 uppercase tracking-wider z-10">
-                  {promo.badgeText}
-                </span>
+                <div className="relative z-10 flex items-center justify-between gap-3">
+                  <span className="bg-white/15 backdrop-blur-md text-white text-[10px] font-black px-3 py-1 rounded-full border border-white/20">
+                    {promo.badgeText}
+                  </span>
+                  {promo.metric && (
+                    <span className="bg-black/12 backdrop-blur-md text-white/90 text-[10px] font-bold px-2.5 py-1 rounded-full border border-white/10">
+                      {promo.metric}
+                    </span>
+                  )}
+                </div>
               )}
 
               {/* Content */}
-              <div className="z-10">
+              <div className="relative z-10">
+                {promo.eyebrow && (
+                  <p className="mb-1.5 text-[11px] font-black text-white/75 tracking-tight">{promo.eyebrow}</p>
+                )}
                 <div className="flex items-end justify-between">
                   <div>
-                    <h3 className="text-white font-black text-lg leading-tight">
-                      {promo.emoji && <span className="mr-1">{promo.emoji}</span>}
+                    <h3 className="text-white font-black text-[22px] leading-tight drop-shadow-sm max-w-[230px]">
                       {promo.title}
                     </h3>
                     {promo.subtitle && (
-                      <p className="text-white/80 text-xs mt-1.5 leading-relaxed max-w-[210px]">
+                      <p className="text-white/85 text-xs mt-1.5 leading-relaxed max-w-[220px] font-medium">
                         {promo.subtitle}
                       </p>
                     )}
@@ -94,10 +122,10 @@ export default function PromoBannerCarousel({ promotions = [], loading }) {
 
                   <Link
                     to={promo.ctaHref}
-                    className="shrink-0 flex items-center gap-1 bg-white/95 backdrop-blur text-gray-900 text-xs font-bold px-3 py-2 rounded-full shadow-sm active:scale-95 transition-transform ml-2"
+                    className="shrink-0 flex items-center gap-1 bg-white/95 backdrop-blur text-gray-900 text-xs font-black px-3.5 py-2.5 rounded-2xl shadow-lg active:scale-95 transition-transform ml-2"
                   >
                     {promo.ctaText}
-                    <ArrowLeftIcon className="w-3 h-3" />
+                    <ArrowLeftIcon className="w-3.5 h-3.5" />
                   </Link>
                 </div>
               </div>

@@ -271,6 +271,7 @@ export const getClubBookingsController = async (req, res) => {
           id: users.id,
           name: users.name,
           phone: users.phone,
+          image: users.image,
         },
         court: {
           id: courts.id,

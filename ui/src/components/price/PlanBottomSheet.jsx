@@ -177,7 +177,7 @@ const PlanBottomSheet = ({
             selectedPlanData.buttonClass
           )}
         >
-          خرید اشتراک پلاس{" "}
+          خرید رکت‌زون پلاس
         </button>
       </div>
     </BottomSheet>

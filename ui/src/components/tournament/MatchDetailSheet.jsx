@@ -13,6 +13,8 @@ import {
 import { currentUserAtom } from "@/config/state";
 import { matchService } from "@/services/matchService";
 import { cn } from "@/lib/utils";
+import UserAvatar from "@/components/ui/UserAvatar";
+import UserProfileSheet from "@/components/ui/UserProfileSheet";
 
 const SPORT_ICONS = {
   padel: "🏓",
@@ -62,6 +64,7 @@ export default function MatchDetailSheet() {
   const match = selectedMatch;
   const currentUserId = currentUser?.id;
   const countdown = useCountdown(match?.scheduledAt);
+  const [viewingUser, setViewingUser] = useState(null);
   const isUserInMatch =
     match && [...match.teamA, ...match.teamB].some((p) => p.userId === currentUserId);
 
@@ -215,22 +218,34 @@ export default function MatchDetailSheet() {
                           {Array.from({ length: match.teamSize }).map((_, i) => {
                             const player = players[i];
                             return (
-                              <div key={i} className={cn(
-                                "flex items-center gap-2 rounded-xl px-2.5 py-2",
-                                player ? "bg-background/70" : "border border-dashed border-border"
-                              )}>
+                              <div
+                                key={i}
+                                onClick={() => player && player.userId !== currentUserId && setViewingUser(player)}
+                                className={cn(
+                                  "flex items-center gap-2 rounded-xl px-2.5 py-2 transition-colors",
+                                  player
+                                    ? player.userId !== currentUserId
+                                      ? "bg-background/70 cursor-pointer hover:bg-muted/60 active:scale-[0.98]"
+                                      : "bg-background/70"
+                                    : "border border-dashed border-border"
+                                )}
+                              >
                                 {player ? (
                                   <>
-                                    <div className={cn(
-                                      "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0",
-                                      color === "blue" ? "bg-blue-500" : "bg-violet-500"
-                                    )}>
-                                      {player.name?.[0]?.toUpperCase() ?? "?"}
-                                    </div>
+                                    <UserAvatar
+                                      image={player.image}
+                                      name={player.name}
+                                      className="w-7 h-7 rounded-full text-xs text-white"
+                                      fallbackClassName={cn(
+                                        "w-7 h-7 rounded-full text-xs text-white",
+                                        color === "blue" ? "bg-blue-500" : "bg-violet-500"
+                                      )}
+                                    />
                                     <span className="text-xs font-medium text-foreground truncate">{player.name}</span>
-                                    {player.userId === currentUserId && (
-                                      <span className="text-[9px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-semibold mr-auto shrink-0">شما</span>
-                                    )}
+                                    {player.userId === currentUserId
+                                      ? <span className="text-[9px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-semibold mr-auto shrink-0">شما</span>
+                                      : <span className="text-[9px] text-muted-foreground mr-auto shrink-0 opacity-50">👁</span>
+                                    }
                                   </>
                                 ) : (
                                   <span className="text-xs text-muted-foreground/50 px-1">جای خالی</span>
@@ -285,6 +300,15 @@ export default function MatchDetailSheet() {
               <div className="h-4" />
             </div>
           </motion.div>
+
+          {viewingUser && (
+            <UserProfileSheet
+              userId={viewingUser.userId}
+              name={viewingUser.name}
+              image={viewingUser.image}
+              onClose={() => setViewingUser(null)}
+            />
+          )}
         </>
       )}
     </AnimatePresence>

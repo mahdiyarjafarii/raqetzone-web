@@ -48,9 +48,9 @@ const fmtDate = (v) => {
 
 function StatPill({ icon: Icon, value, label, color }) {
   return (
-    <div className="flex-1 flex flex-col items-center gap-1 py-3">
-      <span className={cn("text-xl font-black", color)}>{value ?? "—"}</span>
-      <span className="text-[11px] text-muted-foreground">{label}</span>
+    <div className="flex-1 flex flex-col items-center gap-1.5 py-4">
+      <span className={cn("text-2xl font-black tracking-tight", color)}>{value ?? "—"}</span>
+      <span className="text-[11px] text-muted-foreground font-medium">{label}</span>
     </div>
   );
 }
@@ -59,17 +59,17 @@ function XpBar({ levelData }) {
   if (!levelData) return null;
   const { current, progressPct, rank, progressXp, neededXp } = levelData;
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-2.5">
       <div className="flex justify-between items-center text-xs">
-        <span className="font-semibold text-foreground">سطح {current}</span>
-        <span className="text-muted-foreground">{fmt(progressXp)} / {fmt(neededXp)} XP</span>
+        <span className="font-black text-foreground">سطح {current}</span>
+        <span className="text-muted-foreground font-semibold">{fmt(progressXp)} / {fmt(neededXp)} XP</span>
       </div>
-      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+      <div className="h-2 bg-black/[0.04] dark:bg-white/10 rounded-full overflow-hidden shadow-inner">
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: `${progressPct}%` }}
           transition={{ duration: 0.8, delay: 0.3 }}
-          className="h-full rounded-full"
+          className="h-full rounded-full shadow-sm"
           style={{ background: `linear-gradient(90deg, ${rank?.gradient?.[0] ?? "#6366f1"}, ${rank?.gradient?.[1] ?? "#8b5cf6"})` }}
         />
       </div>
@@ -128,83 +128,90 @@ export default function ProfilePage() {
   const displayedPayments = showAllPayments ? payments : payments.slice(0, 3);
 
   return (
-    <div className="min-h-screen bg-background text-foreground pb-28">
+    <div className="min-h-screen bg-[#fbfaf8] dark:bg-background text-foreground pb-28">
 
       {/* ── Hero ──────────────────────────────────────────────────────── */}
-      <div className="relative px-5 pt-10 pb-6">
-        {/* subtle gradient bg */}
+      <div className="relative px-4 pt-4 pb-5">
         <div
-          className="absolute inset-x-0 top-0 h-48 pointer-events-none opacity-[0.07]"
-          style={{ background: `linear-gradient(160deg, ${profileData?.level?.rank?.gradient?.[0] ?? "#6366f1"}, ${profileData?.level?.rank?.gradient?.[1] ?? "#8b5cf6"})` }}
+          className="absolute inset-x-0 top-0 h-64 pointer-events-none opacity-80"
+          style={{ background: `radial-gradient(circle at 70% 0%, ${profileData?.level?.rank?.gradient?.[0] ?? "#6366f1"}22, transparent 38%), radial-gradient(circle at 20% 20%, ${profileData?.level?.rank?.gradient?.[1] ?? "#8b5cf6"}18, transparent 34%)` }}
         />
 
-        {/* edit button */}
-        <button
-          onClick={() => setEditOpen(true)}
-          className="absolute top-5 left-5 z-10 w-9 h-9 rounded-full bg-muted flex items-center justify-center"
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="relative overflow-hidden rounded-[32px] border border-white/80 dark:border-white/10 bg-white/85 dark:bg-card/80 shadow-xl shadow-slate-200/60 dark:shadow-black/20 backdrop-blur-xl"
         >
-          <PencilIcon className="w-4 h-4 text-muted-foreground" />
-        </button>
-
-        {/* avatar */}
-        <div className="relative w-fit mx-auto mb-4">
-          {loading ? (
-            <div className="w-24 h-24 rounded-full bg-muted animate-pulse" />
-          ) : (
-            <motion.img
-              initial={{ scale: 0.85, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ type: "spring", stiffness: 200 }}
-              src={getUserImage(user?.image)}
-              alt={user?.name}
-              className="w-24 h-24 rounded-full object-cover border-2 border-border shadow-md"
-            />
-          )}
+          <div
+            className="absolute inset-x-0 top-0 h-28 opacity-90"
+            style={{ background: `linear-gradient(135deg, ${profileData?.level?.rank?.gradient?.[0] ?? "#6366f1"}18, ${profileData?.level?.rank?.gradient?.[1] ?? "#8b5cf6"}10)` }}
+          />
           <button
-            onClick={() => fileRef.current?.click()}
-            className="absolute bottom-0 right-0 w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center shadow-md"
+            onClick={() => setEditOpen(true)}
+            className="absolute top-5 left-5 z-10 w-10 h-10 rounded-2xl bg-white/80 dark:bg-white/10 border border-white/70 dark:border-white/10 flex items-center justify-center shadow-sm backdrop-blur-md"
           >
-            <CameraIcon className="w-3.5 h-3.5" />
+            <PencilIcon className="w-4 h-4 text-muted-foreground" />
           </button>
-          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageUpload(f); }} />
-        </div>
 
-        {/* name + badges */}
-        {loading ? (
-          <div className="space-y-2 flex flex-col items-center">
-            <div className="h-6 w-32 rounded-xl bg-muted animate-pulse" />
-            <div className="h-4 w-20 rounded-xl bg-muted animate-pulse" />
-          </div>
-        ) : (
-          <div className="text-center space-y-2">
-            <h1 className="text-2xl font-black text-foreground">{user?.name ?? user?.phone ?? "بازیکن"}</h1>
-            <div className="flex items-center justify-center gap-2 flex-wrap">
-              <span className={cn("text-xs px-3 py-1 rounded-full font-semibold", skill.color)}>
-                {skill.label}
-              </span>
-              {user?.favoriteSport && (
-                <span className="text-xs px-3 py-1 rounded-full bg-muted text-muted-foreground font-medium">
-                  {SPORT_ICON[user.favoriteSport]} {user.favoriteSport}
-                </span>
+          <div className="relative px-5 pt-11 pb-5">
+            <div className="relative w-fit mx-auto mb-4">
+              {loading ? (
+                <div className="w-28 h-28 rounded-[34px] bg-muted animate-pulse" />
+              ) : (
+                <motion.img
+                  initial={{ scale: 0.85, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  transition={{ type: "spring", stiffness: 200 }}
+                  src={getUserImage(user?.image)}
+                  alt={user?.name}
+                  className="w-28 h-28 rounded-[34px] object-cover border-4 border-white dark:border-background shadow-xl shadow-slate-300/60 dark:shadow-black/30"
+                />
               )}
+              <button
+                onClick={() => fileRef.current?.click()}
+                className="absolute -bottom-1 -right-1 w-9 h-9 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center shadow-lg shadow-primary/25 border-2 border-white dark:border-background"
+              >
+                <CameraIcon className="w-4 h-4" />
+              </button>
+              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageUpload(f); }} />
             </div>
-            {user?.bio && (
-              <p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">{user.bio}</p>
+
+            {loading ? (
+              <div className="space-y-2 flex flex-col items-center">
+                <div className="h-7 w-32 rounded-xl bg-muted animate-pulse" />
+                <div className="h-6 w-28 rounded-xl bg-muted animate-pulse" />
+              </div>
+            ) : (
+              <div className="text-center space-y-3">
+                <h1 className="text-3xl font-black text-foreground tracking-tight">{user?.name ?? user?.phone ?? "بازیکن"}</h1>
+                <div className="flex items-center justify-center gap-2 flex-wrap">
+                  <span className={cn("text-xs px-3.5 py-1.5 rounded-full font-bold shadow-sm", skill.color)}>
+                    {skill.label}
+                  </span>
+                  {user?.favoriteSport && (
+                    <span className="text-xs px-3.5 py-1.5 rounded-full bg-black/[0.04] dark:bg-white/10 text-muted-foreground font-bold">
+                      {SPORT_ICON[user.favoriteSport]} {user.favoriteSport}
+                    </span>
+                  )}
+                </div>
+                {user?.bio && (
+                  <p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">{user.bio}</p>
+                )}
+              </div>
+            )}
+
+            {profileData?.level && (
+              <motion.div
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+                className="mt-6"
+              >
+                <XpBar levelData={profileData.level} />
+              </motion.div>
             )}
           </div>
-        )}
-
-        {/* XP bar */}
-        {profileData?.level && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="mt-5"
-          >
-            <XpBar levelData={profileData.level} />
-          </motion.div>
-        )}
+        </motion.div>
       </div>
 
       {/* ── Stats ─────────────────────────────────────────────────────── */}
@@ -213,9 +220,9 @@ export default function ProfilePage() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.15 }}
-          className="mx-5 rounded-2xl bg-card border border-border overflow-hidden"
+          className="mx-4 rounded-[26px] bg-white/90 dark:bg-card border border-black/[0.06] dark:border-border overflow-hidden shadow-lg shadow-slate-200/50 dark:shadow-black/10"
         >
-          <div className="flex divide-x divide-x-reverse divide-border">
+          <div className="flex divide-x divide-x-reverse divide-black/[0.06] dark:divide-border">
             <StatPill icon={SwordsIcon} value={stats.totalMatches} label="کل بازی‌ها" color="text-foreground" />
             <StatPill icon={TrophyIcon} value={stats.wins} label="برد" color="text-emerald-500" />
             <StatPill icon={TrendingUpIcon} value={stats.winRate != null ? `${stats.winRate}%` : null} label="نرخ برد" color="text-primary" />
@@ -228,11 +235,11 @@ export default function ProfilePage() {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.22 }}
-        className="mt-6 px-5"
+        className="mt-7 px-4"
       >
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-bold text-foreground">بازی‌های اخیر</h2>
-          <Link to="/tournament" className="text-xs text-primary flex items-center gap-0.5">
+          <h2 className="text-base font-black text-foreground">بازی‌های اخیر</h2>
+          <Link to="/tournament" className="text-xs text-primary font-bold flex items-center gap-0.5">
             همه <ChevronRightIcon className="w-3.5 h-3.5" />
           </Link>
         </div>
@@ -244,9 +251,9 @@ export default function ProfilePage() {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.28 }}
-        className="mt-6 px-5 space-y-3"
+        className="mt-7 px-4 space-y-3"
       >
-        <h2 className="text-sm font-bold text-foreground">اشتراک</h2>
+        <h2 className="text-base font-black text-foreground">اشتراک</h2>
 
         {paymentsLoading ? (
           <div className="h-28 rounded-2xl bg-muted animate-pulse" />

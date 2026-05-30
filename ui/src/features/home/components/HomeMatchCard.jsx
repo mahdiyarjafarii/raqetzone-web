@@ -33,32 +33,33 @@ export default function HomeMatchCard({ match, index = 0 }) {
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: index * 0.08 }}
-      className="shrink-0 w-52"
+      className="shrink-0 w-60"
     >
       <Link to="/tournament">
-        <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm active:scale-[0.98] transition-transform">
+        <div className="rounded-[26px] border border-white/70 dark:border-border bg-white/90 dark:bg-card overflow-hidden shadow-xl shadow-slate-200/50 dark:shadow-black/10 active:scale-[0.98] transition-transform">
           {/* Gradient header */}
-          <div className={cn("h-14 bg-gradient-to-r flex items-center px-3 gap-2", sportGrad)}>
-            <span className="text-2xl">{SPORT_ICONS[match.sportType] ?? "🏅"}</span>
+          <div className={cn("relative h-20 bg-gradient-to-r flex items-center px-4 gap-3 overflow-hidden", sportGrad)}>
+            <div className="absolute -left-6 -top-8 h-24 w-24 rounded-full bg-white/10" />
+            <span className="relative text-3xl">{SPORT_ICONS[match.sportType] ?? "🏅"}</span>
             <div className="min-w-0">
-              <p className="text-white font-bold text-sm truncate leading-tight">{match.title}</p>
-              <p className="text-white/70 text-[10px] capitalize">{match.sportType}</p>
+              <p className="text-white font-black text-base truncate leading-tight drop-shadow-sm">{match.title}</p>
+              <p className="text-white/75 text-[11px] capitalize font-semibold mt-0.5">{match.sportType}</p>
             </div>
           </div>
 
-          <div className="p-3 space-y-2">
-            <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
-              <ClockIcon className="w-3 h-3 shrink-0" />
+          <div className="p-3.5 space-y-2.5">
+            <div className="flex items-center gap-1.5 text-muted-foreground text-xs font-medium">
+              <ClockIcon className="w-3.5 h-3.5 shrink-0 text-primary" />
               <span>{formatMatchTime(match.scheduledAt)}</span>
             </div>
-            <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
-              <MapPinIcon className="w-3 h-3 shrink-0" />
+            <div className="flex items-center gap-1.5 text-muted-foreground text-xs font-medium">
+              <MapPinIcon className="w-3.5 h-3.5 shrink-0 text-primary" />
               <span className="truncate">{match.courtName || match.location}</span>
             </div>
 
             {/* Slots */}
-            <div className="flex items-center justify-between pt-1 border-t border-border">
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <div className="flex items-center justify-between pt-2 border-t border-border/70">
+              <div className="flex items-center gap-1 text-xs text-muted-foreground font-semibold">
                 <UsersIcon className="w-3 h-3" />
                 <span>{filled}/{total} نفر</span>
               </div>

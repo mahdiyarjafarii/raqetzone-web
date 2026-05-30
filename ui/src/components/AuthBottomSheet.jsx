@@ -164,31 +164,33 @@ const AuthBottomSheet = () => {
     <BottomSheet
       open={open}
       onDismiss={handleDismiss}
-      defaultSnap={({ maxHeight }) => maxHeight * 0.6}
-      snapPoints={({ maxHeight }) => [maxHeight * 0.6, maxHeight * 0.8]}
+      defaultSnap={({ maxHeight }) => maxHeight * 0.58}
+      snapPoints={({ maxHeight }) => [maxHeight * 0.58, maxHeight * 0.78]}
       blocking={true}
       scrollLocking={true}
       className="auth-bottom-sheet bottom-sheet"
     >
-      <div className="flex flex-col gap-4 px-6 pb-8">
+      <div className="relative overflow-hidden bg-[#fbfaf8] px-5 pb-6 pt-4 text-foreground dark:bg-background">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_70%_0%,rgba(43,15,217,0.12),transparent_38%)]" />
+        <div className="relative rounded-[28px] border border-black/[0.06] bg-white p-4 shadow-lg shadow-slate-200/50 dark:border-white/10 dark:bg-card dark:shadow-black/10">
         {currentForm === "enter-phone" ? (
           <form onSubmit={handleSubmitPhone}>
             <FieldGroup>
-              <div className="flex flex-col items-center gap-2 text-center mb-4">
-                <div className="flex size-12 items-center justify-center rounded-md">
-                  <img src="/logo.png" alt="Raqet Zone" className="size-12" />
+              <div className="flex flex-col items-center gap-1.5 text-center mb-3">
+                <div className="flex size-13 items-center justify-center rounded-[20px] bg-primary/8 border border-primary/10">
+                  <img src="/logo.png" alt="Raqet Zone" className="size-10 object-contain" />
                 </div>
-                <h1 className="text-xl font-bold">ورود به رکت زون</h1>
-                <p className="text-sm text-muted-foreground">
-                  لطفا شماره موبایل خود را وارد کنید
+                <h1 className="text-xl font-black tracking-tight">ورود به رکت‌زون</h1>
+                <p className="text-xs text-muted-foreground font-medium leading-relaxed">
+                  شماره موبایل‌ت رو وارد کن تا کد ورود برات ارسال بشه.
                 </p>
               </div>
 
               <Field>
-                <FieldLabel htmlFor="phone">شماره تلفن</FieldLabel>
-                <InputGroup>
+                <FieldLabel htmlFor="phone" className="font-bold">شماره موبایل</FieldLabel>
+                <InputGroup className="rounded-2xl border-border/70 bg-muted/40 px-1">
                   <InputGroupAddon>
-                    <PhoneIcon className="size-4" />
+                    <PhoneIcon className="size-4 text-muted-foreground" />
                   </InputGroupAddon>
                   <InputGroupInput
                     id="phone"
@@ -198,6 +200,7 @@ const AuthBottomSheet = () => {
                     onChange={(e) => setPhone(e.target.value)}
                     required
                     autoFocus
+                    className="h-11 text-base font-bold"
                   />
                 </InputGroup>
               </Field>
@@ -206,13 +209,13 @@ const AuthBottomSheet = () => {
                 <Button
                   type="submit"
                   disabled={isSubmitting || !phone}
-                  className="w-full"
+                  className="w-full h-11 rounded-2xl font-black"
                 >
-                  {isSubmitting ? <Spinner /> : "ادامه"}
+                  {isSubmitting ? <Spinner /> : "ورود"}
                 </Button>
               </Field>
 
-              <FieldDescription className="text-center text-xs mt-2">
+              <FieldDescription className="text-center text-[11px] mt-1 leading-relaxed">
                 با ادامه، با <a href="#" className="text-primary">شرایط خدمات</a> و{" "}
                 <a href="#" className="text-primary">سیاست حریم خصوصی</a> موافقت می‌کنید.
               </FieldDescription>
@@ -221,18 +224,18 @@ const AuthBottomSheet = () => {
         ) : (
           <form onSubmit={handleSubmitCode}>
             <FieldGroup>
-              <div className="flex flex-col items-center gap-2 text-center mb-4">
-                <div className="flex size-12 items-center justify-center rounded-md">
-                  <img src="/logo.png" alt="Raqet Zone" className="size-12" />
+              <div className="flex flex-col items-center gap-1.5 text-center mb-3">
+                <div className="flex size-13 items-center justify-center rounded-[20px] bg-primary/8 border border-primary/10">
+                  <img src="/logo.png" alt="Raqet Zone" className="size-10 object-contain" />
                 </div>
-                <h1 className="text-xl font-bold">کد تایید را وارد کنید</h1>
-                <p className="text-sm text-muted-foreground">
+                <h1 className="text-xl font-black tracking-tight">کد تایید را وارد کنید</h1>
+                <p className="text-xs text-muted-foreground font-medium leading-relaxed">
                   کد تایید ۴ رقمی به شماره {phone} ارسال شد
                 </p>
               </div>
 
               <Field>
-                <FieldLabel className="text-center">کد تایید</FieldLabel>
+                <FieldLabel className="text-center font-bold">کد تایید</FieldLabel>
                 <div className="flex justify-center" dir="ltr">
                   <VerificationInput
                     length={OTP_LENGTH}
@@ -244,13 +247,13 @@ const AuthBottomSheet = () => {
                     classNames={{
                       container: "gap-3",
                       character:
-                        "rounded-md border !border-gray-400 shadow !w-12 !h-14 text-xl",
-                      characterInactive: "!bg-gray-200",
-                      characterSelected: "border-ring ring-2 ring-ring/50",
+                        "rounded-2xl border !border-border bg-muted/40 !w-11 !h-13 text-xl font-black",
+                      characterInactive: "!bg-muted/40",
+                      characterSelected: "!border-primary ring-2 ring-primary/20",
                     }}
                   />
                 </div>
-                <FieldDescription className="text-center">
+                <FieldDescription className="text-center text-xs">
                   کد را از پیامک دریافتی خود وارد کنید
                 </FieldDescription>
               </Field>
@@ -259,7 +262,7 @@ const AuthBottomSheet = () => {
                 <Button
                   type="submit"
                   disabled={code.length !== OTP_LENGTH || isSubmitting}
-                  className="w-full"
+                  className="w-full h-11 rounded-2xl font-black"
                 >
                   {isSubmitting ? <Spinner /> : "تایید کد"}
                 </Button>
@@ -275,14 +278,14 @@ const AuthBottomSheet = () => {
                     setResendTimer(0);
                   }}
                   disabled={isSubmitting}
-                  className="w-full"
+                  className="w-full h-11 rounded-2xl font-bold"
                 >
                   <PencilLineIcon className="size-4" />
                   تغییر شماره تلفن
                 </Button>
               </Field>
 
-              <FieldDescription className="text-center">
+              <FieldDescription className="text-center text-xs">
                 کد را دریافت نکردید؟{" "}
                 <button
                   type="button"
@@ -303,6 +306,7 @@ const AuthBottomSheet = () => {
             </FieldGroup>
           </form>
         )}
+        </div>
       </div>
     </BottomSheet>
   );

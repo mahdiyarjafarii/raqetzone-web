@@ -31,9 +31,9 @@ function ClubCardHome({ club, index }) {
       transition={{ delay: index * 0.07 }}
     >
       <Link to={`/clubs/${club.id}`}>
-        <div className="flex items-center gap-3 bg-card border border-border rounded-2xl overflow-hidden shadow-sm active:scale-[0.99] transition-transform">
+        <div className="flex items-center gap-3 bg-white/90 dark:bg-card border border-white/70 dark:border-border rounded-[24px] overflow-hidden shadow-lg shadow-slate-200/45 dark:shadow-black/10 active:scale-[0.99] transition-transform">
           {/* Thumbnail */}
-          <div className="w-20 h-20 shrink-0 relative overflow-hidden bg-muted">
+          <div className="w-24 h-24 shrink-0 relative overflow-hidden bg-muted">
             {cover && !imgError ? (
               <img
                 src={cover}
@@ -50,16 +50,16 @@ function ClubCardHome({ club, index }) {
           </div>
 
           {/* Info */}
-          <div className="flex-1 min-w-0 py-3 pr-0">
+          <div className="flex-1 min-w-0 py-3.5 pr-0">
             <div className="flex items-start justify-between gap-2">
-              <p className="font-bold text-foreground text-sm leading-snug truncate">{club.name}</p>
-              <div className="flex items-center gap-0.5 shrink-0">
+              <p className="font-black text-foreground text-sm leading-snug truncate">{club.name}</p>
+              <div className="flex items-center gap-0.5 shrink-0 bg-amber-400/12 px-1.5 py-0.5 rounded-full">
                 <StarIcon className="w-3 h-3 fill-amber-400 text-amber-400" />
                 <span className="text-xs font-bold text-foreground">{club.rating}</span>
               </div>
             </div>
 
-            <div className="flex items-center gap-1 mt-0.5 text-muted-foreground text-xs">
+            <div className="flex items-center gap-1 mt-1 text-muted-foreground text-xs font-medium">
               <MapPinIcon className="w-3 h-3 shrink-0" />
               <span className="truncate">{club.location}</span>
             </div>
@@ -72,7 +72,7 @@ function ClubCardHome({ club, index }) {
                   </span>
                 ))}
               </div>
-              <div className="text-right shrink-0">
+              <div className="text-right shrink-0 bg-primary/8 px-2 py-1 rounded-xl">
                 <span className="text-primary font-black text-xs">{formatPrice(club.priceFrom)}</span>
                 <span className="text-muted-foreground text-[10px]"> ت</span>
               </div>
@@ -100,7 +100,7 @@ export default function HomeCourtsSection({ courts = [], loading: homeLoading })
       <div className="space-y-2.5 px-4">
         {loading ? (
           Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="h-20 rounded-2xl bg-muted animate-pulse" />
+            <div key={i} className="h-24 rounded-[24px] bg-muted animate-pulse" />
           ))
         ) : (
           clubs.map((club, i) => (
@@ -111,7 +111,7 @@ export default function HomeCourtsSection({ courts = [], loading: homeLoading })
         {/* See all link */}
         <Link
           to="/clubs"
-          className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl border border-dashed border-border text-muted-foreground text-sm font-medium active:bg-muted transition-colors"
+          className="flex items-center justify-center gap-2 w-full py-3.5 rounded-[22px] border border-dashed border-border bg-white/60 dark:bg-card text-muted-foreground text-sm font-bold active:bg-muted transition-colors"
         >
           مشاهده همه مجموعه‌ها
           <ArrowLeftIcon className="w-4 h-4" />

@@ -220,3 +220,63 @@ export const updateSportsProfileController = async (req, res) => {
     return res.status(500).json({ message: "خطای سرور" });
   }
 };
+
+// ─── Public Profile (view another user) ──────────────────────────────────────
+
+export const getPublicProfileController = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const [user] = await db
+      .select({
+        id: users.id,
+        name: users.name,
+        image: users.image,
+        bio: users.bio,
+        skillLevel: users.skillLevel,
+        favoriteSport: users.favoriteSport,
+        level: users.level,
+        xp: users.xp,
+        createdAt: users.createdAt,
+      })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    if (!user) return res.status(404).json({ message: "کاربر یافت نشد" });
+
+    const participations = await db
+      .select({
+        matchId: matchParticipants.matchId,
+        isWin: matchParticipants.isWin,
+        joinedAt: matchParticipants.joinedAt,
+        matchSportType: matches.sportType,
+      })
+      .from(matchParticipants)
+      .innerJoin(matches, eq(matchParticipants.matchId, matches.id))
+      .where(eq(matchParticipants.userId, userId));
+
+    const totalMatches = participations.length;
+    const decidedMatches = participations.filter((p) => p.isWin !== null);
+    const wins = decidedMatches.filter((p) => p.isWin === true).length;
+    const winRate = decidedMatches.length > 0 ? Math.round((wins / decidedMatches.length) * 100) : 0;
+
+    const currentLevel = user.level ?? 1;
+    const rank = getRank(currentLevel);
+    const nextLevelXp = Math.pow(currentLevel, 2) * 80;
+    const currentLevelXp = Math.pow(currentLevel - 1, 2) * 80;
+    const earnedXp = user.xp ?? 0;
+    const progressXp = earnedXp - currentLevelXp;
+    const neededXp = nextLevelXp - currentLevelXp;
+    const progressPct = neededXp > 0 ? Math.round((progressXp / neededXp) * 100) : 100;
+
+    return res.status(200).json({
+      user,
+      stats: { totalMatches, wins, winRate },
+      level: { current: currentLevel, xp: earnedXp, progressXp, neededXp, progressPct, rank },
+    });
+  } catch (error) {
+    console.error("getPublicProfile error:", error);
+    return res.status(500).json({ message: "خطای سرور" });
+  }
+};

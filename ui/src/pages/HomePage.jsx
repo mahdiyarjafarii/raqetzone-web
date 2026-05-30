@@ -19,7 +19,7 @@ import HomeCourtsSection from "@/features/home/components/HomeCourtsSection";
 import BookingSummaryBar from "@/features/home/components/BookingSummaryBar";
 
 function SectionDivider() {
-  return <div className="h-4" />;
+  return <div className="h-5" />;
 }
 
 export default function HomePage() {
@@ -27,7 +27,9 @@ export default function HomePage() {
   const { data, loading, refetch } = useHomeData();
 
   return (
-    <div className="min-h-screen bg-background text-foreground pb-24">
+    <div className="relative min-h-screen overflow-hidden bg-[#fbfaf8] text-foreground pb-28 dark:bg-background">
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-80 bg-[radial-gradient(circle_at_75%_0%,rgba(43,15,217,0.16),transparent_38%),radial-gradient(circle_at_15%_8%,rgba(239,24,113,0.10),transparent_32%)]" />
+      <div className="relative">
       {/* ── Greeting ── */}
       <GreetingHeader user={currentUser} />
 
@@ -88,6 +90,7 @@ export default function HomePage() {
           </motion.button>
         )}
       </AnimatePresence>
+      </div>
     </div>
   );
 }

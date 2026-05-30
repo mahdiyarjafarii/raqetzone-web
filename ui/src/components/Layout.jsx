@@ -3,9 +3,7 @@ import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAtom, useSetAtom } from "jotai";
 import {
   ArrowRightIcon,
-  SparklesIcon,
   GemIcon,
-  SettingsIcon,
   ShoppingCart,
   User,
   Gem,
@@ -24,12 +22,8 @@ import { LimelightNav } from "@/components/ui/shadcn-io/limelight-nav";
 import {
   showPricingSheetAtom,
   pricingSheetTriggerSourceAtom,
-  showReachLimitPricingSheetAtom,
-  reachLimitPricingSheetTriggerSourceAtom,
-  hasTitleReachLimitPricingSheetAtom,
   showOverlayLoadingAtom,
   gemHintAtom,
-  showOnboardingAtom,
   usageHintAtom,
   themeAtom,
 } from "@/config/state";
@@ -44,7 +38,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import useAuth from "@/auth/useAuth";
 import HintAlertModal from "./HintAlertModal";
-import Onboarding from "./Onboariding";
 import { fetchBatchPreferences } from "@/hooks/useUserPreference";
 import apiClient from "@/lib/apiClient";
 import PREFERENCE_KEYS from "@/config/preferenceKeys";
@@ -64,16 +57,6 @@ function Layout() {
   const [, setPricingSheetTriggerSource] = useAtom(
     pricingSheetTriggerSourceAtom
   );
-  const [, setShowReachLimitPricingSheet] = useAtom(
-    showReachLimitPricingSheetAtom
-  );
-  const [, setReachLimitTriggerSource] = useAtom(
-    reachLimitPricingSheetTriggerSourceAtom
-  );
-  const [, setHasTitleReachLimitPricingSheet] = useAtom(
-    hasTitleReachLimitPricingSheetAtom
-  );
-  const [showOnboarding, setShowOnboardingAtom] = useAtom(showOnboardingAtom);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
 
@@ -88,12 +71,10 @@ function Layout() {
 
       try {
         const prefs = await fetchBatchPreferences([
-          PREFERENCE_KEYS.SHOW_ONBOARDING,
           PREFERENCE_KEYS.USAGE_HINT,
           PREFERENCE_KEYS.GEM_HINT,
         ]);
 
-        setShowOnboardingAtom(prefs[PREFERENCE_KEYS.SHOW_ONBOARDING] ?? true);
         setUsageHintAtom(prefs[PREFERENCE_KEYS.USAGE_HINT] ?? true);
         setGemHintAtom(prefs[PREFERENCE_KEYS.GEM_HINT] ?? true);
       } catch (error) {
@@ -121,20 +102,6 @@ function Layout() {
     }
   };
 
-  const setShowOnboarding = async (value) => {
-    setShowOnboardingAtom(value);
-    const token = authStorage.getToken();
-    if (token && currentUser) {
-      try {
-        await apiClient.post(`/preference/${PREFERENCE_KEYS.SHOW_ONBOARDING}`, {
-          value,
-        });
-      } catch (error) {
-        console.error("Error saving onboarding preference:", error);
-      }
-    }
-  };
-
   useEffect(() => {
     prevPathname = location.pathname;
   }, [location.pathname]);
@@ -142,18 +109,6 @@ function Layout() {
   const isChatPage = location.pathname.startsWith("/chat");
   const isVideoGeneratePage = location.pathname === "/video-generate";
   const isImageGeneratePage = location.pathname === "/image-generate";
-
-  const shouldShowSubscriptionButton = (() => {
-    // if (!isHomePage) return false;
-    if (currentUser?.subscriptionType) return false;
-    if (currentUser?.subscriptionEndDate) {
-      const endDate = new Date(currentUser.subscriptionEndDate);
-      const now = new Date();
-      if (endDate > now) return false;
-    }
-
-    return true;
-  })();
 
   const formatNumber = (num) => {
     if (num == null || num === undefined) return num;
@@ -180,10 +135,8 @@ function Layout() {
 
     return true;
   })();
-  // Wait for preferences to load before showing onboarding
+  // Wait for preferences to load
   if (!preferencesLoaded) return null;
-  if (showOnboarding)
-    return <Onboarding setShowOnboarding={setShowOnboarding} />;
 
   return (
     <div
@@ -247,25 +200,6 @@ function Layout() {
           </div>
 
           <div className="flex items-center gap-2">
-            {shouldShowSubscriptionButton && (
-              <div
-                className="flex items-center gap-1 px-2 py-1 rounded-md cursor-pointer border-2 text-sm font-medium"
-                style={{
-                  backgroundColor: "rgba(234, 0, 105, 0.1)",
-                  borderColor: "rgba(234, 0, 105, 1)",
-                  color: "rgba(234, 0, 105, 1)",
-                }}
-                onClick={() => {
-                  setReachLimitTriggerSource("header_subscribe_button");
-                  setShowReachLimitPricingSheet(true);
-                  setHasTitleReachLimitPricingSheet(false);
-                }}
-              >
-                <SparklesIcon size={16} />
-                خرید اشتراک
-              </div>
-            )}
-
             {shouldShowCredits && (
               <Link
                 to="/profile"
@@ -290,22 +224,23 @@ function Layout() {
                 <User size={26} />
               </DropdownMenuTrigger>
 
-              <DropdownMenuContent className="transform translate-x-3 min-w-[180px] z-10">
-                <DropdownMenuLabel className="py-2 text-sm text-center">
+              <DropdownMenuContent className="transform translate-x-3 min-w-[220px] z-10 rounded-[22px] border border-black/[0.06] dark:border-white/10 bg-white/95 dark:bg-card/95 p-2 shadow-2xl shadow-black/15 backdrop-blur-xl">
+                <DropdownMenuLabel className="py-3 text-sm text-center font-black text-foreground">
                   {currentUser?.phone}
                 </DropdownMenuLabel>
-                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={(e) => {
                     e.preventDefault();
                     navigate("/profile");
                     setIsDropdownOpen(false);
                   }}
-                  className="cursor-pointer border text-primary! bg-primary/10! px-3 py-2.5 min-h-[44px]"
+                  className="cursor-pointer rounded-2xl border border-primary/10 text-primary! bg-primary/10! px-3 py-3 min-h-[52px] mb-1"
                 >
-                  <GemIcon size={18} className="text-primary!" />
+                  <div className="w-9 h-9 rounded-xl bg-primary/12 flex items-center justify-center">
+                    <GemIcon size={18} className="text-primary!" />
+                  </div>
                   <span className="text-sm font-medium">
-                    اعتبار: {formatNumber(currentUser?.credits)} جم
+                    اعتبار: {formatNumber(currentUser?.credits)}
                   </span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
@@ -313,33 +248,26 @@ function Layout() {
                     setPricingSheetTriggerSource("user_dropdown_menu");
                     setShowPricingSheet(true);
                   }}
-                  className="px-3 py-2.5 min-h-[44px]"
+                  className="rounded-2xl px-3 py-3 min-h-[50px] cursor-pointer"
                 >
-                  <ShoppingCart size={18} />
-                  <span className="text-sm">خرید اشتراک</span>
+                  <div className="w-9 h-9 rounded-xl bg-[#ef1871]/10 text-[#ef1871] flex items-center justify-center">
+                    <ShoppingCart size={18} />
+                  </div>
+                  <span className="text-sm font-bold">خرید رکت‌زون پلاس</span>
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={(e) => {
-                    e.preventDefault();
-                    navigate("/profile");
-                    setIsDropdownOpen(false);
-                  }}
-                  className="px-3 py-2.5 min-h-[44px]"
-                >
-                  <SettingsIcon size={18} />
-                  <span className="text-sm">تنظیمات</span>
-                </DropdownMenuItem>{" "}
                 <DropdownMenuItem
                   onClick={(e) => {
                     e.preventDefault();
                     setTheme(theme === "dark" ? "light" : "dark");
                     setIsDropdownOpen(false);
                   }}
-                  className="px-3 py-2.5 min-h-[44px] flex items-center justify-between"
+                  className="rounded-2xl px-3 py-3 min-h-[50px] flex items-center justify-between cursor-pointer"
                 >
-                  <div className="flex items-center gap-2">
-                    {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
-                    <span className="text-sm">حالت تیره</span>
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center">
+                      {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+                    </div>
+                    <span className="text-sm font-bold">حالت تیره</span>
                   </div>
 
                   <button
@@ -352,29 +280,31 @@ function Layout() {
                       setIsDropdownOpen(false);
                     }}
                     className={cn(
-                      "relative inline-flex h-5 w-9 items-center rounded-full transition-colors",
-                      theme === "dark" ? "bg-primary" : "bg-muted"
+                      "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
+                      theme === "dark" ? "bg-primary" : "bg-black/10 dark:bg-white/10"
                     )}
                   >
                     <span
                       className={cn(
-                        "inline-block h-4 w-4 transform rounded-full bg-background shadow transition-transform",
-                        theme === "dark" ? "translate-x-4" : "translate-x-1"
+                        "inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform",
+                        theme === "dark" ? "translate-x-5" : "translate-x-0.5"
                       )}
                     />
                   </button>
                 </DropdownMenuItem>
-                <hr />
+                <DropdownMenuSeparator className="my-1" />
                 <DropdownMenuItem
                   onClick={(e) => {
                     e.preventDefault();
 
                     logOut();
                   }}
-                  className="px-3 py-2.5 min-h-[44px] cursor-pointer flex items-center gap-2"
+                  className="rounded-2xl px-3 py-3 min-h-[50px] cursor-pointer flex items-center gap-2.5 text-destructive focus:text-destructive"
                 >
-                  <LogOutIcon size={18} />
-                  <span className="text-sm ">خروج از رکت زون</span>
+                  <div className="w-9 h-9 rounded-xl bg-destructive/10 flex items-center justify-center">
+                    <LogOutIcon size={18} />
+                  </div>
+                  <span className="text-sm font-bold">خروج از رکت زون</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

@@ -13,12 +13,13 @@ export default function BookingSummaryBar({ summary }) {
       className="mx-4"
     >
       <Link to="/mybooking">
-        <div className="flex items-center justify-between bg-primary/8 border border-primary/20 rounded-2xl px-4 py-3">
+        <div className="relative overflow-hidden flex items-center justify-between bg-white/90 dark:bg-card border border-primary/15 rounded-[24px] px-4 py-3.5 shadow-lg shadow-slate-200/45 dark:shadow-black/10">
+          <div className="absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-primary/10 to-transparent" />
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-primary/10 flex items-center justify-center">
-              <CalendarCheckIcon className="w-4 h-4 text-primary" />
+            <div className="relative h-11 w-11 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center shadow-lg shadow-primary/20">
+              <CalendarCheckIcon className="w-4 h-4 text-primary-foreground" />
             </div>
-            <div>
+            <div className="relative">
               <p className="text-foreground text-sm font-bold">رزروهای من</p>
               <p className="text-muted-foreground text-xs">
                 {summary.pending > 0 && (
@@ -34,7 +35,7 @@ export default function BookingSummaryBar({ summary }) {
               </p>
             </div>
           </div>
-          <ChevronLeftIcon className="w-4 h-4 text-muted-foreground" />
+          <ChevronLeftIcon className="relative w-4 h-4 text-muted-foreground" />
         </div>
       </Link>
     </motion.div>

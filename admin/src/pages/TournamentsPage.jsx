@@ -7,6 +7,33 @@ import {
   ChevronLeftIcon, CheckIcon, GiftIcon, ShieldCheckIcon,
   ZapIcon, Trash2Icon,
 } from "lucide-react";
+
+const ADMIN_BASE = import.meta.env.VITE_API_URL?.replace("/api", "") ?? "http://localhost:3000";
+
+function buildUserImageUrl(image) {
+  if (!image) return null;
+  if (image.startsWith("http")) return image;
+  return `${ADMIN_BASE}/uploads/user/${image}`;
+}
+
+function UserAvatar({ image, name, className, fallbackClassName }) {
+  const src = buildUserImageUrl(image);
+  if (src) {
+    return (
+      <img
+        src={src}
+        alt={name ?? ""}
+        onError={(e) => { e.currentTarget.style.display = "none"; e.currentTarget.nextElementSibling.style.display = "flex"; }}
+        className={`object-cover shrink-0 ${className}`}
+      />
+    );
+  }
+  return (
+    <div className={`flex items-center justify-center font-bold shrink-0 ${fallbackClassName ?? className}`}>
+      {name?.[0]?.toUpperCase() ?? "?"}
+    </div>
+  );
+}
 import toast from "react-hot-toast";
 import apiClient from "@/lib/apiClient";
 import PageHeader from "@/components/PageHeader";
@@ -344,9 +371,12 @@ function ParticipantsModal({ tournament, onClose }) {
             participants.map((p, i) => (
               <div key={p.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-border bg-muted/30">
                 <span className="text-xs font-mono text-muted-foreground w-5 shrink-0">#{i+1}</span>
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center text-white text-xs font-bold shrink-0">
-                  {p.name?.[0]?.toUpperCase() ?? "?"}
-                </div>
+                <UserAvatar
+                  image={p.image}
+                  name={p.name}
+                  className="w-8 h-8 rounded-full text-white text-xs font-bold"
+                  fallbackClassName="w-8 h-8 rounded-full bg-gradient-to-br from-violet-600 to-indigo-600 text-white text-xs font-bold"
+                />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-foreground truncate">{p.name ?? "ناشناس"}</p>
                   <p className="text-xs text-muted-foreground" dir="ltr">{p.phone ?? "-"}</p>

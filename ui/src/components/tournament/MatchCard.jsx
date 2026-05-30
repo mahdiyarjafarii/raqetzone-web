@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { MapPinIcon, CalendarIcon, UsersIcon, ChevronRightIcon, ClockIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import UserAvatar from "@/components/ui/UserAvatar";
 
 function useCountdown(targetDate) {
   const [label, setLabel] = useState("");
@@ -138,17 +139,17 @@ export default function MatchCard({ match, onClick, index = 0 }) {
             <div className="flex -space-x-1.5">
               {Array.from({ length: match.teamSize }).map((_, i) => {
                 const player = match.teamA[i];
-                return (
-                  <div
+                return player ? (
+                  <UserAvatar
                     key={i}
-                    className={cn(
-                      "h-7 w-7 rounded-full border-2 border-background flex items-center justify-center text-[10px] font-bold",
-                      player
-                        ? "bg-blue-500 text-white"
-                        : "bg-muted text-muted-foreground border-dashed"
-                    )}
-                  >
-                    {player ? (player.name?.[0]?.toUpperCase() ?? "?") : "+"}
+                    image={player.image}
+                    name={player.name}
+                    className="h-7 w-7 rounded-full border-2 border-background text-[10px] text-white"
+                    fallbackClassName="h-7 w-7 rounded-full border-2 border-background bg-blue-500 text-white text-[10px]"
+                  />
+                ) : (
+                  <div key={i} className="h-7 w-7 rounded-full border-2 border-background border-dashed bg-muted text-muted-foreground flex items-center justify-center text-[10px] font-bold">
+                    +
                   </div>
                 );
               })}
@@ -160,17 +161,17 @@ export default function MatchCard({ match, onClick, index = 0 }) {
             <div className="flex -space-x-1.5">
               {Array.from({ length: match.teamSize }).map((_, i) => {
                 const player = match.teamB[i];
-                return (
-                  <div
+                return player ? (
+                  <UserAvatar
                     key={i}
-                    className={cn(
-                      "h-7 w-7 rounded-full border-2 border-background flex items-center justify-center text-[10px] font-bold",
-                      player
-                        ? "bg-violet-500 text-white"
-                        : "bg-muted text-muted-foreground border-dashed"
-                    )}
-                  >
-                    {player ? (player.name?.[0]?.toUpperCase() ?? "?") : "+"}
+                    image={player.image}
+                    name={player.name}
+                    className="h-7 w-7 rounded-full border-2 border-background text-[10px] text-white"
+                    fallbackClassName="h-7 w-7 rounded-full border-2 border-background bg-violet-500 text-white text-[10px]"
+                  />
+                ) : (
+                  <div key={i} className="h-7 w-7 rounded-full border-2 border-background border-dashed bg-muted text-muted-foreground flex items-center justify-center text-[10px] font-bold">
+                    +
                   </div>
                 );
               })}

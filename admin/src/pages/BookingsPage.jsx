@@ -11,6 +11,36 @@ import Input from "@/components/ui/Input";
 import { fmt, fmtDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
+const ADMIN_BASE = import.meta.env.VITE_API_URL?.replace("/api", "") ?? "http://localhost:3000";
+
+function UserAvatar({ image, name }) {
+  const src = image
+    ? image.startsWith("http") ? image : `${ADMIN_BASE}/uploads/user/${image}`
+    : null;
+
+  return (
+    <div className="w-9 h-9 rounded-full overflow-hidden shrink-0 border border-border">
+      {src ? (
+        <img
+          src={src}
+          alt={name ?? ""}
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            e.currentTarget.style.display = "none";
+            e.currentTarget.nextSibling.style.display = "flex";
+          }}
+        />
+      ) : null}
+      <div
+        className="w-full h-full bg-gradient-to-br from-violet-600 to-indigo-500 text-white text-xs font-bold items-center justify-center"
+        style={{ display: src ? "none" : "flex" }}
+      >
+        {name?.[0]?.toUpperCase() ?? "?"}
+      </div>
+    </div>
+  );
+}
+
 const STATUS_BADGE = {
   pending:   { variant: "warning",     label: "در انتظار" },
   approved:  { variant: "success",     label: "تأیید شده" },
@@ -133,8 +163,13 @@ export default function BookingsPage() {
                         className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors"
                       >
                         <td className="px-4 py-3">
-                          <div className="font-medium text-foreground">{b.user?.name ?? "—"}</div>
-                          <div className="text-xs text-muted-foreground" dir="ltr">{b.user?.phone}</div>
+                          <div className="flex items-center gap-2.5">
+                            <UserAvatar image={b.user?.image} name={b.user?.name} />
+                            <div>
+                              <div className="font-medium text-foreground">{b.user?.name ?? "—"}</div>
+                              <div className="text-xs text-muted-foreground" dir="ltr">{b.user?.phone}</div>
+                            </div>
+                          </div>
                         </td>
                         <td className="px-4 py-3">
                           <div className="font-medium text-foreground">{b.court?.name}</div>

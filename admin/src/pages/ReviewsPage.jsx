@@ -184,7 +184,7 @@ export default function ReviewsPage() {
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden">
                     {r.user?.image
-                      ? <img src={r.user.image.startsWith("http") ? r.user.image : `${BASE}${r.user.image}`} alt="" className="w-full h-full object-cover" />
+                      ? <img src={r.user.image.startsWith("http") ? r.user.image : `${BASE}/uploads/user/${r.user.image}`} alt="" className="w-full h-full object-cover" />
                       : <span className="text-sm font-bold text-primary">{r.user?.name?.[0]?.toUpperCase() ?? "?"}</span>
                     }
                   </div>

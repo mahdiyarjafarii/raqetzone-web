@@ -9,6 +9,7 @@ import { CameraIcon, UserCircleIcon } from "lucide-react";
 
 import { showOnboardingSheetAtom, currentUserAtom } from "@/config/state";
 import apiClient from "@/lib/apiClient";
+import authStorage from "@/auth/storage";
 import { cn } from "@/lib/utils";
 
 // ── data ──────────────────────────────────────────────────────────────────────
@@ -104,7 +105,7 @@ function StepPhoto({ preview, onSelect, uploading }) {
         <div className="text-5xl mb-4">🤳</div>
         <h2 className="text-xl font-black text-foreground">عکس پروفایلت رو بزار</h2>
         <p className="text-muted-foreground text-sm mt-2">
-          بقیه بازیکنا بهتر می‌شناسنت
+          برای ادامه انتخاب عکس الزامیه 📸
         </p>
       </div>
 
@@ -293,6 +294,7 @@ export default function OnboardingSheet() {
 
   const canNext = () => {
     if (step === 1) return name.trim().length >= 2;
+    if (step === 2) return !!photoPreview && !photoUploading;
     return true;
   };
 
@@ -303,13 +305,21 @@ export default function OnboardingSheet() {
     try {
       const form = new FormData();
       form.append("image", file);
-      const res = await apiClient.post("/users/upload-image", form);
+      const res = await fetch(`${import.meta.env.VITE_WEBSITE_URL}/api/users/upload-image`, {
+        method: "POST",
+        headers: { "x-auth-token": authStorage.getToken() ?? "" },
+        body: form,
+      });
+      const data = await res.json();
       if (!res.ok) {
         toast.error("خطا در آپلود عکس");
         setPhotoPreview(null);
-      } else if (res.data?.user) {
-        setCurrentUser(res.data.user);
+      } else if (data?.user) {
+        setCurrentUser(data.user);
       }
+    } catch {
+      toast.error("خطا در اتصال");
+      setPhotoPreview(null);
     } finally {
       setPhotoUploading(false);
     }
@@ -333,7 +343,7 @@ export default function OnboardingSheet() {
 
   const btnLabel = () => {
     if (step === 0) return "شروع کن 🚀";
-    if (step === 2) return photoPreview ? "ادامه" : "رد کردن";
+    if (step === 2) return photoUploading ? "در حال آپلود..." : photoPreview ? "ادامه" : "عکس پروفایل الزامی است";
     if (isLastStep) return saving ? "در حال ذخیره..." : "بزن بریم! 🎉";
     return "بعدی";
   };

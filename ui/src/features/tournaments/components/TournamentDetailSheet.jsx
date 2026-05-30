@@ -8,6 +8,8 @@ import {
   CheckCircleIcon, ChevronDownIcon, CheckIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import UserAvatar from "@/components/ui/UserAvatar";
+import UserProfileSheet from "@/components/ui/UserProfileSheet";
 import { selectedTournamentAtom, tournamentDetailOpenAtom } from "../store/tournamentStore";
 import { tournamentService } from "../services/tournamentService";
 
@@ -109,8 +111,9 @@ function CountdownBlock({ deadline }) {
 
 // ─── Participants list ──────────────────────────────────────────────────────────
 
-function ParticipantsList({ participants, max }) {
+function ParticipantsList({ participants, max, currentUserId }) {
   const [showAll, setShowAll] = useState(false);
+  const [viewingUser, setViewingUser] = useState(null);
   const visible = showAll ? participants : participants.slice(0, 6);
 
   return (
@@ -133,29 +136,51 @@ function ParticipantsList({ participants, max }) {
         <>
           <div className="space-y-2">
             <AnimatePresence>
-              {visible.map((p, i) => (
-                <motion.div
-                  key={p.id}
-                  initial={{ opacity:0, x:-8 }}
-                  animate={{ opacity:1, x:0 }}
-                  transition={{ delay: i * 0.03 }}
-                  className="flex items-center gap-3 py-2 px-3 rounded-xl bg-muted/40 border border-border/60"
-                >
-                  <span className="text-[10px] font-mono text-muted-foreground w-4 shrink-0">#{i+1}</span>
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center text-white text-xs font-black shrink-0">
-                    {p.name?.[0]?.toUpperCase() ?? "?"}
-                  </div>
-                  <p className="flex-1 text-sm font-medium text-foreground truncate">{p.name ?? "کاربر"}</p>
-                  <span className={cn(
-                    "text-[10px] font-semibold px-2 py-0.5 rounded-full border shrink-0",
-                    p.paymentStatus === "paid"
-                      ? "text-emerald-600 bg-emerald-500/10 border-emerald-500/25"
-                      : "text-amber-600 bg-amber-500/10 border-amber-500/25"
-                  )}>
-                    {p.paymentStatus === "paid" ? "✓ پرداخت" : "⏳ در انتظار"}
-                  </span>
-                </motion.div>
-              ))}
+              {visible.map((p, i) => {
+                const isMe = p.userId === currentUserId;
+                return (
+                  <motion.div
+                    key={p.id}
+                    initial={{ opacity:0, x:-8 }}
+                    animate={{ opacity:1, x:0 }}
+                    transition={{ delay: i * 0.03 }}
+                    onClick={() => !isMe && setViewingUser(p)}
+                    className={cn(
+                      "flex items-center gap-3 py-2 px-3 rounded-xl bg-muted/40 border border-border/60 transition-colors",
+                      !isMe && "cursor-pointer hover:bg-muted/70 active:scale-[0.99]"
+                    )}
+                  >
+                    <span className="text-[10px] font-mono text-muted-foreground w-4 shrink-0">#{i+1}</span>
+                    <UserAvatar
+                      image={p.image}
+                      name={p.name}
+                      className="w-8 h-8 rounded-full text-xs text-white font-black"
+                      fallbackClassName="w-8 h-8 rounded-full bg-gradient-to-br from-violet-600 to-indigo-600 text-white text-xs font-black"
+                    />
+                    <p className="flex-1 text-sm font-medium text-foreground truncate">{p.name ?? "کاربر"}</p>
+                    {isMe ? (
+                      <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-full font-semibold shrink-0">شما</span>
+                    ) : (
+                      <span className={cn(
+                        "text-[10px] font-semibold px-2 py-0.5 rounded-full border shrink-0",
+                        p.paymentStatus === "paid"
+                          ? "text-emerald-600 bg-emerald-500/10 border-emerald-500/25"
+                          : "text-amber-600 bg-amber-500/10 border-amber-500/25"
+                      )}>
+                        {p.paymentStatus === "paid" ? "✓ پرداخت" : "⏳ در انتظار"}
+                      </span>
+                    )}
+                  </motion.div>
+                );
+              })}
+              {viewingUser && (
+                <UserProfileSheet
+                  userId={viewingUser.userId}
+                  name={viewingUser.name}
+                  image={viewingUser.image}
+                  onClose={() => setViewingUser(null)}
+                />
+              )}
             </AnimatePresence>
           </div>
           {participants.length > 6 && (
@@ -380,6 +405,7 @@ export default function TournamentDetailSheet() {
                 <ParticipantsList
                   participants={tournament.participants ?? []}
                   max={tournament.maxParticipants}
+                  currentUserId={userId}
                 />
 
                 {/* Rules */}

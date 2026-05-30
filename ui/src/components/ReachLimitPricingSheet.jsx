@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { BottomSheet } from "react-spring-bottom-sheet";
-import { useAtom, useAtomValue, useSetAtom } from "jotai";
+import { useAtom, useSetAtom } from "jotai";
 import toast from "react-hot-toast";
 import { X } from "lucide-react";
 
@@ -8,13 +8,10 @@ import {
   showReachLimitPricingSheetAtom,
   hasTitleReachLimitPricingSheetAtom,
   showOverlayLoadingAtom,
-  themeAtom,
   reachLimitPricingSheetTriggerSourceAtom,
 } from "@/config/state";
 import { cn } from "@/lib/utils";
 import apiClient from "@/lib/apiClient";
-import pricingImg from "@/assets/img/pricing-img.png";
-import pricingDarkImg from "@/assets/img/pricing-img-dark.png";
 import {
   trackPricingEvent,
   PRICING_EVENTS,
@@ -42,14 +39,14 @@ const periods = [
   {
     id: "monthly",
     label: "۱ ماهه",
-    label2: "۱۵۰۰ 💎 جم",
+    label2: "۱۵۰۰ اعتبار",
     price: basicPlanPrice.monthly,
     discount: null,
   },
   {
     id: "quarterly",
     label: "۳ ماهه",
-    label2: "۴۵۰۰ 💎 جم",
+    label2: "۴۵۰۰ اعتبار",
     price: basicPlanPrice.quarterly,
     monthlyPrice: monthlyPrices.quarterly,
     // discount: "۳۰٪ تخفیف",
@@ -57,7 +54,7 @@ const periods = [
   {
     id: "halfYearly",
     label: "۶ ماهه",
-    label2: "۹۰۰۰ 💎 جم",
+    label2: "۹۰۰۰ اعتبار",
     price: basicPlanPrice.halfYearly,
     monthlyPrice: monthlyPrices.halfYearly,
     discount: "۲۰٪ تخفیف",
@@ -67,8 +64,7 @@ const periods = [
 const ReachLimitPricingSheet = () => {
   const setShowOverlayLoading = useSetAtom(showOverlayLoadingAtom);
   const [open, setOpen] = useAtom(showReachLimitPricingSheetAtom);
-  const [hasTitle, setHasTitle] = useAtom(hasTitleReachLimitPricingSheetAtom);
-  const theme = useAtomValue(themeAtom);
+  useAtom(hasTitleReachLimitPricingSheetAtom);
   const [triggerSource] = useAtom(reachLimitPricingSheetTriggerSourceAtom);
 
   const [selectedPeriod, setSelectedPeriod] = useState("monthly");
@@ -130,35 +126,30 @@ const ReachLimitPricingSheet = () => {
       scrollLocking={true}
       className="bottom-sheet"
     >
-      {/* Header with AI Model Icons */}
-      <div className="relative overflow-hidden bg-[#FEFEFE] dark:bg-[#0F0F0F] flex flex-col h-[calc(100vh-1.3rem)]">
+      <div className="relative overflow-hidden bg-[#fbfaf8] dark:bg-background flex flex-col h-[calc(100vh-1.3rem)]">
+        <div className="absolute inset-x-0 top-0 h-72 bg-[radial-gradient(circle_at_70%_0%,rgba(43,15,217,0.18),transparent_38%),radial-gradient(circle_at_20%_10%,rgba(239,24,113,0.12),transparent_34%)]" />
         <button
           aria-label="بستن"
           onClick={() => setOpen(false)}
-          className="absolute top-3 left-3 z-30 p-2 rounded-full dark:text-white transition"
+          className="absolute top-4 left-4 z-30 w-11 h-11 rounded-2xl bg-white/80 dark:bg-white/10 border border-white/70 dark:border-white/10 flex items-center justify-center shadow-sm backdrop-blur-md active:scale-95 transition-transform"
         >
           <X className="w-5 h-5" />
         </button>
 
-        <div className="relative w-full flex items-center justify-center -px-4">
-          {/* Central Myket Logo - Glowing */}
-          <img
-            src={theme === "dark" ? pricingDarkImg : pricingImg}
-            alt="pricing"
-            className="w-full object-contain"
-          />
-        </div>
-
-        <div className="flex flex-col px-8 -mt-2 rounded-t-3xl relative z-10 flex-1 overflow-y-auto pb-24">
-          <div className="text-center space-y-2 pt-4">
-            <p className="text-lg font-bold text-foreground">
-              ChatGPT و ۲۰ مدل هوش مصنوعی‌ دیگر رو <br /> در یک اشتراک بخر!
-            </p>
-            <p className="text-[15px] text-[#333333] dark:text-gray-400 font-semibold leading-relaxed mt-4">
-              با خرید اشتراک به Gemini, Claude, Grok, ChatGPT و مدل‌های پیشرفته
-              ساخت تصویر و ویدئو مانند Seadream, Nanobanana و Flux دسترسی پیدا
-              کنید.
-            </p>
+        <div className="relative z-10 flex-1 overflow-y-auto px-4 pt-16 pb-28">
+          <div className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-[#24115F] via-[#4C1D95] to-[#2B0FD9] px-5 py-6 text-white shadow-2xl shadow-primary/25 mb-5">
+            <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-white/10 blur-sm" />
+            <div className="absolute -left-8 bottom-0 h-28 w-28 rounded-full bg-white/10 blur-md" />
+            <div className="relative">
+              <div className="w-16 h-16 rounded-[24px] bg-white/15 border border-white/20 flex items-center justify-center text-4xl shadow-lg backdrop-blur-md mb-4">
+                🎾
+              </div>
+              <p className="text-xs font-black text-white/70 mb-1">اعتبار شما تمام شده</p>
+              <h2 className="text-2xl font-black leading-tight">با رکت‌زون پلاس ادامه بده</h2>
+              <p className="text-sm text-white/78 leading-relaxed mt-3">
+                برای استفاده از امکانات ویژه، پیشنهادهای هوشمند و تجربه کامل‌تر رکت‌زون، یکی از دوره‌ها را انتخاب کن.
+              </p>
+            </div>
           </div>
 
           <div className="flex flex-col gap-3 mt-4">
@@ -170,45 +161,42 @@ const ReachLimitPricingSheet = () => {
                   key={period.id}
                   onClick={() => setSelectedPeriod(period.id)}
                   className={cn(
-                    "flex items-center justify-between h-16 px-4 rounded-xl border-2 transition-all text-right relative",
+                    "flex items-center justify-between min-h-16 px-4 py-4 rounded-[24px] border transition-all text-right relative bg-white/90 dark:bg-card shadow-sm",
                     isSelected
-                      ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30"
-                      : "border-border hover:border-blue-300 dark:hover:border-blue-700"
+                      ? "border-primary bg-primary/8 shadow-lg shadow-primary/10"
+                      : "border-black/[0.06] dark:border-border hover:border-primary/50"
                   )}
                 >
                   {/* Discount Badge */}
                   {period.discount && (
-                    <span className="absolute -top-3 right-4 text-xs text-white bg-red-500 dark:bg-red-600 px-2 py-0.5 rounded-full font-bold">
+                    <span className="absolute -top-3 left-4 text-xs text-white bg-[#ef1871] px-2.5 py-1 rounded-full font-black shadow-lg shadow-[#ef1871]/20">
                       {period.discount}
                     </span>
                   )}
-
-                  <span className="absolute top-5 -right-8 rotate-90 text-xs text-white bg-blue-500 dark:bg-blue-600 px-4 py-0.5 rounded-full font-bold">
-                    {period.label}
-                  </span>
 
                   {/* Radio Button and Label */}
                   <div className="flex items-center gap-3">
                     <div
                       className={cn(
-                        "w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all shrink-0",
+                        "w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all shrink-0",
                         isSelected
-                          ? "border-blue-500 bg-blue-500"
+                          ? "border-primary"
                           : "border-muted-foreground"
                       )}
                     >
                       {isSelected && (
-                        <div className="w-3 h-3 rounded-full bg-white" />
+                        <div className="w-3.5 h-3.5 rounded-full bg-primary" />
                       )}
                     </div>
-                    <span className="text-foreground font-medium">
-                      {period.label2}
-                    </span>
+                    <div>
+                      <p className="text-foreground font-black text-sm">{period.label}</p>
+                      <p className="text-muted-foreground font-bold text-xs mt-0.5">{period.label2}</p>
+                    </div>
                   </div>
 
                   {/* Price */}
                   <div className="text-left">
-                    <p className="text-foreground font-bold">
+                    <p className="text-foreground font-black">
                       {formatPrice(period.price)} تومان
                     </p>
                     {period.monthlyPrice && (
@@ -226,11 +214,11 @@ const ReachLimitPricingSheet = () => {
         <button
           onClick={handlePurchase}
           className={cn(
-            "w-full py-5 font-bold transition-all text-base mt-2 absolute bottom-0 left-0 right-0 z-10",
-            "bg-blue-500 hover:bg-blue-600 text-white shadow-lg"
+            "w-full py-5 font-black transition-all text-base mt-2 absolute bottom-0 left-0 right-0 z-10",
+            "bg-primary text-primary-foreground shadow-2xl shadow-primary/25"
           )}
         >
-          خرید اشتراک پلاس
+          خرید رکت‌زون پلاس
         </button>
       </div>
     </BottomSheet>

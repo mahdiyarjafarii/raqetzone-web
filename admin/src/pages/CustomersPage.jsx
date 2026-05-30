@@ -338,7 +338,7 @@ function SmsCampaignModal({ open, onClose, clubs, customerCount }) {
 
 function Avatar({ customer }) {
   if (customer.image) {
-    const src = customer.image.startsWith("http") ? customer.image : `${API_BASE}${customer.image}`;
+    const src = customer.image.startsWith("http") ? customer.image : `${API_BASE}/uploads/user/${customer.image}`;
     return <img src={src} alt="" className="h-10 w-10 rounded-full object-cover shrink-0" />;
   }
   const initials = (customer.name ?? customer.phone ?? "?")[0].toUpperCase();
