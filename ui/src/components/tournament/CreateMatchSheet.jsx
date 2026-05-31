@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAtom, useSetAtom } from "jotai";
 import toast from "react-hot-toast";
-import { ChevronRightIcon, CheckIcon, BuildingIcon, MapPinIcon } from "lucide-react";
+import { ChevronRightIcon, CheckIcon, BuildingIcon, MapPinIcon, ShieldCheckIcon } from "lucide-react";
 
 import { createMatchOpenAtom, matchesAtom } from "@/store/matchStore";
 import { matchService } from "@/services/matchService";
@@ -24,6 +24,7 @@ const defaultForm = {
   courtId: "",
   scheduledAt: "",
   teamSize: 2,
+  isCertified: false,
 };
 
 const STEPS = ["ورزش و نام", "باشگاه و زمین", "زمان و تیم"];
@@ -83,6 +84,7 @@ export default function CreateMatchSheet() {
         courtName: selectedCourt?.name ?? "",
         scheduledAt: form.scheduledAt,
         teamSize: form.teamSize,
+        isCertified: form.isCertified,
       };
       const res = await matchService.createMatch(payload);
       if (res.ok) {
@@ -406,6 +408,47 @@ function StepTime({ form, setForm, selectedClub, selectedCourt }) {
           ))}
         </div>
       </div>
+
+      {/* Certified toggle */}
+      <button
+        type="button"
+        onClick={() => setForm((f) => ({ ...f, isCertified: !f.isCertified }))}
+        className={cn(
+          "w-full flex items-center gap-4 p-4 rounded-2xl border-2 text-right transition-all",
+          form.isCertified
+            ? "border-emerald-500/50 bg-emerald-500/8"
+            : "border-border bg-muted/30"
+        )}
+      >
+        <div className={cn(
+          "w-11 h-11 rounded-xl flex items-center justify-center shrink-0 transition-colors",
+          form.isCertified ? "bg-emerald-500/20" : "bg-muted"
+        )}>
+          <ShieldCheckIcon className={cn(
+            "w-5 h-5 transition-colors",
+            form.isCertified ? "text-emerald-500" : "text-muted-foreground"
+          )} />
+        </div>
+        <div className="flex-1 min-w-0 text-right">
+          <p className={cn(
+            "font-bold text-sm transition-colors",
+            form.isCertified ? "text-emerald-700 dark:text-emerald-400" : "text-foreground"
+          )}>
+            گارانتی رکت‌زون
+          </p>
+          <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">
+            {form.isCertified
+              ? "اگه مچ پر نشه، رکت‌زون ۲ ساعت قبل جایگزین می‌فرسته ✓"
+              : "رکت‌زون تضمین می‌کنه بازی برگزار میشه"}
+          </p>
+        </div>
+        <div className={cn(
+          "w-5 h-5 rounded-full border-2 shrink-0 flex items-center justify-center transition-all",
+          form.isCertified ? "bg-emerald-500 border-emerald-500" : "border-border"
+        )}>
+          {form.isCertified && <CheckIcon className="w-3 h-3 text-white" />}
+        </div>
+      </button>
     </motion.div>
   );
 }

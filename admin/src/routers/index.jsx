@@ -10,6 +10,7 @@ const TournamentsPage = lazy(() => import("@/pages/TournamentsPage"));
 const AnalyticsPage   = lazy(() => import("@/pages/AnalyticsPage"));
 const UsersPage       = lazy(() => import("@/pages/UsersPage"));
 const DiscountsPage   = lazy(() => import("@/pages/DiscountsPage"));
+const MarketingPage   = lazy(() => import("@/pages/MarketingPage"));
 const ClubsPage       = lazy(() => import("@/pages/ClubsPage"));
 const ClubDetailPage  = lazy(() => import("@/pages/ClubDetailPage"));
 const ReviewsPage     = lazy(() => import("@/pages/ReviewsPage"));
@@ -34,6 +35,7 @@ const router = createBrowserRouter(
         <Route path="customers" element={S(CustomersPage)} />
         <Route path="courts"    element={S(CourtsPage)} />
         <Route path="discounts" element={S(DiscountsPage)} />
+        <Route path="marketing" element={S(MarketingPage)} />
         <Route path="tournaments" element={S(TournamentsPage)} />
         <Route path="analytics" element={S(AnalyticsPage)} />
         <Route path="users"     element={S(UsersPage)} />

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MapPinIcon, CalendarIcon, LogOutIcon, UsersIcon, ClockIcon } from "lucide-react";
+import { MapPinIcon, CalendarIcon, LogOutIcon, UsersIcon, ClockIcon, ShareIcon, ZapIcon, StarIcon, ShieldCheckIcon } from "lucide-react";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import toast from "react-hot-toast";
 
@@ -65,8 +65,57 @@ export default function MatchDetailSheet() {
   const currentUserId = currentUser?.id;
   const countdown = useCountdown(match?.scheduledAt);
   const [viewingUser, setViewingUser] = useState(null);
+  const [showRating, setShowRating] = useState(false);
+  const [emergencyLoading, setEmergencyLoading] = useState(false);
+  const [compatibility, setCompatibility] = useState(null);
   const isUserInMatch =
     match && [...match.teamA, ...match.teamB].some((p) => p.userId === currentUserId);
+  const isCreator = match?.createdBy === currentUserId;
+
+  useEffect(() => {
+    if (!match) return;
+    matchService.getCompatibility(match.id).then((res) => {
+      if (res.ok) setCompatibility(res.data.compatibility);
+    });
+  }, [match?.id]);
+
+  const handleShare = async () => {
+    if (!match) return;
+    const res = await matchService.getInviteLink(match.id);
+    if (!res.ok) { toast.error("خطا در دریافت لینک"); return; }
+    const url = res.data.inviteUrl;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("لینک دعوت کپی شد!");
+    } catch {
+      // fallback for older browsers
+      const el = document.createElement("textarea");
+      el.value = url;
+      el.style.position = "fixed";
+      el.style.opacity = "0";
+      document.body.appendChild(el);
+      el.focus();
+      el.select();
+      document.execCommand("copy");
+      document.body.removeChild(el);
+      toast.success("لینک دعوت کپی شد!");
+    }
+  };
+
+  const handleEmergencySub = async () => {
+    if (!match) return;
+    setEmergencyLoading(true);
+    try {
+      const res = await matchService.emergencySub(match.id);
+      if (res.ok) {
+        toast.success(`پیام به ${res.data.notified} بازیکن ارسال شد! 🚨`);
+      } else {
+        toast.error(res.data?.message ?? "خطا");
+      }
+    } finally {
+      setEmergencyLoading(false);
+    }
+  };
 
   const handleLeave = async () => {
     if (!match) return;
@@ -126,6 +175,12 @@ export default function MatchDetailSheet() {
                   </div>
                   <div className="relative flex-1 min-w-0 pt-1">
                     <h2 className="text-2xl font-black text-foreground leading-tight tracking-tight">{match.title}</h2>
+                    {match.isCertified && (
+                      <div className="flex items-center gap-1 mt-1 text-emerald-600 dark:text-emerald-400 text-xs font-bold">
+                        <ShieldCheckIcon className="w-3.5 h-3.5" />
+                        گارانتی‌شده توسط رکت‌زون
+                      </div>
+                    )}
                     <div className="flex items-center gap-2 mt-2">
                       <span className="text-sm font-semibold text-muted-foreground capitalize">{match.sportType}</span>
                       <span
@@ -166,6 +221,16 @@ export default function MatchDetailSheet() {
                     <div className="flex items-center gap-2 bg-amber-500/12 rounded-2xl px-3.5 py-3 border border-amber-500/20 shadow-sm">
                       <ClockIcon className="w-4 h-4 text-amber-500 shrink-0" />
                       <span className="text-sm font-black text-amber-600 dark:text-amber-300">{countdown}</span>
+                    </div>
+                  )}
+
+                  {/* Compatibility pill */}
+                  {compatibility !== null && !isUserInMatch && (
+                    <div className="flex items-center gap-1.5 bg-violet-500/10 rounded-2xl px-3.5 py-2.5 border border-violet-500/20">
+                      <StarIcon className="w-3.5 h-3.5 text-violet-500 shrink-0" />
+                      <span className="text-xs font-bold text-violet-600 dark:text-violet-300">
+                        سازگاری با این مچ: {compatibility}٪
+                      </span>
                     </div>
                   )}
                 </div>
@@ -283,9 +348,38 @@ export default function MatchDetailSheet() {
                 </div>
               </div>
 
-              {/* Leave button */}
+              {/* Quick actions row */}
+              <div className="px-5 pb-3 flex gap-2">
+                <button
+                  onClick={handleShare}
+                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-border bg-muted/50 text-xs font-semibold text-muted-foreground active:scale-95 transition-all"
+                >
+                  <ShareIcon className="w-3.5 h-3.5" />
+                  دعوت
+                </button>
+                {isCreator && match.status !== "full" && match.status !== "completed" && (
+                  <button
+                    onClick={handleEmergencySub}
+                    disabled={emergencyLoading}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-orange-500/30 bg-orange-500/8 text-xs font-bold text-orange-600 dark:text-orange-400 active:scale-95 transition-all disabled:opacity-60"
+                  >
+                    <ZapIcon className="w-3.5 h-3.5 shrink-0" />
+                    {emergencyLoading ? "ارسال..." : "یار دقیقه‌نودی"}
+                  </button>
+                )}
+              </div>
+
+              {/* Actions for participants */}
               {isUserInMatch && (
-                <div className="px-5 pb-6">
+                <div className="px-5 pb-6 space-y-2">
+                  {/* Rate teammates */}
+                  <button
+                    onClick={() => setShowRating(true)}
+                    className="w-full py-3 rounded-2xl border-2 border-violet-500/30 text-violet-600 dark:text-violet-400 text-sm font-semibold flex items-center justify-center gap-2 bg-violet-500/5 active:scale-[0.98] transition-all"
+                  >
+                    <StarIcon className="w-4 h-4" />
+                    امتیاز به هم‌بازی‌ها
+                  </button>
                   <button
                     onClick={handleLeave}
                     disabled={joinLoading}
@@ -309,8 +403,127 @@ export default function MatchDetailSheet() {
               onClose={() => setViewingUser(null)}
             />
           )}
+
+          {showRating && match && (
+            <RatingSheet
+              match={match}
+              currentUserId={currentUserId}
+              onClose={() => setShowRating(false)}
+            />
+          )}
         </>
       )}
     </AnimatePresence>
+  );
+}
+
+// ─── Rating Sheet ─────────────────────────────────────────────────────────────
+
+const RATING_TAGS = [
+  "وقت‌شناس", "خوش‌اخلاق", "تیمی", "رقابتی", "مبتدی‌فرندلی",
+  "حرفه‌ای", "شاد", "منضبط",
+];
+
+function RatingSheet({ match, currentUserId, onClose }) {
+  const teammates = [...match.teamA, ...match.teamB].filter((p) => p.userId !== currentUserId);
+  const [ratings, setRatings] = useState(() =>
+    Object.fromEntries(teammates.map((p) => [p.userId, []]))
+  );
+  const [loading, setLoading] = useState(false);
+
+  const toggleTag = (userId, tag) => {
+    setRatings((prev) => {
+      const current = prev[userId] ?? [];
+      return {
+        ...prev,
+        [userId]: current.includes(tag) ? current.filter((t) => t !== tag) : [...current, tag],
+      };
+    });
+  };
+
+  const handleSubmit = async () => {
+    setLoading(true);
+    try {
+      const ratingArray = teammates.map((p) => ({ toUserId: p.userId, tags: ratings[p.userId] ?? [] }));
+      const res = await matchService.rateMatch(match.id, ratingArray);
+      if (res.ok) {
+        toast.success("امتیازها ثبت شد ✨");
+        onClose();
+      } else {
+        toast.error(res.data?.message ?? "خطا در ثبت");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60]"
+      />
+      <motion.div
+        initial={{ y: "100%" }}
+        animate={{ y: 0 }}
+        exit={{ y: "100%" }}
+        transition={{ type: "spring", damping: 28, stiffness: 280 }}
+        className="fixed bottom-0 left-0 right-0 z-[70] bg-background rounded-t-3xl max-h-[85vh] flex flex-col"
+      >
+        <div className="flex justify-center pt-3 pb-1 shrink-0">
+          <div className="w-10 h-1 bg-muted rounded-full" />
+        </div>
+        <div className="px-5 pt-2 pb-4 border-b border-border shrink-0">
+          <h2 className="font-black text-lg">امتیاز به هم‌بازی‌ها</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">برچسب‌هایی که بهشون می‌خوری انتخاب کن</p>
+        </div>
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-6">
+          {teammates.map((player) => (
+            <div key={player.userId}>
+              <div className="flex items-center gap-3 mb-3">
+                <UserAvatar
+                  image={player.image}
+                  name={player.name}
+                  className="w-9 h-9 rounded-full text-sm text-white"
+                  fallbackClassName="w-9 h-9 rounded-full bg-primary text-white text-sm"
+                />
+                <span className="font-semibold text-sm">{player.name}</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {RATING_TAGS.map((tag) => {
+                  const selected = (ratings[player.userId] ?? []).includes(tag);
+                  return (
+                    <button
+                      key={tag}
+                      onClick={() => toggleTag(player.userId, tag)}
+                      className={cn(
+                        "px-3 py-1.5 rounded-full text-xs font-semibold border transition-all",
+                        selected
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-muted text-muted-foreground border-border"
+                      )}
+                    >
+                      {tag}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="px-5 pb-8 pt-3 border-t border-border bg-background shrink-0">
+          <button
+            onClick={handleSubmit}
+            disabled={loading}
+            className="w-full py-4 rounded-2xl font-bold text-base bg-primary text-primary-foreground shadow-lg shadow-primary/25 active:scale-[0.98] transition-all disabled:opacity-60"
+          >
+            {loading ? "در حال ثبت..." : "ثبت امتیازها ✨"}
+          </button>
+        </div>
+      </motion.div>
+    </>
   );
 }

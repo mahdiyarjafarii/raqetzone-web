@@ -1,7 +1,13 @@
-import { eq, and, asc, desc, gte, inArray } from "drizzle-orm";
+import { eq, and, asc, ne, gte, lte, notInArray, inArray } from "drizzle-orm";
+import { randomBytes } from "crypto";
 import { db } from "../db/index.js";
-import { matches, matchParticipants, users } from "../db/schema.js";
+import { matches, matchParticipants, matchRatings, users } from "../db/schema.js";
 import { sendSMS } from "../utils/sms.js";
+
+const RATING_TAGS = [
+  "وقت‌شناس", "خوش‌اخلاق", "تیمی", "رقابتی", "مبتدی‌فرندلی",
+  "حرفه‌ای", "شاد", "منضبط",
+];
 
 const SPORT_TYPES = ["padel", "tennis", "squash", "badminton", "ping-pong"];
 
@@ -220,7 +226,7 @@ export const leaveMatchController = async (req, res) => {
 
 export const createMatchController = async (req, res) => {
   try {
-    const { title, sportType, location, courtName, scheduledAt, teamSize = 2 } = req.body;
+    const { title, sportType, location, courtName, scheduledAt, teamSize = 2, isCertified = false } = req.body;
     const userId = req.user.id;
 
     if (!title || !sportType || !location || !scheduledAt) {
@@ -238,13 +244,271 @@ export const createMatchController = async (req, res) => {
 
     const [match] = await db
       .insert(matches)
-      .values({ title, sportType, location, courtName, scheduledAt: parsedDate, teamSize, createdBy: userId })
+      .values({ title, sportType, location, courtName, scheduledAt: parsedDate, teamSize, isCertified: !!isCertified, createdBy: userId })
       .returning();
 
-    const enriched = await enrichMatch(match);
+    const inviteToken = randomBytes(24).toString("hex");
+    const [withToken] = await db
+      .update(matches)
+      .set({ inviteToken })
+      .where(eq(matches.id, match.id))
+      .returning();
+
+    const enriched = await enrichMatch(withToken);
     return res.status(201).json({ match: enriched });
   } catch (error) {
     console.error("createMatch error:", error);
+    return res.status(500).json({ message: "خطای سرور" });
+  }
+};
+
+// ─── Certified Match (admin only) ────────────────────────────────────────────
+
+export const certifyMatchController = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { certified } = req.body;
+
+    const [match] = await db
+      .update(matches)
+      .set({ isCertified: !!certified, updatedAt: new Date() })
+      .where(eq(matches.id, id))
+      .returning();
+
+    if (!match) return res.status(404).json({ message: "مسابقه یافت نشد" });
+    return res.status(200).json({ match: await enrichMatch(match) });
+  } catch (error) {
+    console.error("certifyMatch error:", error);
+    return res.status(500).json({ message: "خطای سرور" });
+  }
+};
+
+// ─── Emergency Sub ───────────────────────────────────────────────────────────
+
+export const emergencySubController = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const [match] = await db.select().from(matches).where(eq(matches.id, id)).limit(1);
+    if (!match) return res.status(404).json({ message: "مسابقه یافت نشد" });
+    if (match.createdBy !== userId) {
+      return res.status(403).json({ message: "فقط سازنده بازی می‌تواند این کار را کند" });
+    }
+    if (match.status === "full" || match.status === "completed") {
+      return res.status(400).json({ message: "بازی پر یا تمام شده است" });
+    }
+
+    // Find participants already in this match to exclude them
+    const alreadyIn = await db
+      .select({ userId: matchParticipants.userId })
+      .from(matchParticipants)
+      .where(eq(matchParticipants.matchId, id));
+    const excludeIds = [userId, ...alreadyIn.map((p) => p.userId)];
+
+    // Find users who have a match overlapping the ±2h window around this match's time
+    const matchStart = new Date(match.scheduledAt);
+    const windowStart = new Date(matchStart.getTime() - 2 * 3600000);
+    const windowEnd = new Date(matchStart.getTime() + 2 * 3600000);
+
+    const busyParticipants = await db
+      .select({ userId: matchParticipants.userId })
+      .from(matchParticipants)
+      .innerJoin(matches, eq(matchParticipants.matchId, matches.id))
+      .where(
+        and(
+          ne(matches.id, id),
+          gte(matches.scheduledAt, windowStart),
+          lte(matches.scheduledAt, windowEnd),
+        )
+      );
+
+    const busyIds = busyParticipants.map((p) => p.userId);
+    const allExcludeIds = [...new Set([...excludeIds, ...busyIds])];
+
+    // Get available users (not busy, not already in match)
+    const candidates = await db
+      .select({ phone: users.phone, name: users.name })
+      .from(users)
+      .where(
+        allExcludeIds.length > 0
+          ? notInArray(users.id, allExcludeIds)
+          : undefined
+      )
+      .limit(50);
+
+    const sportsLabel = { padel: "پادل", tennis: "تنیس", squash: "اسکواش", badminton: "بدمینتون", "ping-pong": "پینگ‌پنگ" };
+    const smsText =
+      `🚨 یار دقیقه‌نودی!\n` +
+      `بچه‌های «${match.location}» همین الان به یک بازیکن ${sportsLabel[match.sportType] ?? match.sportType} نیاز دارند.\n` +
+      `سهم زمین رایگانه! رکت‌زون رو باز کن.`;
+
+    const results = await Promise.allSettled(candidates.map((u) => sendSMS(u.phone, smsText)));
+    const sent = results.filter((r) => r.status === "fulfilled").length;
+
+    return res.status(200).json({ message: `پیام به ${sent} بازیکن ارسال شد`, notified: sent });
+  } catch (error) {
+    console.error("emergencySub error:", error);
+    return res.status(500).json({ message: "خطای سرور" });
+  }
+};
+
+// ─── Match Rating (MQI) ──────────────────────────────────────────────────────
+
+export const rateMatchController = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { ratings } = req.body; // [{ toUserId, tags: string[] }]
+    const fromUserId = req.user.id;
+
+    if (!Array.isArray(ratings) || ratings.length === 0) {
+      return res.status(400).json({ message: "امتیازها ارسال نشده‌اند" });
+    }
+
+    const [match] = await db.select().from(matches).where(eq(matches.id, id)).limit(1);
+    if (!match) return res.status(404).json({ message: "مسابقه یافت نشد" });
+
+    const participant = await db
+      .select()
+      .from(matchParticipants)
+      .where(and(eq(matchParticipants.matchId, id), eq(matchParticipants.userId, fromUserId)))
+      .limit(1);
+
+    if (participant.length === 0) {
+      return res.status(403).json({ message: "شما در این بازی نبوده‌اید" });
+    }
+
+    const validTags = new Set(RATING_TAGS);
+    const rows = ratings
+      .filter((r) => r.toUserId && r.toUserId !== fromUserId)
+      .map((r) => ({
+        matchId: id,
+        fromUserId,
+        toUserId: r.toUserId,
+        tags: (r.tags ?? []).filter((t) => validTags.has(t)),
+      }));
+
+    if (rows.length === 0) return res.status(400).json({ message: "داده‌های نامعتبر" });
+
+    await db
+      .insert(matchRatings)
+      .values(rows)
+      .onConflictDoUpdate({
+        target: [matchRatings.matchId, matchRatings.fromUserId, matchRatings.toUserId],
+        set: { tags: matchRatings.tags },
+      });
+
+    return res.status(200).json({ message: "امتیازها ثبت شد" });
+  } catch (error) {
+    console.error("rateMatch error:", error);
+    return res.status(500).json({ message: "خطای سرور" });
+  }
+};
+
+export const getCompatibilityController = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const [match] = await db.select().from(matches).where(eq(matches.id, id)).limit(1);
+    if (!match) return res.status(404).json({ message: "مسابقه یافت نشد" });
+
+    // Get all participants of this match
+    const participants = await db
+      .select({ userId: matchParticipants.userId })
+      .from(matchParticipants)
+      .where(eq(matchParticipants.matchId, id));
+
+    const participantIds = participants.map((p) => p.userId);
+    if (participantIds.length === 0) return res.status(200).json({ compatibility: 100 });
+
+    // Get tags received by current user historically
+    const myReceivedTags = await db
+      .select({ tags: matchRatings.tags })
+      .from(matchRatings)
+      .where(eq(matchRatings.toUserId, userId));
+
+    // Get tags received by match participants historically
+    if (participantIds.length === 0) return res.status(200).json({ compatibility: 100 });
+
+    const theirReceivedTags = await db
+      .select({ tags: matchRatings.tags })
+      .from(matchRatings)
+      .where(inArray(matchRatings.toUserId, participantIds));
+
+    const flattenTags = (rows) => rows.flatMap((r) => r.tags ?? []);
+    const countTags = (tags) => {
+      const counts = {};
+      tags.forEach((t) => { counts[t] = (counts[t] ?? 0) + 1; });
+      return counts;
+    };
+
+    const myCounts = countTags(flattenTags(myReceivedTags));
+    const theirCounts = countTags(flattenTags(theirReceivedTags));
+
+    const allTags = new Set([...Object.keys(myCounts), ...Object.keys(theirCounts)]);
+    if (allTags.size === 0) return res.status(200).json({ compatibility: 85 }); // no data → neutral
+
+    let dot = 0, magA = 0, magB = 0;
+    allTags.forEach((tag) => {
+      const a = myCounts[tag] ?? 0;
+      const b = theirCounts[tag] ?? 0;
+      dot += a * b;
+      magA += a * a;
+      magB += b * b;
+    });
+
+    const similarity = magA && magB ? dot / (Math.sqrt(magA) * Math.sqrt(magB)) : 0.85;
+    const compatibility = Math.round(50 + similarity * 50); // map [0,1] → [50,100]
+
+    return res.status(200).json({ compatibility });
+  } catch (error) {
+    console.error("getCompatibility error:", error);
+    return res.status(500).json({ message: "خطای سرور" });
+  }
+};
+
+// ─── Invite Link ─────────────────────────────────────────────────────────────
+
+export const getInviteLinkController = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [match] = await db.select().from(matches).where(eq(matches.id, id)).limit(1);
+    if (!match) return res.status(404).json({ message: "مسابقه یافت نشد" });
+
+    let token = match.inviteToken;
+    if (!token) {
+      token = randomBytes(24).toString("hex");
+      await db.update(matches).set({ inviteToken: token }).where(eq(matches.id, id));
+    }
+
+    const appBaseUrl = process.env.APP_BASE_URL ?? "https://raqetzone.com";
+    const inviteUrl = `${appBaseUrl}/join/${token}`;
+
+    return res.status(200).json({ inviteUrl, token });
+  } catch (error) {
+    console.error("getInviteLink error:", error);
+    return res.status(500).json({ message: "خطای سرور" });
+  }
+};
+
+export const getMatchByInviteTokenController = async (req, res) => {
+  try {
+    const { token } = req.params;
+
+    const [match] = await db
+      .select()
+      .from(matches)
+      .where(eq(matches.inviteToken, token))
+      .limit(1);
+
+    if (!match) return res.status(404).json({ message: "لینک نامعتبر است" });
+
+    const enriched = await enrichMatch(match);
+    return res.status(200).json({ match: enriched });
+  } catch (error) {
+    console.error("getMatchByInviteToken error:", error);
     return res.status(500).json({ message: "خطای سرور" });
   }
 };

@@ -1,9 +1,5 @@
 import React, { lazy } from "react";
-import { Route } from "react-router-dom";
-import {
-  createBrowserRouter,
-  createRoutesFromElements,
-} from "react-router-dom";
+import { createBrowserRouter } from "react-router-dom";
 
 import Layout from "@/components/Layout";
 import SuspensedView from "@/components/SuspensedView";
@@ -12,6 +8,7 @@ import ErrorFallback from "@/components/ErrorFallback";
 import ChatPage from "@/pages/ai/ChatPage";
 import NewChatPage from "@/pages/ai/NewChatPage";
 
+const JoinMatchPage = lazy(() => import("@/pages/JoinMatchPage"));
 const AiPage = lazy(() => import("@/pages/ai/AiPage"));
 const NotFoundPage = lazy(() => import("@/pages/404Page"));
 const ProfilePage = lazy(() => import("@/pages/user/ProfilePage"));
@@ -25,40 +22,39 @@ const BookingTrackPage = lazy(() => import("@/pages/booking/BookingTrackPage"));
 const ConversationsPage = lazy(() => import("@/pages/messages/ConversationsPage"));
 const DirectChatPage = lazy(() => import("@/pages/messages/DirectChatPage"));
 
-const getSuspensedElement = (Page) => (
-  <SuspensedView>
-    <Page />
-  </SuspensedView>
-);
+const s = (Page) => <SuspensedView><Page /></SuspensedView>;
 
-const router = createBrowserRouter(
-  createRoutesFromElements(
-    <Route
-      path="/"
-      element={<Layout />}
-      errorElement={
-        <ErrorFallback
-          error={{ message: "خطایی در بارگذاری صفحه رخ داد" }}
-          resetErrorBoundary={() => (window.location.href = "/")}
-        />
-      }
-    >
-      <Route index element={getSuspensedElement(HomePage)} />
-      <Route path="ai" element={getSuspensedElement(AiPage)} />
-      <Route path="tournament" element={getSuspensedElement(TournamentPage)} />
-      <Route path="clubs" element={getSuspensedElement(ClubsPage)} />
-      <Route path="clubs/:clubId" element={getSuspensedElement(ClubDetailPage)} />
-      <Route path="mybooking" element={getSuspensedElement(MyBookingPage)} />
-      <Route path="booking/track/:code" element={getSuspensedElement(BookingTrackPage)} />
-      <Route path="notifications" element={getSuspensedElement(NotificationsPage)} />
-      <Route path="profile" element={getSuspensedElement(ProfilePage)} />
-      <Route path="chat/new" element={getSuspensedElement(NewChatPage)} />
-      <Route path="chat/:id" element={getSuspensedElement(ChatPage)} />
-      <Route path="messages" element={getSuspensedElement(ConversationsPage)} />
-      <Route path="messages/:conversationId" element={getSuspensedElement(DirectChatPage)} />
-      <Route path="*" element={<NotFoundPage />} />
-    </Route>
-  )
-);
+const router = createBrowserRouter([
+  {
+    path: "/join/:token",
+    element: s(JoinMatchPage),
+  },
+  {
+    path: "/",
+    element: <Layout />,
+    errorElement: (
+      <ErrorFallback
+        error={{ message: "خطایی در بارگذاری صفحه رخ داد" }}
+        resetErrorBoundary={() => (window.location.href = "/")}
+      />
+    ),
+    children: [
+      { index: true, element: s(HomePage) },
+      { path: "ai", element: s(AiPage) },
+      { path: "tournament", element: s(TournamentPage) },
+      { path: "clubs", element: s(ClubsPage) },
+      { path: "clubs/:clubId", element: s(ClubDetailPage) },
+      { path: "mybooking", element: s(MyBookingPage) },
+      { path: "booking/track/:code", element: s(BookingTrackPage) },
+      { path: "notifications", element: s(NotificationsPage) },
+      { path: "profile", element: s(ProfilePage) },
+      { path: "chat/new", element: <NewChatPage /> },
+      { path: "chat/:id", element: <ChatPage /> },
+      { path: "messages", element: s(ConversationsPage) },
+      { path: "messages/:conversationId", element: s(DirectChatPage) },
+      { path: "*", element: s(NotFoundPage) },
+    ],
+  },
+]);
 
 export default router;

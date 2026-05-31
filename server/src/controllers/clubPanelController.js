@@ -1,6 +1,6 @@
 import { eq, and, desc, inArray, count, sum, gte, lte, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { clubs, courts, bookings, users, slotOverrides, tournaments, tournamentRegistrations } from "../db/schema.js";
+import { clubs, courts, bookings, users, slotOverrides, tournaments, tournamentRegistrations, deals } from "../db/schema.js";
 import { sendNotification } from "../utils/sendNotification.js";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -29,6 +29,62 @@ async function assertCourtOwnership(req, courtId) {
     .where(and(eq(courts.id, courtId), eq(clubs.ownerId, req.user.id)))
     .limit(1);
   return !!row;
+}
+
+function addDays(date, days) {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+function toDateStr(date) {
+  return date.toISOString().split("T")[0];
+}
+
+function minutes(time) {
+  const [h, m] = time.split(":").map(Number);
+  return h * 60 + m;
+}
+
+function timeStr(total) {
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
+function buildCourtSlots(court) {
+  const slots = [];
+  const open = minutes(court.openTime);
+  const close = minutes(court.closeTime);
+  const duration = Number(court.slotDuration ?? 60);
+  for (let t = open; t + duration <= close; t += duration) {
+    slots.push({ startTime: timeStr(t), endTime: timeStr(t + duration) });
+  }
+  return slots;
+}
+
+function recommendedDiscount(date, startTime) {
+  const target = new Date(`${date}T${startTime}:00`);
+  const hoursLeft = (target.getTime() - Date.now()) / 36e5;
+  const hour = Number(startTime.slice(0, 2));
+  if (hoursLeft <= 24) return 30;
+  if (hoursLeft <= 48) return hour >= 12 && hour <= 17 ? 25 : 20;
+  return hour >= 12 && hour <= 17 ? 20 : 10;
+}
+
+async function getOwnerCourtScope(req, clubId) {
+  const ownerId = ownerFilter(req);
+  let clubRows = [];
+  if (clubId) {
+    if (!(await assertClubOwnership(req, clubId))) return null;
+    clubRows = await db.select({ id: clubs.id, name: clubs.name }).from(clubs).where(eq(clubs.id, clubId));
+  } else {
+    clubRows = ownerId
+      ? await db.select({ id: clubs.id, name: clubs.name }).from(clubs).where(eq(clubs.ownerId, ownerId))
+      : await db.select({ id: clubs.id, name: clubs.name }).from(clubs);
+  }
+  const clubIds = clubRows.map(c => c.id);
+  if (clubIds.length === 0) return { clubRows, courtRows: [] };
+  const courtRows = await db.select().from(courts).where(inArray(courts.clubId, clubIds));
+  return { clubRows, courtRows };
 }
 
 // ── Clubs ─────────────────────────────────────────────────────────────────────
@@ -545,6 +601,94 @@ export const getSlotOverridesController = async (req, res) => {
     return res.json({ slotOverrides: rows });
   } catch (error) {
     console.error("getSlotOverrides error:", error);
+    return res.status(500).json({ message: "خطای سرور" });
+  }
+};
+
+export const getAutoFillOpportunitiesController = async (req, res) => {
+  try {
+    const horizonDays = Math.min(Math.max(parseInt(req.query.days ?? "3", 10), 1), 7);
+    const scope = await getOwnerCourtScope(req, req.query.clubId);
+    if (!scope) return res.status(403).json({ message: "دسترسی ندارید" });
+
+    const today = new Date();
+    const from = toDateStr(today);
+    const to = toDateStr(addDays(today, horizonDays - 1));
+    const courtRows = scope.courtRows.filter(c => c.isActive);
+    const courtIds = courtRows.map(c => c.id);
+    if (courtIds.length === 0) return res.json({ summary: { emptySlots: 0, revenuePotential: 0, avgDiscount: 0 }, opportunities: [] });
+
+    const bookingRows = await db.select().from(bookings).where(and(inArray(bookings.courtId, courtIds), gte(bookings.date, from), lte(bookings.date, to)));
+    const overrideRows = await db.select().from(slotOverrides).where(and(inArray(slotOverrides.courtId, courtIds), gte(slotOverrides.date, from), lte(slotOverrides.date, to)));
+    const booked = new Set(bookingRows.filter(b => ["pending", "approved"].includes(b.status)).map(b => `${b.courtId}|${b.date}|${b.startTime}`));
+    const overrides = new Map(overrideRows.map(o => [`${o.courtId}|${o.date}|${o.startTime}`, o]));
+    const clubNameById = Object.fromEntries(scope.clubRows.map(c => [c.id, c.name]));
+    const opportunities = [];
+
+    for (const court of courtRows) {
+      for (let i = 0; i < horizonDays; i++) {
+        const date = toDateStr(addDays(today, i));
+        for (const slot of buildCourtSlots(court)) {
+          const key = `${court.id}|${date}|${slot.startTime}`;
+          const targetTime = new Date(`${date}T${slot.startTime}:00`);
+          const override = overrides.get(key);
+          if (targetTime <= today || booked.has(key) || override?.status === "blocked" || override?.status === "booked" || Number(override?.discountPercent ?? 0) > 0) continue;
+          const discountPercent = Math.max(Number(override?.discountPercent ?? 0), recommendedDiscount(date, slot.startTime));
+          const price = override?.price ?? court.pricePerHour;
+          opportunities.push({
+            id: key,
+            courtId: court.id,
+            courtName: court.name,
+            clubId: court.clubId,
+            clubName: clubNameById[court.clubId],
+            sportType: court.sportType,
+            date,
+            startTime: slot.startTime,
+            endTime: slot.endTime,
+            price,
+            discountPercent,
+            finalPrice: Math.round(price * (1 - discountPercent / 100)),
+            hoursLeft: Math.max(0, Math.round((targetTime.getTime() - Date.now()) / 36e5)),
+          });
+        }
+      }
+    }
+
+    opportunities.sort((a, b) => a.hoursLeft - b.hoursLeft || b.discountPercent - a.discountPercent);
+    const revenuePotential = opportunities.reduce((sum, item) => sum + item.price, 0);
+    const avgDiscount = opportunities.length ? Math.round(opportunities.reduce((sum, item) => sum + item.discountPercent, 0) / opportunities.length) : 0;
+    return res.json({ summary: { emptySlots: opportunities.length, revenuePotential, avgDiscount }, opportunities });
+  } catch (error) {
+    console.error("getAutoFillOpportunities error:", error);
+    return res.status(500).json({ message: "خطای سرور" });
+  }
+};
+
+export const runAutoFillController = async (req, res) => {
+  try {
+    const { slots = [] } = req.body;
+    if (!Array.isArray(slots) || slots.length === 0) return res.status(400).json({ message: "هیچ سانسی انتخاب نشده" });
+    const selected = slots.slice(0, 50);
+    let applied = 0;
+
+    for (const item of selected) {
+      if (!(await assertCourtOwnership(req, item.courtId))) continue;
+      const discountPercent = Math.min(Math.max(parseInt(item.discountPercent ?? "20", 10), 5), 50);
+      const [existing] = await db.select().from(slotOverrides).where(and(eq(slotOverrides.courtId, item.courtId), eq(slotOverrides.date, item.date), eq(slotOverrides.startTime, item.startTime))).limit(1);
+      if (existing) {
+        if (["blocked", "booked"].includes(existing.status)) continue;
+        if (Number(existing.discountPercent ?? 0) > 0) continue;
+        await db.update(slotOverrides).set({ status: "available", price: item.price ?? existing.price, discountPercent, updatedAt: new Date() }).where(eq(slotOverrides.id, existing.id));
+      } else {
+        await db.insert(slotOverrides).values({ courtId: item.courtId, date: item.date, startTime: item.startTime, endTime: item.endTime, status: "available", price: item.price ?? null, discountPercent });
+      }
+      await db.insert(deals).values({ courtId: item.courtId, slotDate: item.date, slotStart: item.startTime, slotEnd: item.endTime, discountPercent, validUntil: new Date(`${item.date}T${item.startTime}:00`) });
+      applied++;
+    }
+
+    return res.json({ applied });
+  } catch (error) {
+    console.error("runAutoFill error:", error);
     return res.status(500).json({ message: "خطای سرور" });
   }
 };

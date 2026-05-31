@@ -44,6 +44,12 @@ function App() {
   };
 
   const preload = async () => {
+    // Let invite/join pages bypass auth
+    if (window.location.pathname.startsWith("/join/")) {
+      setIsReady(true);
+      return;
+    }
+
     const token = storage.getToken();
     const user = storage.getUser();
 

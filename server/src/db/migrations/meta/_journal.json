@@ -22,6 +22,20 @@
       "when": 1780059001901,
       "tag": "0002_classy_lyja",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1780141806629,
+      "tag": "0003_wonderful_karnak",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1748649600000,
+      "tag": "0004_match_features",
+      "breakpoints": true
     }
   ]
 }

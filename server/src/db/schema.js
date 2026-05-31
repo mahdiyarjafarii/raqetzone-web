@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   pgTable,
   uuid,
@@ -7,6 +8,7 @@ import {
   jsonb,
   integer,
   index,
+  uniqueIndex,
   boolean,
   smallint,
 } from "drizzle-orm/pg-core";
@@ -136,6 +138,8 @@ export const matches = pgTable("matches", {
   scheduledAt: timestamp("scheduled_at").notNull(),
   teamSize: smallint("team_size").notNull().default(2), // players per team
   status: varchar("status", { length: 20 }).notNull().default("open"), // open | full | cancelled | completed
+  isCertified: boolean("is_certified").notNull().default(false),
+  inviteToken: varchar("invite_token", { length: 64 }),
   createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -143,6 +147,21 @@ export const matches = pgTable("matches", {
   index("idx_matches_status").on(table.status),
   index("idx_matches_scheduled_at").on(table.scheduledAt),
   index("idx_matches_sport_type").on(table.sportType),
+  uniqueIndex("idx_matches_invite_token").on(table.inviteToken),
+]);
+
+export const matchRatings = pgTable("match_ratings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  matchId: uuid("match_id").notNull().references(() => matches.id, { onDelete: "cascade" }),
+  fromUserId: uuid("from_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  toUserId: uuid("to_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  tags: text("tags").array().notNull().default(sql`'{}'`),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_match_ratings_match_id").on(table.matchId),
+  index("idx_match_ratings_to_user_id").on(table.toUserId),
+  index("idx_match_ratings_from_user_id").on(table.fromUserId),
+  uniqueIndex("match_ratings_unique").on(table.matchId, table.fromUserId, table.toUserId),
 ]);
 
 export const matchParticipants = pgTable("match_participants", {

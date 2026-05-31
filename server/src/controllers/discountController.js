@@ -208,7 +208,6 @@ export const sendSmsCampaignController = async (req, res) => {
     }
 
     const { discountCodeId, message, recipientFilter = "all" } = req.body;
-    // recipientFilter: "all" | "booked" | "tournament"
 
     if (!message || message.trim().length < 5) {
       return res.status(400).json({ message: "متن پیام بسیار کوتاه است" });
@@ -226,15 +225,20 @@ export const sendSmsCampaignController = async (req, res) => {
       discountCode = row;
     }
 
-    // Get all customers of this club (same logic as getClubCustomers)
     const clubCourts = await db.select({ id: courts.id }).from(courts).where(eq(courts.clubId, clubId));
     const courtIds = clubCourts.map(c => c.id);
 
     const bookingRows = courtIds.length > 0
       ? await db
-          .select({ userId: bookings.userId })
+          .select({
+            userId: bookings.userId,
+            lastDate: sql`max(${bookings.date})`,
+            bookCount: sql`count(*)`,
+            totalSpent: sql`sum(case when ${bookings.status} = 'approved' then ${bookings.totalPrice} else 0 end)`,
+          })
           .from(bookings)
           .where(inArray(bookings.courtId, courtIds))
+          .groupBy(bookings.userId)
       : [];
 
     const clubTournaments = await db.select({ id: tournaments.id }).from(tournaments).where(eq(tournaments.clubId, clubId));
@@ -246,12 +250,25 @@ export const sendSmsCampaignController = async (req, res) => {
 
     const bookedUserIds = new Set(bookingRows.map(r => r.userId));
     const tournamentUserIds = new Set(tournamentRows.map(r => r.userId));
+    const now = new Date();
+    const dormantBefore = new Date(now); dormantBefore.setDate(now.getDate() - 30);
+    const freshAfter = new Date(now); freshAfter.setDate(now.getDate() - 14);
+    const dormantBeforeStr = dormantBefore.toISOString().split("T")[0];
+    const freshAfterStr = freshAfter.toISOString().split("T")[0];
 
     let targetUserIds;
     if (recipientFilter === "booked") {
       targetUserIds = [...bookedUserIds];
     } else if (recipientFilter === "tournament") {
       targetUserIds = [...tournamentUserIds];
+    } else if (recipientFilter === "vip") {
+      targetUserIds = bookingRows.filter(r => Number(r.bookCount) >= 3 || Number(r.totalSpent) >= 3000000).map(r => r.userId);
+    } else if (recipientFilter === "dormant") {
+      targetUserIds = bookingRows.filter(r => r.lastDate && r.lastDate < dormantBeforeStr).map(r => r.userId);
+    } else if (recipientFilter === "new") {
+      targetUserIds = bookingRows.filter(r => r.lastDate && r.lastDate >= freshAfterStr && Number(r.bookCount) <= 2).map(r => r.userId);
+    } else if (recipientFilter === "low_activity") {
+      targetUserIds = bookingRows.filter(r => Number(r.bookCount) <= 1).map(r => r.userId);
     } else {
       targetUserIds = [...new Set([...bookedUserIds, ...tournamentUserIds])];
     }
@@ -304,6 +321,60 @@ export const sendSmsCampaignController = async (req, res) => {
       sent,
       failed,
       message: `پیام برای ${sent} نفر ارسال شد${failed > 0 ? `، ${failed} نفر ناموفق` : ""}`,
+    });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ message: "خطای سرور" });
+  }
+};
+
+export const getMarketingSegmentsController = async (req, res) => {
+  try {
+    const { clubId } = req.params;
+    if (!(await assertClubOwnership(req, clubId))) {
+      return res.status(403).json({ message: "دسترسی ندارید" });
+    }
+
+    const clubCourts = await db.select({ id: courts.id }).from(courts).where(eq(courts.clubId, clubId));
+    const courtIds = clubCourts.map(c => c.id);
+    const bookingRows = courtIds.length > 0
+      ? await db
+          .select({
+            userId: bookings.userId,
+            lastDate: sql`max(${bookings.date})`,
+            bookCount: sql`count(*)`,
+            totalSpent: sql`sum(case when ${bookings.status} = 'approved' then ${bookings.totalPrice} else 0 end)`,
+          })
+          .from(bookings)
+          .where(inArray(bookings.courtId, courtIds))
+          .groupBy(bookings.userId)
+      : [];
+
+    const clubTournaments = await db.select({ id: tournaments.id }).from(tournaments).where(eq(tournaments.clubId, clubId));
+    const tournamentIds = clubTournaments.map(t => t.id);
+    const tournamentRows = tournamentIds.length > 0
+      ? await db.select({ userId: tournamentRegistrations.userId }).from(tournamentRegistrations).where(inArray(tournamentRegistrations.tournamentId, tournamentIds))
+      : [];
+
+    const now = new Date();
+    const dormantBefore = new Date(now); dormantBefore.setDate(now.getDate() - 30);
+    const freshAfter = new Date(now); freshAfter.setDate(now.getDate() - 14);
+    const dormantBeforeStr = dormantBefore.toISOString().split("T")[0];
+    const freshAfterStr = freshAfter.toISOString().split("T")[0];
+    const bookedUserIds = new Set(bookingRows.map(r => r.userId));
+    const tournamentUserIds = new Set(tournamentRows.map(r => r.userId));
+    const allUserIds = new Set([...bookedUserIds, ...tournamentUserIds]);
+    const countRows = (fn) => bookingRows.filter(fn).length;
+
+    return res.json({
+      segments: [
+        { key: "all", label: "همه مشتریان", count: allUserIds.size, recommendedDiscount: 15 },
+        { key: "vip", label: "مشتریان VIP", count: countRows(r => Number(r.bookCount) >= 3 || Number(r.totalSpent) >= 3000000), recommendedDiscount: 10 },
+        { key: "dormant", label: "مشتریان خوابیده", count: countRows(r => r.lastDate && r.lastDate < dormantBeforeStr), recommendedDiscount: 25 },
+        { key: "new", label: "مشتریان تازه‌وارد", count: countRows(r => r.lastDate && r.lastDate >= freshAfterStr && Number(r.bookCount) <= 2), recommendedDiscount: 15 },
+        { key: "low_activity", label: "کم‌فعال‌ها", count: countRows(r => Number(r.bookCount) <= 1), recommendedDiscount: 20 },
+        { key: "tournament", label: "تورنومنتی‌ها", count: tournamentUserIds.size, recommendedDiscount: 12 },
+      ],
     });
   } catch (err) {
     console.error(err);

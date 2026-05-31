@@ -93,6 +93,13 @@ export default function MatchCard({ match, onClick, index = 0 }) {
           accentBorder
         )}
       >
+        {/* Certified badge */}
+        {match.isCertified && (
+          <div className="absolute top-3 right-3 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold px-2 py-1 rounded-full border border-emerald-500/30 z-10 flex items-center gap-1">
+            <span>✓</span> گارانتی رکت‌زون
+          </div>
+        )}
+
         {/* Full badge */}
         {isFull && (
           <div className="absolute top-3 left-3 bg-destructive/10 text-destructive text-[10px] font-bold px-2 py-1 rounded-full border border-destructive/20 uppercase tracking-wider z-10">

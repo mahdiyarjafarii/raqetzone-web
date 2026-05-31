@@ -18,6 +18,8 @@ import {
   getClubStatsController,
   getSlotOverridesController,
   upsertSlotOverrideController,
+  getAutoFillOpportunitiesController,
+  runAutoFillController,
   getClubCustomersController,
 } from "../controllers/clubPanelController.js";
 import {
@@ -27,6 +29,7 @@ import {
   deleteDiscountCodeController,
   getDiscountCodeUsagesController,
   sendSmsCampaignController,
+  getMarketingSegmentsController,
 } from "../controllers/discountController.js";
 
 const router = Router();
@@ -58,6 +61,10 @@ router.delete("/club-panel/courts/:courtId",                 deleteClubCourtCont
 router.get("/club-panel/courts/:courtId/slot-overrides",     getSlotOverridesController);
 router.post("/club-panel/courts/:courtId/slot-overrides",    upsertSlotOverrideController);
 
+// AutoFill
+router.get("/club-panel/autofill/opportunities",             getAutoFillOpportunitiesController);
+router.post("/club-panel/autofill/run",                      runAutoFillController);
+
 // Customers
 router.get("/club-panel/customers",                          getClubCustomersController);
 
@@ -68,6 +75,7 @@ router.patch("/club-panel/clubs/:clubId/discount-codes/:codeId",           updat
 router.delete("/club-panel/clubs/:clubId/discount-codes/:codeId",          deleteDiscountCodeController);
 router.get("/club-panel/clubs/:clubId/discount-codes/:codeId/usages",      getDiscountCodeUsagesController);
 router.post("/club-panel/clubs/:clubId/sms-campaign",                      sendSmsCampaignController);
+router.get("/club-panel/clubs/:clubId/marketing-segments",                 getMarketingSegmentsController);
 
 // Bookings
 router.get("/club-panel/bookings",                           getClubBookingsController);
