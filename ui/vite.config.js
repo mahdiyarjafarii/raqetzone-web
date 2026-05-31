@@ -13,6 +13,9 @@ export default defineConfig({
   },
   assetsInclude: ["**/*.lottie"],
   server: {
-    allowedHosts: ["ai.raqetzone.ir"],
-  }
+    allowedHosts: ["ai.raqetzone.ir", "app.raqetzone.com"],
+  },
+  preview: {
+    allowedHosts: ["ai.raqetzone.ir", "app.raqetzone.com"],
+  },
 });
