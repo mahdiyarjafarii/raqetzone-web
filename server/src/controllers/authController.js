@@ -114,8 +114,13 @@ export const verifyOTPController = async (req, res) => {
         .returning();
       if (!isClubOwner) sendWelcomeNotification(user.id).catch(() => {});
     } else {
+      if (isClubOwner && !user.isClubOwner) {
+        return res.status(409).json({
+          message: 'این شماره قبلاً در وب‌اپ ثبت شده است. لطفاً برای پنل باشگاه با شماره دیگری وارد شوید',
+        });
+      }
+
       const updateData = { updatedAt: new Date() };
-      if (isClubOwner && !user.isClubOwner) updateData.isClubOwner = true;
       [user] = await db
         .update(users)
         .set(updateData)
@@ -135,6 +140,7 @@ export const verifyOTPController = async (req, res) => {
         email: user.email,
         image: user.image,
         isAdmin: user.isAdmin ?? false,
+        isClubOwner: user.isClubOwner ?? false,
       },
     });
   } catch (error) {

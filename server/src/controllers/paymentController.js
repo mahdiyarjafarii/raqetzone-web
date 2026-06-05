@@ -10,6 +10,7 @@ import { transactions, users } from "../db/schema.js";
 import { getPlanPrice } from "../utils/credits/getPlanPrice.js";
 import { getPlanCredits } from "../utils/credits/getPlanCredits.js";
 import { config } from "../config/env.js";
+import { completeWalletTopup, failWalletTopup } from "./walletController.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const successPaymentHtml = fs.readFileSync(
@@ -130,8 +131,23 @@ export const callbackController = async (req, res) => {
       .from(transactions)
       .where(eq(transactions.trackCode, ResNum));
 
-    if (!transaction)
+    if (!transaction) {
+      if (State !== "OK" || Status !== "2") {
+        const failedWalletTopup = await failWalletTopup(ResNum, req.body);
+        if (failedWalletTopup) return res.send(failedPaymentHtml);
+      }
+
+      const { data } = await gatewayClient.post("/payment/check", {
+        RefNum,
+      });
+
+      if (data.status !== "success") throw new Error("Payment failed");
+
+      const completedWalletTopup = await completeWalletTopup(ResNum, req.body);
+      if (completedWalletTopup) return res.send(successPaymentHtml);
+
       return res.status(400).json({ message: "پرداخت یافت نشد" });
+    }
 
     // update transaction callback body
     await db

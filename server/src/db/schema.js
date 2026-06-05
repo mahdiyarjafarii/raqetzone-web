@@ -54,6 +54,17 @@ export const otpCodes = pgTable("otp_codes", {
   index("idx_otp_codes_created_at").on(table.createdAt),
 ]);
 
+export const wallets = pgTable("wallets", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }).unique(),
+  balance: integer("balance").notNull().default(0),
+  currency: varchar("currency", { length: 10 }).notNull().default("IRT"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_wallets_user_id").on(table.userId),
+]);
+
 export const chats = pgTable("chats", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id")
@@ -103,6 +114,27 @@ export const transactions = pgTable("transactions", {
   callbackBody: jsonb("callback_body"),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+export const walletTransactions = pgTable("wallet_transactions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  walletId: uuid("wallet_id").references(() => wallets.id, { onDelete: "set null" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  amount: integer("amount").notNull(),
+  direction: varchar("direction", { length: 10 }).notNull(),
+  type: varchar("type", { length: 40 }).notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  referenceType: varchar("reference_type", { length: 40 }),
+  referenceId: uuid("reference_id"),
+  gatewayTrackCode: varchar("gateway_track_code", { length: 255 }),
+  callbackBody: jsonb("callback_body"),
+  metadata: jsonb("metadata").default({}),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_wallet_transactions_user_id").on(table.userId),
+  index("idx_wallet_transactions_wallet_id").on(table.walletId),
+  index("idx_wallet_transactions_gateway_track_code").on(table.gatewayTrackCode),
+  index("idx_wallet_transactions_reference").on(table.referenceType, table.referenceId),
+]);
 
 // Analytics table for tracking pricing modal interactions
 export const pricingAnalytics = pgTable("pricing_analytics", {
@@ -233,6 +265,8 @@ export const bookings = pgTable("bookings", {
   endTime: varchar("end_time", { length: 5 }).notNull(),     // HH:mm
   durationHours: integer("duration_hours").notNull(),
   totalPrice: integer("total_price").notNull(),
+  paymentMethod: varchar("payment_method", { length: 20 }).notNull().default("none"),
+  paymentStatus: varchar("payment_status", { length: 20 }).notNull().default("unpaid"),
   status: varchar("status", { length: 20 }).notNull().default("pending"), // pending | approved | rejected | cancelled
   trackingCode: varchar("tracking_code", { length: 20 }).unique(),
   reminderSent: boolean("reminder_sent").notNull().default(false),

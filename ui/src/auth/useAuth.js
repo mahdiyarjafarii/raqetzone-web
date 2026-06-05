@@ -36,9 +36,10 @@ export default function useAuth() {
 
   const getUserImage = (image = currentUser?.image) => {
     if(image) {
-      if(image.startsWith("https://")) return image;
+      if(image.startsWith("http")) return encodeURI(image);
 
-      return `${import.meta.env.VITE_WEBSITE_URL}/uploads/user/${image}`;
+      const encodedImage = image.split("/").map(encodeURIComponent).join("/");
+      return `${import.meta.env.VITE_WEBSITE_URL}/uploads/user/${encodedImage}`;
     }
 
     return userIcon;

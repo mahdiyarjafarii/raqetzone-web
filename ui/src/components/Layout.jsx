@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAtom, useSetAtom } from "jotai";
+import { motion } from "framer-motion";
 import {
   ArrowRightIcon,
   GemIcon,
@@ -11,6 +12,8 @@ import {
   Sun,
   Moon,
   CalendarCheckIcon,
+  WalletIcon,
+  SparklesIcon,
 } from "lucide-react";
 
 import NotificationBell from "@/features/notifications/components/NotificationBell";
@@ -43,6 +46,7 @@ import apiClient from "@/lib/apiClient";
 import PREFERENCE_KEYS from "@/config/preferenceKeys";
 import authStorage from "@/auth/storage";
 import useSocket from "@/hooks/useSocket";
+import { walletService } from "@/features/wallet/walletService";
 
 let prevPathname = "";
 
@@ -61,6 +65,7 @@ function Layout() {
   );
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
+  const [wallet, setWallet] = useState(null);
 
   // Load preferences from backend on mount
   useEffect(() => {
@@ -119,6 +124,15 @@ function Layout() {
     if (numValue == null) return numValue;
     return numValue.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   };
+
+  useEffect(() => {
+    if (!currentUser) return;
+    let alive = true;
+    walletService.getWallet().then((res) => {
+      if (alive && res.ok) setWallet(res.data.wallet);
+    });
+    return () => { alive = false; };
+  }, [currentUser]);
   const handleBack = () => {
     setShowOverlayLoading(true);
     navigate(-1);
@@ -227,22 +241,33 @@ function Layout() {
                 <User size={26} />
               </DropdownMenuTrigger>
 
-              <DropdownMenuContent className="transform translate-x-3 min-w-[220px] z-10 rounded-[22px] border border-black/[0.06] dark:border-white/10 bg-white/95 dark:bg-card/95 p-2 shadow-2xl shadow-black/15 backdrop-blur-xl">
-                <DropdownMenuLabel className="py-3 text-sm text-center font-black text-foreground">
+              <DropdownMenuContent className="transform translate-x-3 min-w-[200px] z-10 rounded-[20px] border border-black/[0.06] dark:border-white/10 bg-white/95 dark:bg-card/95 p-1.5 shadow-2xl shadow-black/15 backdrop-blur-xl">
+                <DropdownMenuLabel className="py-2 text-xs text-center font-bold text-muted-foreground">
                   {currentUser?.phone}
                 </DropdownMenuLabel>
+                <div className="relative mb-1.5 overflow-hidden rounded-2xl border border-primary/15 bg-gradient-to-l from-primary/12 to-[#ef1871]/8 px-3 py-2">
+                  <div className="relative flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <WalletIcon size={17} className="text-primary" />
+                      <span className="text-xs font-bold text-muted-foreground">کیف پول</span>
+                    </div>
+                    <span className="text-sm font-black text-foreground">
+                      {formatNumber(wallet?.balance ?? 0)}
+                    </span>
+                  </div>
+                </div>
                 <DropdownMenuItem
                   onClick={(e) => {
                     e.preventDefault();
                     navigate("/profile");
                     setIsDropdownOpen(false);
                   }}
-                  className="cursor-pointer rounded-2xl border border-primary/10 text-primary! bg-primary/10! px-3 py-3 min-h-[52px] mb-1"
+                  className="cursor-pointer rounded-2xl border border-primary/10 text-primary! bg-primary/10! px-3 py-2.5 min-h-[44px] mb-1"
                 >
-                  <div className="w-9 h-9 rounded-xl bg-primary/12 flex items-center justify-center">
-                    <GemIcon size={18} className="text-primary!" />
+                  <div className="w-8 h-8 rounded-xl bg-primary/12 flex items-center justify-center">
+                    <GemIcon size={16} className="text-primary!" />
                   </div>
-                  <span className="text-sm font-medium">
+                  <span className="text-sm font-bold">
                     اعتبار: {formatNumber(currentUser?.credits)}
                   </span>
                 </DropdownMenuItem>
@@ -251,49 +276,49 @@ function Layout() {
                     setPricingSheetTriggerSource("user_dropdown_menu");
                     setShowPricingSheet(true);
                   }}
-                  className="rounded-2xl px-3 py-3 min-h-[50px] cursor-pointer"
+                  className="rounded-2xl px-3 py-2.5 min-h-[44px] cursor-pointer"
                 >
-                  <div className="w-9 h-9 rounded-xl bg-[#ef1871]/10 text-[#ef1871] flex items-center justify-center">
-                    <ShoppingCart size={18} />
+                  <div className="w-8 h-8 rounded-xl bg-[#ef1871]/10 text-[#ef1871] flex items-center justify-center">
+                    <ShoppingCart size={16} />
                   </div>
-                  <span className="text-sm font-bold">خرید رکت‌زون پلاس</span>
+                  <span className="text-sm font-bold">رکت‌زون پلاس</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={(e) => {
                     e.preventDefault();
                     setTheme(theme === "dark" ? "light" : "dark");
-                    setIsDropdownOpen(false);
                   }}
-                  className="rounded-2xl px-3 py-3 min-h-[50px] flex items-center justify-between cursor-pointer"
+                  className={cn(
+                    "rounded-2xl px-3 py-2.5 min-h-[44px] flex items-center justify-between cursor-pointer border transition-all",
+                    theme === "dark"
+                      ? "border-indigo-400/25 bg-gradient-to-l from-indigo-500/20 to-slate-900/10"
+                      : "border-amber-400/25 bg-gradient-to-l from-amber-300/25 to-orange-200/20"
+                  )}
                 >
                   <div className="flex items-center gap-2.5">
-                    <div className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center">
-                      {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+                    <div className={cn(
+                      "w-8 h-8 rounded-xl flex items-center justify-center shadow-inner",
+                      theme === "dark" ? "bg-slate-950 text-indigo-200" : "bg-white text-amber-500"
+                    )}>
+                      {theme === "dark" ? <Moon size={16} /> : <Sun size={16} />}
                     </div>
-                    <span className="text-sm font-bold">حالت تیره</span>
+                    <span className="text-sm font-black">تم</span>
                   </div>
 
-                  <button
-                    type="button"
-                    aria-label="toggle theme"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      setTheme(theme === "dark" ? "light" : "dark");
-                      setIsDropdownOpen(false);
-                    }}
-                    className={cn(
-                      "relative inline-flex h-6 w-11 items-center rounded-full transition-colors",
-                      theme === "dark" ? "bg-primary" : "bg-black/10 dark:bg-white/10"
-                    )}
-                  >
-                    <span
+                  <div className={cn(
+                    "relative h-7 w-13 rounded-full p-1 transition-colors shadow-inner",
+                    theme === "dark" ? "bg-slate-950" : "bg-white"
+                  )}>
+                    <motion.span
+                      layout
                       className={cn(
-                        "inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform",
-                        theme === "dark" ? "translate-x-5" : "translate-x-0.5"
+                        "absolute top-1 h-5 w-5 rounded-full flex items-center justify-center shadow-lg",
+                        theme === "dark" ? "right-7 bg-indigo-500 text-white" : "right-1 bg-amber-400 text-white"
                       )}
-                    />
-                  </button>
+                    >
+                      {theme === "dark" ? <Moon size={11} /> : <Sun size={11} />}
+                    </motion.span>
+                  </div>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="my-1" />
                 <DropdownMenuItem

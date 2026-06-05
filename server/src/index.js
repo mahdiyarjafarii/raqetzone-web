@@ -11,6 +11,7 @@ import authRoutes from "./routes/auth.js";
 import chatRoutes from "./routes/chat.js";
 import userRoutes from "./routes/user.js";
 import paymentRoutes from "./routes/payment.js";
+import walletRoutes from "./routes/wallet.js";
 import analyticsRoutes from "./routes/analytics.js";
 import uploadRoutes from "./routes/upload.js";
 import preferenceRoutes from "./routes/preference.js";
@@ -94,6 +95,7 @@ app.use("/api", publicRoutes);
 
 app.use("/api", authRoutes);
 app.use("/api", paymentRoutes);
+app.use("/api", walletRoutes);
 app.use("/api", preferenceRoutes);
 app.use("/api", chatRoutes);
 app.use("/api", userRoutes);

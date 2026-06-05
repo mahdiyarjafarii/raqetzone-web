@@ -1,8 +1,9 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { MapPinIcon, CalendarIcon, ClockIcon, BanknoteIcon, FileTextIcon } from "lucide-react";
+import { MapPinIcon, CalendarIcon, ClockIcon, BanknoteIcon, FileTextIcon, WalletIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { walletService } from "@/features/wallet/walletService";
 
 const SPORT_ICONS = { padel: "🏓", tennis: "🎾", squash: "🟡", badminton: "🏸" };
 
@@ -22,11 +23,22 @@ function formatPrice(p) {
 
 export default function BookingSummary({ court, date, slot, onConfirm, onBack, submitting }) {
   const [notes, setNotes] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("none");
+  const [wallet, setWallet] = useState(null);
 
   const startMin = slot.start.split(":").reduce((h, m, i) => h + (i === 0 ? +m * 60 : +m), 0);
   const endMin = slot.end.split(":").reduce((h, m, i) => h + (i === 0 ? +m * 60 : +m), 0);
   const durationHours = (endMin - startMin) / 60;
   const totalPrice = Math.round(court.pricePerHour * durationHours);
+  const canPayWithWallet = (wallet?.balance ?? 0) >= totalPrice;
+
+  useEffect(() => {
+    let alive = true;
+    walletService.getWallet().then((res) => {
+      if (alive && res.ok) setWallet(res.data.wallet);
+    });
+    return () => { alive = false; };
+  }, []);
 
   const rows = [
     { icon: <span className="text-lg">{SPORT_ICONS[court.sportType] ?? "🏅"}</span>, label: "زمین", value: court.name },
@@ -87,6 +99,40 @@ export default function BookingSummary({ court, date, slot, onConfirm, onBack, s
         />
       </div>
 
+      <div className="rounded-2xl border border-border bg-card overflow-hidden">
+        <div className="px-4 py-3 border-b border-border bg-muted/40 flex items-center gap-2">
+          <WalletIcon className="w-4 h-4 text-primary" />
+          <p className="text-xs text-muted-foreground font-medium">روش پرداخت</p>
+        </div>
+        <div className="p-3 grid gap-2">
+          <button
+            type="button"
+            onClick={() => setPaymentMethod("none")}
+            className={cn(
+              "rounded-xl border px-3 py-3 text-right text-sm transition-colors",
+              paymentMethod === "none" ? "border-primary bg-primary/10" : "border-border bg-muted/30"
+            )}
+          >
+            پرداخت مستقیم / تسویه عادی
+          </button>
+          <button
+            type="button"
+            onClick={() => canPayWithWallet && setPaymentMethod("wallet")}
+            disabled={!canPayWithWallet}
+            className={cn(
+              "rounded-xl border px-3 py-3 text-right text-sm transition-colors disabled:opacity-50",
+              paymentMethod === "wallet" ? "border-primary bg-primary/10" : "border-border bg-muted/30"
+            )}
+          >
+            <span className="font-bold">پرداخت از کیف پول</span>
+            <span className="block text-xs text-muted-foreground mt-1">
+              موجودی: {formatPrice(wallet?.balance ?? 0)} تومان
+              {!canPayWithWallet ? " · موجودی کافی نیست" : ""}
+            </span>
+          </button>
+        </div>
+      </div>
+
       {/* Status notice */}
       <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 px-4 py-3 text-amber-700 dark:text-amber-400 text-xs leading-relaxed">
         ⏳ درخواست رزرو شما برای بررسی مدیر زمین ارسال می‌شود. پس از تأیید، رزرو شما نهایی خواهد شد.
@@ -103,7 +149,7 @@ export default function BookingSummary({ court, date, slot, onConfirm, onBack, s
           بازگشت
         </Button>
         <Button
-          onClick={() => onConfirm(notes)}
+          onClick={() => onConfirm(notes, paymentMethod)}
           disabled={submitting}
           className="flex-2 rounded-xl font-bold"
         >

@@ -71,7 +71,28 @@ function AiPage() {
   };
 
   return (
-    <div className="flex flex-col pt-4">
+    <div className="relative flex flex-col pt-4">
+      <div className="fixed inset-x-0 top-0 bottom-16 z-50 flex items-center justify-center bg-background/85 px-4 backdrop-blur-md">
+        <div className="relative max-w-sm overflow-hidden rounded-3xl border border-primary/20 bg-card/95 px-6 py-7 text-center shadow-2xl shadow-primary/10">
+          <div className="absolute inset-x-10 -top-16 h-32 rounded-full bg-primary/20 blur-3xl" />
+          <div className="relative mb-5 inline-flex rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+            به‌زودی
+          </div>
+          <div className="relative mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 ring-1 ring-primary/20">
+            <img src="/logo.png" alt="Raqetzone" className="h-11 w-11 object-contain" />
+          </div>
+          <div className="relative space-y-3">
+            <p className="text-xl font-bold text-foreground">
+              دستیار هوشمند رکت‌زون در راه است
+            </p>
+            <p className="text-sm leading-7 text-muted-foreground">
+              به زودی این بخش به یک مربی هوشمند هوش مصنوعی تبدیل می‌شود تا در
+              تمرین، تحلیل بازی و پیشرفت مهارت‌ها همراه شما باشد.
+            </p>
+          </div>
+        </div>
+      </div>
+
       <PromptSuggestions
         onSelectPrompt={(prompt, images = [], gptId = null) => {
           if (prompt?.type === "image") {

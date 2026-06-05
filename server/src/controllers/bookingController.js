@@ -3,6 +3,7 @@ import { db } from "../db/index.js";
 import { bookings, courts, clubs, users, discountCodes, discountCodeUsages } from "../db/schema.js";
 import { sendNotification } from "../utils/sendNotification.js";
 import { sendSMS } from "../utils/sms.js";
+import { payBookingWithWallet } from "./walletController.js";
 
 function generateTrackingCode() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -21,10 +22,14 @@ function timeToMinutes(t) {
 export const createBookingController = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { courtId, date, startTime, endTime, notes, discountCode } = req.body;
+    const { courtId, date, startTime, endTime, notes, discountCode, paymentMethod = "none" } = req.body;
 
     if (!courtId || !date || !startTime || !endTime) {
       return res.status(400).json({ message: "اطلاعات ناقص است" });
+    }
+
+    if (!["none", "wallet"].includes(paymentMethod)) {
+      return res.status(400).json({ message: "روش پرداخت نامعتبر است" });
     }
 
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
@@ -115,23 +120,45 @@ export const createBookingController = async (req, res) => {
     const totalPrice = Math.max(0, basePrice - discountAmount);
     const trackingCode = generateTrackingCode();
 
-    const [booking] = await db
-      .insert(bookings)
-      .values({ userId, courtId, date, startTime, endTime, durationHours, totalPrice, notes, trackingCode })
-      .returning();
+    const { booking, walletPayment } = await db.transaction(async (tx) => {
+      const [createdBooking] = await tx
+        .insert(bookings)
+        .values({
+          userId,
+          courtId,
+          date,
+          startTime,
+          endTime,
+          durationHours,
+          totalPrice,
+          notes,
+          trackingCode,
+          paymentMethod: paymentMethod === "wallet" ? "wallet" : "none",
+          paymentStatus: totalPrice === 0 ? "paid" : "unpaid",
+        })
+        .returning();
 
-    // Record discount usage
-    if (discountCodeRow && discountAmount > 0) {
-      await db.insert(discountCodeUsages).values({
-        discountCodeId: discountCodeRow.id,
-        userId,
-        bookingId: booking.id,
-        discountAmount,
-      });
-      await db.update(discountCodes)
-        .set({ usedCount: discountCodeRow.usedCount + 1, updatedAt: new Date() })
-        .where(eq(discountCodes.id, discountCodeRow.id));
-    }
+      if (discountCodeRow && discountAmount > 0) {
+        await tx.insert(discountCodeUsages).values({
+          discountCodeId: discountCodeRow.id,
+          userId,
+          bookingId: createdBooking.id,
+          discountAmount,
+        });
+        await tx.update(discountCodes)
+          .set({ usedCount: discountCodeRow.usedCount + 1, updatedAt: new Date() })
+          .where(eq(discountCodes.id, discountCodeRow.id));
+      }
+
+      let paidByWallet = null;
+      if (paymentMethod === "wallet" && totalPrice > 0) {
+        paidByWallet = await payBookingWithWallet({ userId, bookingId: createdBooking.id, amount: totalPrice }, tx);
+        createdBooking.paymentMethod = "wallet";
+        createdBooking.paymentStatus = "paid";
+      }
+
+      return { booking: createdBooking, walletPayment: paidByWallet };
+    });
 
     const courtFullName = court.clubName ? `زمین ${court.name} باشگاه ${court.clubName}` : `زمین ${court.name}`;
 
@@ -158,10 +185,10 @@ export const createBookingController = async (req, res) => {
     }
 
     const enriched = { ...booking, court };
-    return res.status(201).json({ booking: enriched });
+    return res.status(201).json({ booking: enriched, wallet: walletPayment?.wallet });
   } catch (error) {
     console.error("createBooking error:", error);
-    return res.status(500).json({ message: "خطای سرور" });
+    return res.status(error.statusCode ?? 500).json({ message: error.statusCode ? error.message : "خطای سرور" });
   }
 };
 

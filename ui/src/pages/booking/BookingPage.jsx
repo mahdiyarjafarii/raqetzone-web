@@ -96,7 +96,7 @@ export default function BookingPage() {
     setStep("summary");
   };
 
-  const handleConfirmBooking = async (notes) => {
+  const handleConfirmBooking = async (notes, paymentMethod = "none") => {
     if (!selectedCourt || !selectedDate || !selectedSlot) return;
     setSubmitting(true);
     try {
@@ -106,6 +106,7 @@ export default function BookingPage() {
         startTime: selectedSlot.start,
         endTime: selectedSlot.end,
         notes,
+        paymentMethod,
       });
       if (res.ok) {
         setCreatedBooking({ ...res.data.booking, court: selectedCourt });

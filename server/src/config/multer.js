@@ -12,6 +12,13 @@ if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
 
+const sanitizeFileName = (name) =>
+  name
+    .normalize("NFKD")
+    .replace(/[^\w.-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "") || "file";
+
 // File filter
 const fileFilter = (req, file, cb) => {
   // Accept images and common document formats
@@ -57,8 +64,8 @@ export const createUpload = (folderName) => {
     },
     filename: (req, file, cb) => {
       const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-      const ext = path.extname(file.originalname);
-      const name = path.basename(file.originalname, ext);
+      const ext = path.extname(file.originalname).toLowerCase();
+      const name = sanitizeFileName(path.basename(file.originalname, ext));
       cb(null, `${name}-${uniqueSuffix}${ext}`);
     },
   });
@@ -86,8 +93,8 @@ const defaultStorage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-    const ext = path.extname(file.originalname);
-    const name = path.basename(file.originalname, ext);
+    const ext = path.extname(file.originalname).toLowerCase();
+    const name = sanitizeFileName(path.basename(file.originalname, ext));
     cb(null, `${name}-${uniqueSuffix}${ext}`);
   },
 });

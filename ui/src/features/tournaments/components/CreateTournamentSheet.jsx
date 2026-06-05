@@ -43,6 +43,71 @@ const defaultForm = {
 const inputClass =
   "w-full bg-muted border border-border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-violet-500 transition-colors";
 
+const dateTimeFormatFa = new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
+  weekday: "short",
+  year: "numeric",
+  month: "long",
+  day: "numeric",
+});
+
+function toLocalDateTimeValue(date) {
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function getDatePart(value) {
+  return value?.split("T")[0] ?? "";
+}
+
+function getTimePart(value) {
+  return value?.split("T")[1] ?? "12:00";
+}
+
+function buildDateOptions(daysAhead = 730) {
+  const today = new Date();
+  today.setHours(12, 0, 0, 0);
+  return Array.from({ length: daysAhead }, (_, index) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() + index);
+    return {
+      value: toLocalDateTimeValue(date).split("T")[0],
+      label: dateTimeFormatFa.format(date),
+    };
+  });
+}
+
+const persianDateOptions = buildDateOptions();
+
+function PersianDateTimeInput({ value, onChange }) {
+  const datePart = getDatePart(value) || persianDateOptions[0]?.value || "";
+  const timePart = getTimePart(value);
+
+  function emit(nextDate, nextTime) {
+    onChange(`${nextDate}T${nextTime}`);
+  }
+
+  return (
+    <div className="grid grid-cols-[1fr_auto] gap-2">
+      <select
+        dir="rtl"
+        value={datePart}
+        onChange={(e) => emit(e.target.value, timePart)}
+        className={inputClass}
+      >
+        {persianDateOptions.map((option) => (
+          <option key={option.value} value={option.value}>{option.label}</option>
+        ))}
+      </select>
+      <input
+        type="time"
+        value={timePart}
+        onChange={(e) => emit(datePart, e.target.value)}
+        className={cn(inputClass, "w-28 text-center")}
+      />
+    </div>
+  );
+}
+
 function Field({ label, hint, children }) {
   return (
     <div className="space-y-1.5">
@@ -136,29 +201,23 @@ function Step2({ form, setForm }) {
       className="space-y-5"
     >
       <Field label="مهلت ثبت‌نام *" hint="قبل از شروع مسابقه">
-        <input
-          type="datetime-local"
+        <PersianDateTimeInput
           value={form.registrationDeadline}
-          onChange={(e) => setForm((p) => ({ ...p, registrationDeadline: e.target.value }))}
-          className={inputClass}
+          onChange={(value) => setForm((p) => ({ ...p, registrationDeadline: value }))}
         />
       </Field>
 
       <Field label="تاریخ شروع *">
-        <input
-          type="datetime-local"
+        <PersianDateTimeInput
           value={form.startDate}
-          onChange={(e) => setForm((p) => ({ ...p, startDate: e.target.value }))}
-          className={inputClass}
+          onChange={(value) => setForm((p) => ({ ...p, startDate: value }))}
         />
       </Field>
 
       <Field label="تاریخ پایان *">
-        <input
-          type="datetime-local"
+        <PersianDateTimeInput
           value={form.endDate}
-          onChange={(e) => setForm((p) => ({ ...p, endDate: e.target.value }))}
-          className={inputClass}
+          onChange={(value) => setForm((p) => ({ ...p, endDate: value }))}
         />
       </Field>
 

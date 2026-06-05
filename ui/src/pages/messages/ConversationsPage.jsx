@@ -11,8 +11,9 @@ const BASE = import.meta.env.VITE_WEBSITE_URL ?? "http://localhost:3000";
 
 function buildAvatar(image) {
   if (!image) return null;
-  if (image.startsWith("http")) return image;
-  return `${BASE}/uploads/user/${image}`;
+  if (image.startsWith("http")) return encodeURI(image);
+  const encodedImage = image.split("/").map(encodeURIComponent).join("/");
+  return `${BASE}/uploads/user/${encodedImage}`;
 }
 
 function timeAgo(dateStr) {

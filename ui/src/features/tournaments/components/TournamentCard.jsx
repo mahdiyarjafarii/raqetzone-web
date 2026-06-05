@@ -62,7 +62,7 @@ export default function TournamentCard({ tournament, onClick, index = 0 }) {
     tournament.organizerClubName ??
     tournament.organizer?.name ??
     tournament.venue?.name ??
-    "باشگاه نامشخص";
+    null;
 
   return (
     <motion.div
@@ -95,11 +95,13 @@ export default function TournamentCard({ tournament, onClick, index = 0 }) {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 mb-3.5 rounded-2xl bg-primary/7 border border-primary/10 px-3 py-2 text-[11px] text-muted-foreground font-semibold">
-            <Building2Icon className="w-3.5 h-3.5 shrink-0 text-primary" />
-            <span className="text-muted-foreground shrink-0">باشگاه برگزارکننده:</span>
-            <span className="text-foreground font-black truncate">{clubName}</span>
-          </div>
+          {clubName && (
+            <div className="flex items-center gap-2 mb-3.5 rounded-2xl bg-primary/7 border border-primary/10 px-3 py-2 text-[11px] text-muted-foreground font-semibold">
+              <Building2Icon className="w-3.5 h-3.5 shrink-0 text-primary" />
+              <span className="text-muted-foreground shrink-0">باشگاه برگزارکننده:</span>
+              <span className="text-foreground font-black truncate">{clubName}</span>
+            </div>
+          )}
 
           {/* Badges row */}
           <div className="flex flex-wrap gap-1.5 mb-3.5">

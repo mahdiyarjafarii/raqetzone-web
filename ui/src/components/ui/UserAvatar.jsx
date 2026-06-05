@@ -3,8 +3,9 @@ import { cn } from "@/lib/utils";
 
 function buildImageUrl(image) {
   if (!image) return null;
-  if (image.startsWith("http")) return image;
-  return `${import.meta.env.VITE_WEBSITE_URL}/uploads/user/${image}`;
+  if (image.startsWith("http")) return encodeURI(image);
+  const encodedImage = image.split("/").map(encodeURIComponent).join("/");
+  return `${import.meta.env.VITE_WEBSITE_URL}/uploads/user/${encodedImage}`;
 }
 
 export default function UserAvatar({ image, name, className, fallbackClassName }) {
