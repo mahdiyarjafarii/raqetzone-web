@@ -15,6 +15,15 @@ import { fmt, cn } from "@/lib/utils";
 
 const API_BASE = import.meta.env.VITE_API_URL?.replace("/api", "") ?? "http://localhost:3000";
 
+function buildUserImageUrl(image) {
+  if (!image) return null;
+  if (image.startsWith("http")) return image;
+  if (image.startsWith("/uploads/")) return `${API_BASE}${image}`;
+  if (image.startsWith("uploads/")) return `${API_BASE}/${image}`;
+  if (image.startsWith("user/")) return `${API_BASE}/uploads/${image}`;
+  return `${API_BASE}/uploads/user/${image}`;
+}
+
 // ─── Message templates ────────────────────────────────────────────────────────
 
 const TEMPLATES = [
@@ -337,14 +346,22 @@ function SmsCampaignModal({ open, onClose, clubs, customerCount }) {
 // ─── Avatar ───────────────────────────────────────────────────────────────────
 
 function Avatar({ customer }) {
-  if (customer.image) {
-    const src = customer.image.startsWith("http") ? customer.image : `${API_BASE}/uploads/user/${customer.image}`;
-    return <img src={src} alt="" className="h-10 w-10 rounded-full object-cover shrink-0" />;
-  }
+  const src = buildUserImageUrl(customer.image);
   const initials = (customer.name ?? customer.phone ?? "?")[0].toUpperCase();
   return (
-    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-      <span className="text-primary font-bold text-sm">{initials}</span>
+    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden">
+      {src ? (
+        <img
+          src={src}
+          alt=""
+          className="h-full w-full object-cover"
+          onError={(e) => {
+            e.currentTarget.style.display = "none";
+            e.currentTarget.nextSibling.style.display = "inline";
+          }}
+        />
+      ) : null}
+      <span className="text-primary font-bold text-sm" style={{ display: src ? "none" : "inline" }}>{initials}</span>
     </div>
   );
 }

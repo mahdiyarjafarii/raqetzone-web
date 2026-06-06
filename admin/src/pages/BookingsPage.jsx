@@ -13,15 +13,21 @@ import { cn } from "@/lib/utils";
 
 const ADMIN_BASE = import.meta.env.VITE_API_URL?.replace("/api", "") ?? "http://localhost:3000";
 
+function buildUserImageUrl(image) {
+  if (!image) return null;
+  if (image.startsWith("http")) return image;
+  if (image.startsWith("/uploads/")) return `${ADMIN_BASE}${image}`;
+  if (image.startsWith("uploads/")) return `${ADMIN_BASE}/${image}`;
+  if (image.startsWith("user/")) return `${ADMIN_BASE}/uploads/${image}`;
+  return `${ADMIN_BASE}/uploads/user/${image}`;
+}
+
 function UserAvatar({ image, name }) {
-  const src = image
-    ? image.startsWith("http") ? image : `${ADMIN_BASE}/uploads/user/${image}`
-    : null;
-  const isUnsupportedImage = /\.(heic|heif)$/i.test(src ?? "");
+  const src = buildUserImageUrl(image);
 
   return (
     <div className="w-9 h-9 rounded-full overflow-hidden shrink-0 border border-border">
-      {src && !isUnsupportedImage ? (
+      {src ? (
         <img
           src={src}
           alt={name ?? ""}
@@ -34,7 +40,7 @@ function UserAvatar({ image, name }) {
       ) : null}
       <div
         className="w-full h-full bg-gradient-to-br from-violet-600 to-indigo-500 text-white text-xs font-bold items-center justify-center"
-        style={{ display: src && !isUnsupportedImage ? "none" : "flex" }}
+        style={{ display: src ? "none" : "flex" }}
       >
         {name?.[0]?.toUpperCase() ?? "?"}
       </div>
