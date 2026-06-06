@@ -337,7 +337,7 @@ export const emergencySubController = async (req, res) => {
       )
       .limit(50);
 
-    const sportsLabel = { padel: "پادل", tennis: "تنیس", squash: "اسکواش", badminton: "بدمینتون", "ping-pong": "پینگ‌پنگ" };
+    const sportsLabel = { padel: "پدل", tennis: "تنیس", squash: "اسکواش", badminton: "بدمینتون", "ping-pong": "پینگ‌پنگ" };
     const smsText =
       `🚨 یار دقیقه‌نودی!\n` +
       `بچه‌های «${match.location}» همین الان به یک بازیکن ${sportsLabel[match.sportType] ?? match.sportType} نیاز دارند.\n` +

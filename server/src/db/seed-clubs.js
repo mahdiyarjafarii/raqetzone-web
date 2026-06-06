@@ -34,7 +34,7 @@ async function seed() {
   const [club] = await db.insert(clubs).values({
     ownerId: owner.id,
     name: CLUB_NAME,
-    description: "رکت زون قزوین با زمین‌های استاندارد پادل و تنیس، بهترین مجموعه ورزشی در قزوین است.",
+    description: "رکت زون قزوین با زمین‌های استاندارد پدل و تنیس، بهترین مجموعه ورزشی در قزوین است.",
     address: "قزوین، خیابان نوروزیان",
     phone: "02833000000",
     sportTypes: ["padel", "tennis"],
@@ -56,7 +56,7 @@ async function seed() {
   await db.insert(courts).values([
     {
       clubId: club.id,
-      name: "زمین پادل ۱",
+      name: "زمین پدل ۱",
       location: CLUB_NAME,
       address: "قزوین، خیابان نوروزیان",
       sportType: "padel",
@@ -67,7 +67,7 @@ async function seed() {
     },
     {
       clubId: club.id,
-      name: "زمین پادل ۲",
+      name: "زمین پدل ۲",
       location: CLUB_NAME,
       address: "قزوین، خیابان نوروزیان",
       sportType: "padel",

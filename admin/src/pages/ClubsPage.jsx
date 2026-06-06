@@ -13,6 +13,7 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
+import PersianTimePicker from "@/components/PersianTimePicker";
 import { cn } from "@/lib/utils";
 
 const API_BASE = import.meta.env.VITE_API_URL?.replace("/api", "") ?? "http://localhost:3000";
@@ -20,7 +21,7 @@ const API_BASE = import.meta.env.VITE_API_URL?.replace("/api", "") ?? "http://lo
 const SPORTS = ["padel","tennis","squash","badminton","ping-pong"];
 const AMENITIES = ["parking","locker","shower","cafe","wifi","lighting","shop","coaching","firstaid","ac"];
 const AMENITY_LABELS = { parking:"پارکینگ", locker:"رختکن", shower:"دوش", cafe:"کافه", wifi:"وای‌فای", lighting:"روشنایی", shop:"فروشگاه", coaching:"کوچینگ", firstaid:"کمک‌های اولیه", ac:"تهویه" };
-const SPORT_LABELS   = { padel:"پادل", tennis:"تنیس", squash:"اسکواش", badminton:"بدمینتون", "ping-pong":"پینگ‌پنگ" };
+const SPORT_LABELS   = { padel:"پدل", tennis:"تنیس", squash:"اسکواش", badminton:"بدمینتون", "ping-pong":"پینگ‌پنگ" };
 
 const emptyClub = {
   name: "", description: "", address: "",
@@ -179,9 +180,9 @@ function ClubForm({ form, setForm, onSubmit, loading, submitLabel, isEdit = fals
           <textarea value={form.description} onChange={e => f("description", e.target.value)} rows={2}
             className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none resize-none" />
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Input label="ساعت باز شدن" type="time" value={form.openTime} onChange={e => f("openTime", e.target.value)} />
-          <Input label="ساعت بستن" type="time" value={form.closeTime} onChange={e => f("closeTime", e.target.value)} />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <PersianTimePicker label="ساعت باز شدن" value={form.openTime} onChange={value => f("openTime", value)} />
+          <PersianTimePicker label="ساعت بستن" value={form.closeTime} onChange={value => f("closeTime", value)} />
         </div>
         <MultiCheck label="ورزش‌های ارائه شده" options={SPORTS} labelMap={SPORT_LABELS} value={form.sportTypes} onChange={v => f("sportTypes", v)} />
         <MultiCheck label="امکانات" options={AMENITIES} labelMap={AMENITY_LABELS} value={form.amenities} onChange={v => f("amenities", v)} />
@@ -241,9 +242,9 @@ function ClubForm({ form, setForm, onSubmit, loading, submitLabel, isEdit = fals
             <p className="text-xs text-muted-foreground mt-0.5">مشخص کنید چه ورزش‌هایی ارائه می‌دهید</p>
           </div>
           <MultiCheck label="ورزش‌های ارائه شده *" options={SPORTS} labelMap={SPORT_LABELS} value={form.sportTypes} onChange={v => f("sportTypes", v)} />
-          <div className="grid grid-cols-2 gap-3 pt-1">
-            <Input label="ساعت باز شدن" type="time" value={form.openTime} onChange={e => f("openTime", e.target.value)} />
-            <Input label="ساعت بستن" type="time" value={form.closeTime} onChange={e => f("closeTime", e.target.value)} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+            <PersianTimePicker label="ساعت باز شدن" value={form.openTime} onChange={value => f("openTime", value)} />
+            <PersianTimePicker label="ساعت بستن" value={form.closeTime} onChange={value => f("closeTime", value)} />
           </div>
           <div className="flex gap-2 pt-1">
             <Button type="button" variant="outline" onClick={prev} className="flex-1">← قبلی</Button>

@@ -136,7 +136,7 @@ export default function ClubDetailPage() {
         <ClubGallery images={club.images} clubName={club.name} />
 
         {/* Floating nav buttons */}
-        <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
+        <div className="absolute top-4 right-4 z-1 flex items-center gap-2">
           <button
             onClick={() => navigate("/clubs")}
             className="h-9 w-9 rounded-full bg-white/90 backdrop-blur shadow-sm flex items-center justify-center active:scale-90 transition-transform"
@@ -145,7 +145,7 @@ export default function ClubDetailPage() {
           </button>
         </div>
 
-        <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
+        <div className="absolute top-4 left-4 z-1 flex items-center gap-2">
           <button
             onClick={() => setLiked((v) => !v)}
             className="h-9 w-9 rounded-full bg-white/90 backdrop-blur shadow-sm flex items-center justify-center active:scale-90 transition-transform"

@@ -53,9 +53,10 @@ export const createBookingController = async (req, res) => {
                 surfaceType: courts.surfaceType, sportType: courts.sportType, pricePerHour: courts.pricePerHour,
                 image: courts.image, managerPhone: courts.managerPhone, openTime: courts.openTime,
                 closeTime: courts.closeTime, slotDuration: courts.slotDuration, isActive: courts.isActive,
-                clubName: clubs.name })
+                clubName: clubs.name, clubPhone: clubs.phone, clubOwnerPhone: users.phone })
       .from(courts)
       .leftJoin(clubs, eq(courts.clubId, clubs.id))
+      .leftJoin(users, eq(clubs.ownerId, users.id))
       .where(and(eq(courts.id, courtId), eq(courts.isActive, true)))
       .limit(1);
 
@@ -172,16 +173,18 @@ export const createBookingController = async (req, res) => {
     }).catch(() => {});
 
     // Notify court manager
-    if (court.managerPhone) {
+    const managerPhone = court.managerPhone || court.clubPhone || court.clubOwnerPhone;
+    const managerPhoneSource = court.managerPhone ? "court.managerPhone" : court.clubPhone ? "club.phone" : court.clubOwnerPhone ? "club.owner.phone" : null;
+    if (managerPhone) {
       const [requester] = await db.select({ name: users.name, phone: users.phone }).from(users).where(eq(users.id, userId)).limit(1);
       const requesterInfo = requester?.name ? `${requester.name} (${requester.phone})` : requester?.phone ?? "کاربر";
       const managerMsg = `پلتفرم رکت‌زون: درخواست رزرو جدید - ${courtFullName} - تاریخ ${date} ساعت ${startTime} تا ${endTime} - رزرو کننده: ${requesterInfo} - لطفا از پنل تایید یا رد کنید.`;
-      console.log(`[SMS-Manager] → ${court.managerPhone}`);
-      sendSMS(court.managerPhone, managerMsg)
+      console.log(`[SMS-Manager] → ${managerPhone} (${managerPhoneSource})`);
+      sendSMS(managerPhone, managerMsg)
         .then(ok => console.log(`[SMS-Manager] result: ${ok}`))
         .catch(err => console.error("[SMS-Manager] error:", err.message));
     } else {
-      console.log(`[SMS-Manager] skipped — no managerPhone for court ${court.id}`);
+      console.log(`[SMS-Manager] skipped — no manager phone, club phone, or owner phone for court ${court.id}`);
     }
 
     const enriched = { ...booking, court };

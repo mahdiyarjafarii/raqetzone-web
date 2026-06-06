@@ -128,10 +128,19 @@ function Layout() {
   useEffect(() => {
     if (!currentUser) return;
     let alive = true;
-    walletService.getWallet().then((res) => {
+    const refreshWallet = () => walletService.getWallet().then((res) => {
       if (alive && res.ok) setWallet(res.data.wallet);
     });
-    return () => { alive = false; };
+    const handleWalletUpdated = (event) => {
+      if (event.detail) setWallet(event.detail);
+      else refreshWallet();
+    };
+    refreshWallet();
+    window.addEventListener("wallet:updated", handleWalletUpdated);
+    return () => {
+      alive = false;
+      window.removeEventListener("wallet:updated", handleWalletUpdated);
+    };
   }, [currentUser]);
   const handleBack = () => {
     setShowOverlayLoading(true);

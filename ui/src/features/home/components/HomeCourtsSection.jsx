@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import SectionHeader from "./SectionHeader";
 import { useClubs } from "@/features/clubs/hooks/useClubs";
 
-const SPORT_LABELS = { padel: "پادل", tennis: "تنیس", squash: "اسکواش", badminton: "بدمینتون" };
+const SPORT_LABELS = { padel: "پدل", tennis: "تنیس", squash: "اسکواش", badminton: "بدمینتون" };
 const BASE = import.meta.env.VITE_API_URL?.replace("/api", "") ?? "http://localhost:3000";
 const imgUrl = (src) => !src ? null : src.startsWith("http") ? src : `${BASE}${src}`;
 const SPORT_COLORS = {

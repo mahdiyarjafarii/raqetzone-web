@@ -12,7 +12,7 @@ import { createTournamentOpenAtom, tournamentsAtom } from "../store/tournamentSt
 import { tournamentService } from "../services/tournamentService";
 
 const SPORTS = [
-  { value: "padel",     label: "پادل",      icon: "🏓" },
+  { value: "padel",     label: "پدل",      icon: "🏓" },
   { value: "tennis",    label: "تنیس",      icon: "🎾" },
   { value: "squash",    label: "اسکواش",    icon: "🟡" },
   { value: "badminton", label: "بدمینتون",  icon: "🏸" },
@@ -77,12 +77,49 @@ function buildDateOptions(daysAhead = 730) {
 }
 
 const persianDateOptions = buildDateOptions();
+const persianNumberFormat = new Intl.NumberFormat("fa-IR", { minimumIntegerDigits: 2 });
+const hourOptions = Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, "0"));
+const minuteOptions = Array.from({ length: 12 }, (_, index) => String(index * 5).padStart(2, "0"));
+
+function PersianTimeInput({ value, onChange }) {
+  const [hour = "12", minute = "00"] = (value || "12:00").split(":");
+
+  function emit(nextHour, nextMinute) {
+    onChange(`${nextHour}:${nextMinute}`);
+  }
+
+  return (
+    <div className="grid grid-cols-2 gap-1 w-32">
+      <select
+        dir="rtl"
+        value={hour}
+        onChange={(e) => emit(e.target.value, minute)}
+        className={cn(inputClass, "text-center px-2")}
+      >
+        {hourOptions.map((option) => (
+          <option key={option} value={option}>{persianNumberFormat.format(Number(option))}</option>
+        ))}
+      </select>
+      <select
+        dir="rtl"
+        value={minute}
+        onChange={(e) => emit(hour, e.target.value)}
+        className={cn(inputClass, "text-center px-2")}
+      >
+        {minuteOptions.map((option) => (
+          <option key={option} value={option}>{persianNumberFormat.format(Number(option))}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
 
 function PersianDateTimeInput({ value, onChange }) {
-  const datePart = getDatePart(value) || persianDateOptions[0]?.value || "";
+  const datePart = getDatePart(value);
   const timePart = getTimePart(value);
 
   function emit(nextDate, nextTime) {
+    if (!nextDate) return;
     onChange(`${nextDate}T${nextTime}`);
   }
 
@@ -94,15 +131,14 @@ function PersianDateTimeInput({ value, onChange }) {
         onChange={(e) => emit(e.target.value, timePart)}
         className={inputClass}
       >
+        <option value="">انتخاب تاریخ...</option>
         {persianDateOptions.map((option) => (
           <option key={option.value} value={option.value}>{option.label}</option>
         ))}
       </select>
-      <input
-        type="time"
+      <PersianTimeInput
         value={timePart}
-        onChange={(e) => emit(datePart, e.target.value)}
-        className={cn(inputClass, "w-28 text-center")}
+        onChange={(nextTime) => emit(datePart, nextTime)}
       />
     </div>
   );
@@ -136,7 +172,7 @@ function Step1({ form, setForm }) {
         <input
           value={form.title}
           onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
-          placeholder="مثال: مسابقات پادل بهاره"
+          placeholder="مثال: مسابقات پدل بهاره"
           className={inputClass}
           autoFocus
         />

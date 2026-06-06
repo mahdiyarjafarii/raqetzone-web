@@ -15,7 +15,7 @@ import { cn } from "@/lib/utils";
 // ── data ──────────────────────────────────────────────────────────────────────
 
 const SPORTS = [
-  { value: "padel",     label: "پادل",     emoji: "🏓" },
+  { value: "padel",     label: "پدل",     emoji: "🏓" },
   { value: "tennis",    label: "تنیس",     emoji: "🎾" },
   { value: "squash",    label: "اسکواش",   emoji: "🟡" },
   { value: "badminton", label: "بدمینتون", emoji: "🏸" },

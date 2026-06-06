@@ -12,7 +12,7 @@ export const AMENITY_META = {
 };
 
 export const SPORT_META = {
-  padel: { label: "پادل", color: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400" },
+  padel: { label: "پدل", color: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400" },
   tennis: { label: "تنیس", color: "bg-yellow-500/15 text-yellow-700 dark:text-yellow-400" },
   squash: { label: "اسکواش", color: "bg-red-500/15 text-red-700 dark:text-red-400" },
   badminton: { label: "بدمینتون", color: "bg-blue-500/15 text-blue-700 dark:text-blue-400" },
@@ -28,7 +28,7 @@ export const BADGE_META = {
 export const MOCK_CLUBS = [
   {
     id: "club-padel-north",
-    name: "پادل پارک شمال",
+    name: "پدل پارک شمال",
     sportTypes: ["padel", "tennis"],
     location: "تهران، الهیه",
     address: "تهران، الهیه، خیابان فرمانیه، پلاک ۱۲",
@@ -44,14 +44,14 @@ export const MOCK_CLUBS = [
     ],
     badges: ["top_rated", "available_today"],
     description:
-      "پادل پارک شمال با ۶ زمین حرفه‌ای پادل و ۲ زمین تنیس در یکی از بهترین مناطق تهران واقع شده است. امکانات درجه یک، روشنایی مناسب برای بازی شبانه و کادر مجرب کوچینگ از ویژگی‌های این مجموعه است.",
+      "پدل پارک شمال با ۶ زمین حرفه‌ای پدل و ۲ زمین تنیس در یکی از بهترین مناطق تهران واقع شده است. امکانات درجه یک، روشنایی مناسب برای بازی شبانه و کادر مجرب کوچینگ از ویژگی‌های این مجموعه است.",
     amenities: ["parking", "locker", "shower", "cafe", "wifi", "lighting", "coaching"],
     openTime: "07:00",
     closeTime: "23:00",
     courts: [
-      { id: "mock-c1", name: "زمین پادل ۱", sportType: "padel", surfaceType: "artificial", pricePerHour: 180000, openTime: "07:00", closeTime: "23:00", location: "پادل پارک شمال" },
-      { id: "mock-c2", name: "زمین پادل ۲", sportType: "padel", surfaceType: "artificial", pricePerHour: 180000, openTime: "07:00", closeTime: "23:00", location: "پادل پارک شمال" },
-      { id: "mock-c3", name: "زمین تنیس ۱", sportType: "tennis", surfaceType: "hard", pricePerHour: 220000, openTime: "07:00", closeTime: "22:00", location: "پادل پارک شمال" },
+      { id: "mock-c1", name: "زمین پدل ۱", sportType: "padel", surfaceType: "artificial", pricePerHour: 180000, openTime: "07:00", closeTime: "23:00", location: "پدل پارک شمال" },
+      { id: "mock-c2", name: "زمین پدل ۲", sportType: "padel", surfaceType: "artificial", pricePerHour: 180000, openTime: "07:00", closeTime: "23:00", location: "پدل پارک شمال" },
+      { id: "mock-c3", name: "زمین تنیس ۱", sportType: "tennis", surfaceType: "hard", pricePerHour: 220000, openTime: "07:00", closeTime: "22:00", location: "پدل پارک شمال" },
     ],
   },
   {
@@ -97,19 +97,19 @@ export const MOCK_CLUBS = [
     ],
     badges: ["available_today", "new"],
     description:
-      "مجموعه ورزشی آزادی با گسترده‌ترین انتخاب ورزش‌ها، شامل پادل، اسکواش و بدمینتون، گزینه‌ای ایده‌آل برای خانواده‌ها و گروه‌های دوستی است.",
+      "مجموعه ورزشی آزادی با گسترده‌ترین انتخاب ورزش‌ها، شامل پدل، اسکواش و بدمینتون، گزینه‌ای ایده‌آل برای خانواده‌ها و گروه‌های دوستی است.",
     amenities: ["parking", "locker", "shower", "shop", "wifi", "lighting", "ac"],
     openTime: "08:00",
     closeTime: "22:00",
     courts: [
       { id: "mock-c6", name: "زمین اسکواش ۱", sportType: "squash", surfaceType: "hard", pricePerHour: 120000, openTime: "08:00", closeTime: "22:00", location: "مجموعه ورزشی آزادی" },
       { id: "mock-c7", name: "زمین بدمینتون ۱", sportType: "badminton", surfaceType: "hard", pricePerHour: 150000, openTime: "08:00", closeTime: "22:00", location: "مجموعه ورزشی آزادی" },
-      { id: "mock-c8", name: "زمین پادل ۱", sportType: "padel", surfaceType: "artificial", pricePerHour: 160000, openTime: "08:00", closeTime: "22:00", location: "مجموعه ورزشی آزادی" },
+      { id: "mock-c8", name: "زمین پدل ۱", sportType: "padel", surfaceType: "artificial", pricePerHour: 160000, openTime: "08:00", closeTime: "22:00", location: "مجموعه ورزشی آزادی" },
     ],
   },
   {
     id: "club-padel-west",
-    name: "پادل کلاب غرب",
+    name: "پدل کلاب غرب",
     sportTypes: ["padel"],
     location: "تهران، پونک",
     address: "تهران، پونک، خیابان اشرفی اصفهانی، پلاک ۳۳",
@@ -123,13 +123,13 @@ export const MOCK_CLUBS = [
     ],
     badges: ["available_today"],
     description:
-      "پادل کلاب غرب با ۳ زمین پادل سرپوشیده و امکانات مدرن، گزینه مناسبی برای بازی در هر آب‌وهوایی است.",
+      "پدل کلاب غرب با ۳ زمین پدل سرپوشیده و امکانات مدرن، گزینه مناسبی برای بازی در هر آب‌وهوایی است.",
     amenities: ["parking", "locker", "shower", "wifi", "lighting", "ac"],
     openTime: "08:00",
     closeTime: "23:00",
     courts: [
-      { id: "mock-c9", name: "زمین پادل A", sportType: "padel", surfaceType: "artificial", pricePerHour: 160000, openTime: "08:00", closeTime: "23:00", location: "پادل کلاب غرب" },
-      { id: "mock-c10", name: "زمین پادل B", sportType: "padel", surfaceType: "artificial", pricePerHour: 160000, openTime: "08:00", closeTime: "23:00", location: "پادل کلاب غرب" },
+      { id: "mock-c9", name: "زمین پدل A", sportType: "padel", surfaceType: "artificial", pricePerHour: 160000, openTime: "08:00", closeTime: "23:00", location: "پدل کلاب غرب" },
+      { id: "mock-c10", name: "زمین پدل B", sportType: "padel", surfaceType: "artificial", pricePerHour: 160000, openTime: "08:00", closeTime: "23:00", location: "پدل کلاب غرب" },
     ],
   },
   {
@@ -153,7 +153,7 @@ export const MOCK_CLUBS = [
     openTime: "09:00",
     closeTime: "22:00",
     courts: [
-      { id: "mock-c11", name: "زمین پادل ۱", sportType: "padel", surfaceType: "artificial", pricePerHour: 130000, openTime: "09:00", closeTime: "22:00", location: "رکت زون شرق" },
+      { id: "mock-c11", name: "زمین پدل ۱", sportType: "padel", surfaceType: "artificial", pricePerHour: 130000, openTime: "09:00", closeTime: "22:00", location: "رکت زون شرق" },
       { id: "mock-c12", name: "زمین اسکواش ۱", sportType: "squash", surfaceType: "hard", pricePerHour: 140000, openTime: "09:00", closeTime: "22:00", location: "رکت زون شرق" },
     ],
   },

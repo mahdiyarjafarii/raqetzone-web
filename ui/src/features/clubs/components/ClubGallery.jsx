@@ -84,7 +84,7 @@ export default function ClubGallery({ images = [], clubName }) {
           </Swiper>
 
           {/* Image count badge */}
-          <div className="absolute bottom-3 left-3 z-10 bg-black/50 backdrop-blur-sm rounded-full px-2.5 py-1 text-white text-xs font-medium">
+          <div className="absolute bottom-3 left-3 z-1 bg-black/50 backdrop-blur-sm rounded-full px-2.5 py-1 text-white text-xs font-medium">
             {images.length} عکس
           </div>
         </div>

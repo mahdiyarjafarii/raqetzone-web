@@ -48,7 +48,7 @@ const SPORT_LIGHT = {
 };
 
 const SPORT_LABEL = {
-  padel: "پادل", tennis: "تنیس", squash: "اسکواش", badminton: "بدمینتون",
+  padel: "پدل", tennis: "تنیس", squash: "اسکواش", badminton: "بدمینتون",
 };
 
 // ── BookingCard ───────────────────────────────────────────────────────────────

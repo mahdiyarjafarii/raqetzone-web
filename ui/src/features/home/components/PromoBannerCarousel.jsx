@@ -19,7 +19,7 @@ export default function PromoBannerCarousel({ promotions = [], loading }) {
       id: "fallback-clubs",
       eyebrow: "رزرو سریع",
       title: "زمین نزدیکت رو پیدا کن",
-      subtitle: "بین مجموعه‌های برتر پادل، تنیس و اسکواش انتخاب کن و زمان مناسب رو رزرو کن.",
+      subtitle: "بین مجموعه‌های برتر پدل، تنیس و اسکواش انتخاب کن و زمان مناسب رو رزرو کن.",
       badgeText: "پیشنهاد امروز",
       metric: "از ۳ دقیقه",
       emoji: "🏓",

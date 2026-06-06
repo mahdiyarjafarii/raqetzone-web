@@ -12,6 +12,7 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
+import PersianTimePicker from "@/components/PersianTimePicker";
 import { fmt, cn } from "@/lib/utils";
 
 // ─── Countdown hook ───────────────────────────────────────────────────────────
@@ -31,6 +32,91 @@ function useCountdown(target) {
 }
 
 function pad(n) { return String(n).padStart(2, "0"); }
+
+const dateTimeFormatFa = new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
+  weekday: "short",
+  year: "numeric",
+  month: "long",
+  day: "numeric",
+});
+
+function toLocalDateTimeValue(date) {
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function getDatePart(value) {
+  return value?.split("T")[0] ?? "";
+}
+
+function getTimePart(value) {
+  return value?.split("T")[1] ?? "12:00";
+}
+
+function buildDateOptions(daysAhead = 730) {
+  const today = new Date();
+  today.setHours(12, 0, 0, 0);
+  return Array.from({ length: daysAhead }, (_, index) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() + index);
+    return {
+      value: toLocalDateTimeValue(date).split("T")[0],
+      label: dateTimeFormatFa.format(date),
+    };
+  });
+}
+
+const persianDateOptions = buildDateOptions();
+
+function PersianDateInput({ value, onChange, required }) {
+  const datePart = value || "";
+
+  return (
+    <select
+      dir="rtl"
+      value={datePart}
+      onChange={(e) => onChange(e.target.value)}
+      required={required}
+      className="h-10 rounded-xl border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/30"
+    >
+      <option value="">انتخاب تاریخ...</option>
+      {persianDateOptions.map((option) => (
+        <option key={option.value} value={option.value}>{option.label}</option>
+      ))}
+    </select>
+  );
+}
+
+function PersianDateTimeInput({ value, onChange, required }) {
+  const datePart = getDatePart(value);
+  const timePart = getTimePart(value);
+
+  function emit(nextDate, nextTime) {
+    if (!nextDate) return;
+    onChange(`${nextDate}T${nextTime}`);
+  }
+
+  return (
+    <div className="grid grid-cols-[1fr_auto] gap-2">
+      <select
+        dir="rtl"
+        value={datePart}
+        onChange={(e) => emit(e.target.value, timePart)}
+        required={required}
+        className="h-10 rounded-xl border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/30"
+      >
+        <option value="">انتخاب تاریخ...</option>
+        {persianDateOptions.map((option) => (
+          <option key={option.value} value={option.value}>{option.label}</option>
+        ))}
+      </select>
+      <PersianTimePicker
+        value={timePart}
+        onChange={(nextTime) => emit(datePart, nextTime)}
+        required={required}
+      />
+    </div>
+  );
+}
 
 function CountdownPill({ validUntil }) {
   const { h, m, s, expired } = useCountdown(validUntil);
@@ -166,8 +252,7 @@ function CreateDealForm({ courts, onCreated, onClose }) {
       <div className="grid grid-cols-2 gap-3">
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-semibold text-muted-foreground">تاریخ اسلات</label>
-          <input type="date" value={form.slotDate} onChange={e => f("slotDate", e.target.value)} required
-            className="h-10 rounded-xl border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/30" />
+          <PersianDateInput value={form.slotDate} onChange={value => f("slotDate", value)} required />
         </div>
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-semibold text-muted-foreground">درصد تخفیف</label>
@@ -179,23 +264,20 @@ function CreateDealForm({ courts, onCreated, onClose }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-semibold text-muted-foreground">ساعت شروع اسلات</label>
-          <input type="time" value={form.slotStart} onChange={e => f("slotStart", e.target.value)} required
-            className="h-10 rounded-xl border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/30" />
+          <PersianTimePicker value={form.slotStart} onChange={value => f("slotStart", value)} required />
         </div>
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-semibold text-muted-foreground">ساعت پایان اسلات</label>
-          <input type="time" value={form.slotEnd} onChange={e => f("slotEnd", e.target.value)} required
-            className="h-10 rounded-xl border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/30" />
+          <PersianTimePicker value={form.slotEnd} onChange={value => f("slotEnd", value)} required />
         </div>
       </div>
 
       <div className="flex flex-col gap-1.5">
         <label className="text-xs font-semibold text-muted-foreground">تاریخ و ساعت انقضای آفر</label>
-        <input type="datetime-local" value={form.validUntil} onChange={e => f("validUntil", e.target.value)} required
-          className="h-10 rounded-xl border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/30" />
+        <PersianDateTimeInput value={form.validUntil} onChange={value => f("validUntil", value)} required />
       </div>
 
       {selectedCourt && form.discountPercent && (
@@ -457,8 +539,7 @@ function CreateVoucherForm({ clubs, onCreated, onClose }) {
         </div>
         <div className="flex flex-col gap-1.5">
           <label className="text-xs font-semibold text-muted-foreground">تاریخ انقضا</label>
-          <input type="datetime-local" value={form.expiresAt} onChange={e => f("expiresAt", e.target.value)}
-            className="h-10 rounded-xl border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/30" />
+          <PersianDateTimeInput value={form.expiresAt} onChange={value => f("expiresAt", value)} />
         </div>
       </div>
 

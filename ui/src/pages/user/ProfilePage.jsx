@@ -9,7 +9,7 @@ import {
   PencilIcon, CameraIcon, ChevronRightIcon,
   SwordsIcon, TrophyIcon, TrendingUpIcon,
   GemIcon, ChevronDownIcon, ChevronUpIcon,
-  MessageCircleIcon,
+  MessageCircleIcon, WalletIcon, PlusIcon,
 } from "lucide-react";
 
 import useAuth from "@/auth/useAuth";
@@ -19,6 +19,7 @@ import { useProfileData } from "@/features/profile/hooks/useProfileData";
 import { profileService } from "@/features/profile/services/profileService";
 import EditProfileSheet from "@/features/profile/components/EditProfileSheet";
 import RecentMatchesList from "@/features/profile/components/RecentMatchesList";
+import { walletService } from "@/features/wallet/walletService";
 import { cn } from "@/lib/utils";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -39,6 +40,7 @@ const STATUS_CLS = {
   failed:    "bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-300",
 };
 const fmt = (v) => v == null ? "-" : new Intl.NumberFormat("fa-IR").format(v);
+const WALLET_TOPUP_AMOUNTS = [100000, 300000, 500000, 1000000];
 const fmtDate = (v) => {
   if (!v) return "-";
   try { return new Intl.DateTimeFormat("fa-IR", { year: "numeric", month: "long", day: "numeric" }).format(new Date(v)); }
@@ -91,6 +93,10 @@ export default function ProfilePage() {
   const [showAllPayments, setShowAllPayments] = useState(false);
   const [payments, setPayments] = useState([]);
   const [paymentsLoading, setPaymentsLoading] = useState(false);
+  const [wallet, setWallet] = useState(null);
+  const [walletLoading, setWalletLoading] = useState(false);
+  const [topupAmount, setTopupAmount] = useState(300000);
+  const [topupLoading, setTopupLoading] = useState(false);
   const fileRef = useRef(null);
 
   useEffect(() => {
@@ -102,6 +108,20 @@ export default function ProfilePage() {
       if (ok) setPayments(data?.payments ?? []);
       setPaymentsLoading(false);
     });
+    return () => { alive = false; };
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    let alive = true;
+    setWalletLoading(true);
+    walletService.getWallet()
+      .then((res) => {
+        if (alive && res.ok) setWallet(res.data?.wallet ?? null);
+      })
+      .finally(() => {
+        if (alive) setWalletLoading(false);
+      });
     return () => { alive = false; };
   }, [currentUser]);
 
@@ -121,6 +141,29 @@ export default function ProfilePage() {
   const handleProfileSaved = (updatedUser) => {
     setCurrentUser((prev) => ({ ...prev, ...updatedUser }));
     setData((prev) => prev ? { ...prev, user: { ...prev.user, ...updatedUser } } : prev);
+  };
+
+  const handleTopup = async () => {
+    const amount = Number(topupAmount);
+    if (!Number.isInteger(amount) || amount < 10000) {
+      toast.error("حداقل مبلغ شارژ ۱۰٬۰۰۰ تومان است");
+      return;
+    }
+    setTopupLoading(true);
+    try {
+      const res = await walletService.topup(amount);
+      if (res.ok) {
+        setWallet(res.data?.wallet ?? null);
+        window.dispatchEvent(new CustomEvent("wallet:updated", { detail: res.data?.wallet ?? null }));
+        toast.success("کیف پول با موفقیت شارژ شد");
+      } else {
+        toast.error(res.data?.message ?? "خطا در شارژ کیف پول");
+      }
+    } catch {
+      toast.error("خطا در شارژ کیف پول");
+    } finally {
+      setTopupLoading(false);
+    }
   };
 
   const user = profileData?.user ?? currentUser;
@@ -231,11 +274,76 @@ export default function ProfilePage() {
         </motion.div>
       )}
 
+      {/* ── Wallet ─────────────────────────────────────────────────────── */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="mt-5 px-4"
+      >
+        <div className="relative overflow-hidden rounded-[28px] border border-primary/20 bg-gradient-to-br from-primary/12 via-white to-[#ef1871]/8 dark:via-card dark:to-primary/5 p-4 shadow-lg shadow-slate-200/50 dark:shadow-black/10">
+          <div className="absolute -left-8 -top-8 h-28 w-28 rounded-full bg-primary/20 blur-3xl" />
+          <div className="relative flex items-start justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center shadow-lg shadow-primary/25">
+                <WalletIcon className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-muted-foreground">کیف پول رکت‌زون</p>
+                <p className="text-2xl font-black text-foreground mt-1">
+                  {walletLoading ? "..." : fmt(wallet?.balance ?? 0)}
+                  <span className="text-xs font-bold text-muted-foreground mr-1">تومان</span>
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="relative mt-4 grid grid-cols-2 gap-2">
+            {WALLET_TOPUP_AMOUNTS.map((amount) => (
+              <button
+                key={amount}
+                type="button"
+                onClick={() => setTopupAmount(amount)}
+                className={cn(
+                  "rounded-2xl border px-3 py-2.5 text-sm font-black transition-all",
+                  Number(topupAmount) === amount
+                    ? "border-primary bg-primary text-primary-foreground shadow-lg shadow-primary/20"
+                    : "border-border bg-white/70 dark:bg-background/70 text-foreground"
+                )}
+              >
+                {fmt(amount)}
+              </button>
+            ))}
+          </div>
+
+          <div className="relative mt-3 flex gap-2">
+            <input
+              type="number"
+              min={10000}
+              step={10000}
+              value={topupAmount}
+              onChange={(e) => setTopupAmount(e.target.value)}
+              className="h-12 flex-1 rounded-2xl border border-border bg-white/80 dark:bg-background/80 px-3 text-sm font-black text-foreground focus:outline-none focus:ring-2 focus:ring-primary/25"
+              placeholder="مبلغ شارژ"
+            />
+            <button
+              type="button"
+              onClick={handleTopup}
+              disabled={topupLoading}
+              className="h-12 rounded-2xl bg-primary px-4 text-sm font-black text-primary-foreground shadow-lg shadow-primary/25 disabled:opacity-60 flex items-center gap-1.5"
+            >
+              <PlusIcon className="w-4 h-4" />
+              {topupLoading ? "..." : "شارژ"}
+            </button>
+          </div>
+        </div>
+      </motion.div>
+
       {/* ── Messages ──────────────────────────────────────────────────── */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.18 }}
+        transition={{ delay: 0.24 }}
         className="mt-5 px-4"
       >
         <Link
@@ -256,7 +364,7 @@ export default function ProfilePage() {
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.22 }}
+        transition={{ delay: 0.28 }}
         className="mt-7 px-4"
       >
         <div className="flex items-center justify-between mb-3">
@@ -272,7 +380,7 @@ export default function ProfilePage() {
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.28 }}
+        transition={{ delay: 0.34 }}
         className="mt-7 px-4 space-y-3"
       >
         <h2 className="text-base font-black text-foreground">اشتراک</h2>

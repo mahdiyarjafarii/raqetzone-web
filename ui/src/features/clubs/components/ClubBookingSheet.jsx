@@ -4,11 +4,12 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { BottomSheet } from "react-spring-bottom-sheet";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRightIcon, CalendarIcon, ClockIcon, BanknoteIcon, CheckCircle2Icon, ClipboardListIcon, TicketIcon, XCircleIcon, CheckCircleIcon, LoaderIcon } from "lucide-react";
+import { ArrowRightIcon, CalendarIcon, ClockIcon, BanknoteIcon, CheckCircle2Icon, ClipboardListIcon, TicketIcon, XCircleIcon, CheckCircleIcon, LoaderIcon, SparklesIcon, WalletIcon, CreditCardIcon } from "lucide-react";
 import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { bookingService } from "@/features/booking/services/bookingService";
+import { walletService } from "@/features/wallet/walletService";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -25,22 +26,36 @@ function formatPrice(p) {
   return new Intl.NumberFormat("fa-IR").format(p);
 }
 
+function toLocalDateValue(date) {
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+function parseLocalDate(dateStr) {
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Date(year, month - 1, day, 12, 0, 0, 0);
+}
+
 function formatDateFa(dateStr) {
-  return new Date(dateStr).toLocaleDateString("fa-IR", {
+  return parseLocalDate(dateStr).toLocaleDateString("fa-IR-u-ca-persian", {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
   });
 }
 
 function addDays(dateStr, n) {
-  const d = new Date(dateStr);
+  const d = parseLocalDate(dateStr);
   d.setDate(d.getDate() + n);
-  return d.toISOString().split("T")[0];
+  return toLocalDateValue(d);
 }
 
 const WEEKDAY_FA = ["یک", "دو", "سه", "چهار", "پنج", "جمعه", "شنبه"];
 function formatDayShort(dateStr) {
-  const d = new Date(dateStr);
-  return { dayNum: d.getDate().toLocaleString("fa-IR"), dayName: WEEKDAY_FA[d.getDay()] };
+  const d = parseLocalDate(dateStr);
+  return {
+    dayNum: d.toLocaleDateString("fa-IR-u-ca-persian", { day: "numeric" }),
+    dayName: WEEKDAY_FA[d.getDay()],
+    monthName: d.toLocaleDateString("fa-IR-u-ca-persian", { month: "short" }),
+  };
 }
 
 // ── Court Selector ────────────────────────────────────────────────────────────
@@ -88,82 +103,123 @@ function CourtSelector({ courts, onSelect }) {
 // ── Combined Date + Slots Step ────────────────────────────────────────────────
 
 function DateSlotsStep({ court, selectedDate, onDateChange, slots, slotsLoading, selectedSlot, onSelectSlot }) {
-  const today = new Date().toISOString().split("T")[0];
-  const dates = Array.from({ length: 7 }, (_, i) => addDays(today, i));
+  const today = toLocalDateValue(new Date());
+  const dates = Array.from({ length: 10 }, (_, i) => addDays(today, i));
 
   return (
-    <div className="space-y-4">
-      {/* Court chip */}
-      <div className="flex items-center gap-3 bg-muted/60 rounded-xl p-3">
-        <span className="text-2xl">{SPORT_ICONS[court.sportType] ?? "🏅"}</span>
-        <div>
-          <p className="font-bold text-sm text-foreground">{court.name}</p>
-          <p className="text-xs text-muted-foreground">{formatPrice(court.pricePerHour)} ت/ساعت</p>
+    <div className="space-y-5">
+      <div className="relative overflow-hidden rounded-3xl border border-border bg-gradient-to-br from-muted/70 to-background p-4">
+        <div className="absolute -left-10 -top-10 h-28 w-28 rounded-full bg-primary/10 blur-2xl" />
+        <div className="relative flex items-center gap-3">
+          <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center text-3xl shrink-0">
+            {SPORT_ICONS[court.sportType] ?? "🏅"}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-black text-base text-foreground truncate">{court.name}</p>
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <span className="inline-flex items-center gap-1">
+                <BanknoteIcon className="h-3.5 w-3.5" />
+                {formatPrice(court.pricePerHour)} تومان/ساعت
+              </span>
+              {court.openTime && court.closeTime && (
+                <span className="inline-flex items-center gap-1">
+                  <ClockIcon className="h-3.5 w-3.5" />
+                  {court.openTime} تا {court.closeTime}
+                </span>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Date strip */}
-      <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-        {dates.map((date) => {
-          const { dayNum, dayName } = formatDayShort(date);
-          const isSelected = date === selectedDate;
-          const isToday = date === today;
-          return (
-            <motion.button
-              key={date}
-              whileTap={{ scale: 0.93 }}
-              onClick={() => onDateChange(date)}
-              className={cn(
-                "flex flex-col items-center justify-center shrink-0 w-14 rounded-2xl border transition-all text-xs font-medium py-3",
-                isSelected
-                  ? "bg-primary text-primary-foreground border-primary shadow-lg"
-                  : "bg-card text-foreground border-border"
-              )}
-            >
-              <span className={cn("text-[10px]", isSelected ? "text-primary-foreground/70" : "text-muted-foreground")}>
-                {dayName}
-              </span>
-              <span className="text-lg font-black leading-tight mt-0.5">{dayNum}</span>
-              {isToday && (
-                <span className={cn("text-[9px] font-semibold mt-0.5", isSelected ? "text-primary-foreground/70" : "text-primary")}>
-                  امروز
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-black text-foreground">انتخاب روز</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{formatDateFa(selectedDate)}</p>
+          </div>
+          <div className="h-10 w-10 rounded-2xl bg-primary/10 text-primary flex items-center justify-center">
+            <CalendarIcon className="h-5 w-5" />
+          </div>
+        </div>
+
+        <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-1 -mx-1 px-1">
+          {dates.map((date) => {
+            const { dayNum, dayName, monthName } = formatDayShort(date);
+            const isSelected = date === selectedDate;
+            const isToday = date === today;
+            return (
+              <motion.button
+                key={date}
+                whileTap={{ scale: 0.94 }}
+                onClick={() => onDateChange(date)}
+                className={cn(
+                  "relative flex min-h-[6.25rem] w-20 shrink-0 flex-col items-center justify-center rounded-3xl border-2 transition-all",
+                  isSelected
+                    ? "border-primary bg-primary text-primary-foreground shadow-xl shadow-primary/25"
+                    : "border-border bg-card text-foreground shadow-sm"
+                )}
+              >
+                {isToday && (
+                  <span className={cn(
+                    "absolute top-2 rounded-full px-2 py-0.5 text-[9px] font-black",
+                    isSelected ? "bg-white/20 text-primary-foreground" : "bg-primary/10 text-primary"
+                  )}>
+                    امروز
+                  </span>
+                )}
+                <span className={cn("mt-2 text-[11px] font-bold", isSelected ? "text-primary-foreground/75" : "text-muted-foreground")}>
+                  {dayName}
                 </span>
-              )}
-            </motion.button>
-          );
-        })}
+                <span className="mt-1 text-2xl font-black leading-none">{dayNum}</span>
+                <span className={cn("mt-1 text-[10px] font-bold", isSelected ? "text-primary-foreground/70" : "text-muted-foreground")}>
+                  {monthName}
+                </span>
+              </motion.button>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Slots */}
-      <div>
-        <div className="flex items-center justify-between text-xs text-muted-foreground mb-2">
-          <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-primary inline-block" /> موجود
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-orange-400 inline-block" /> رزرو شده
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-yellow-400 inline-block" /> در بررسی
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="h-2 w-2 rounded-full bg-muted-foreground/30 inline-block" /> بسته
-          </span>
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-black text-foreground">ساعت‌های قابل رزرو</p>
+            <p className="text-xs text-muted-foreground mt-0.5">یک بازه زمانی را انتخاب کنید</p>
+          </div>
+          <div className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary">
+            <SparklesIcon className="h-3.5 w-3.5" />
+            {slots?.filter((slot) => !slot.isBooked && !slot.isPending).length?.toLocaleString("fa-IR") ?? "۰"} موجود
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground sm:grid-cols-4">
+          {[
+            { label: "موجود", color: "bg-primary" },
+            { label: "رزرو شده", color: "bg-orange-400" },
+            { label: "در بررسی", color: "bg-yellow-400" },
+            { label: "بسته", color: "bg-muted-foreground/30" },
+          ].map((item) => (
+            <span key={item.label} className="flex items-center justify-center gap-1.5 rounded-2xl bg-muted/40 px-2 py-2">
+              <span className={cn("h-2.5 w-2.5 rounded-full", item.color)} />
+              {item.label}
+            </span>
+          ))}
         </div>
 
         {slotsLoading ? (
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {Array.from({ length: 9 }).map((_, i) => (
-              <div key={i} className="h-16 rounded-2xl bg-muted animate-pulse" />
+              <div key={i} className="h-24 rounded-3xl bg-muted animate-pulse" />
             ))}
           </div>
         ) : !slots || slots.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground text-sm">
-            <span className="text-3xl block mb-2">📅</span>
+          <div className="rounded-3xl border border-dashed border-border bg-muted/30 py-10 text-center text-muted-foreground text-sm">
+            <span className="text-4xl block mb-3">📅</span>
             هیچ اسلاتی برای این روز موجود نیست
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {slots.map((slot, i) => {
               const isSelected = selectedSlot?.start === slot.start;
               const isBooked = slot.isBooked;
@@ -181,36 +237,41 @@ function DateSlotsStep({ court, selectedDate, onDateChange, slots, slotsLoading,
               return (
                 <motion.button
                   key={slot.start}
-                  initial={{ opacity: 0, scale: 0.88 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: i * 0.02 }}
-                  whileTap={!unavailable ? { scale: 0.94 } : {}}
+                  initial={{ opacity: 0, y: 10, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  transition={{ delay: i * 0.018 }}
+                  whileTap={!unavailable ? { scale: 0.96 } : {}}
                   disabled={unavailable}
                   onClick={() => !unavailable && onSelectSlot(slot)}
                   className={cn(
-                    "flex flex-col items-center justify-center h-16 rounded-2xl border text-xs font-medium transition-all",
+                    "relative flex min-h-[6.25rem] flex-col items-center justify-center overflow-hidden rounded-3xl border-2 p-3 text-center transition-all",
                     isBlocked
-                      ? "bg-muted/40 border-border text-muted-foreground/40 cursor-not-allowed"
+                      ? "bg-muted/30 border-border text-muted-foreground/40 cursor-not-allowed"
                       : isManualBooked || (isBooked && !isBlocked)
                       ? "bg-orange-500/10 border-orange-300 text-orange-500 cursor-not-allowed"
                       : isPending
                       ? "bg-yellow-500/10 border-yellow-400 text-yellow-600 cursor-not-allowed"
                       : isSelected
-                      ? "bg-primary text-primary-foreground border-primary shadow-md"
+                      ? "bg-primary text-primary-foreground border-primary shadow-xl shadow-primary/25"
                       : hasDiscount
                       ? "bg-emerald-500/10 border-emerald-400 text-foreground active:bg-muted"
-                      : "bg-card border-border text-foreground active:bg-muted"
+                      : "bg-card border-border text-foreground active:bg-muted shadow-sm"
                   )}
                 >
-                  <span className="font-black text-sm">{slot.start}</span>
-                  <span className={cn("text-[10px] mt-0.5", isSelected ? "text-primary-foreground/60" : "text-muted-foreground")}>
+                  {!unavailable && hasDiscount && (
+                    <span className="absolute left-2 top-2 rounded-full bg-emerald-500 px-1.5 py-0.5 text-[9px] font-black text-white">
+                      ٪{slot.discount}
+                    </span>
+                  )}
+                  <span className="text-xl font-black leading-none">{slot.start}</span>
+                  <span className={cn("mt-2 text-[11px] font-bold", isSelected ? "text-primary-foreground/70" : "text-muted-foreground")}>
                     {label}
                   </span>
                   {!unavailable && slot.price && (
-                    <span className={cn("text-[9px] font-semibold leading-none",
-                      isSelected ? "text-primary-foreground/70" : hasDiscount ? "text-emerald-600" : "text-primary"
+                    <span className={cn("mt-1 text-[10px] font-black leading-none",
+                      isSelected ? "text-primary-foreground/80" : hasDiscount ? "text-emerald-600" : "text-primary"
                     )}>
-                      {hasDiscount && <span className="line-through opacity-50 mr-0.5">{formatPrice(slot.originalPrice)}</span>}
+                      {hasDiscount && <span className="line-through opacity-50 ml-1">{formatPrice(slot.originalPrice)}</span>}
                       {formatPrice(slot.price)}ت
                     </span>
                   )}
@@ -231,6 +292,9 @@ function BookingSummaryStep({ court, date, slot, clubId, onConfirm, onBack, subm
   const [discountInput, setDiscountInput] = useState("");
   const [discountState, setDiscountState] = useState(null); // null | { valid, discountAmount, finalPrice, discountValue, discountType, discountCodeId, error }
   const [validating, setValidating] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("none");
+  const [wallet, setWallet] = useState(null);
+  const [walletLoading, setWalletLoading] = useState(true);
 
   const startMin = slot.start.split(":").reduce((acc, v, i) => acc + (i === 0 ? +v * 60 : +v), 0);
   const endMin = slot.end.split(":").reduce((acc, v, i) => acc + (i === 0 ? +v * 60 : +v), 0);
@@ -243,6 +307,25 @@ function BookingSummaryStep({ court, date, slot, clubId, onConfirm, onBack, subm
   const afterVoucher = Math.max(0, baseTotal - voucherDiscount);
   const tax = Math.round(afterVoucher * 0.09);
   const finalTotal = afterVoucher + tax;
+  const walletBalance = wallet?.balance ?? 0;
+  const canPayWithWallet = walletBalance >= finalTotal;
+
+  useEffect(() => {
+    let alive = true;
+    setWalletLoading(true);
+    walletService.getWallet()
+      .then((res) => {
+        if (alive && res.ok) setWallet(res.data?.wallet ?? null);
+      })
+      .finally(() => {
+        if (alive) setWalletLoading(false);
+      });
+    return () => { alive = false; };
+  }, []);
+
+  useEffect(() => {
+    if (paymentMethod === "wallet" && !canPayWithWallet) setPaymentMethod("none");
+  }, [canPayWithWallet, paymentMethod]);
 
   const handleValidate = async () => {
     const code = discountInput.trim().toUpperCase();
@@ -266,13 +349,38 @@ function BookingSummaryStep({ court, date, slot, clubId, onConfirm, onBack, subm
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl border border-border bg-card overflow-hidden">
-        <div className="px-4 py-3 border-b border-border bg-muted/50 flex items-center gap-2">
-          <span className="text-lg">{SPORT_ICONS[court.sportType] ?? "🏅"}</span>
-          <div>
-            <p className="text-xs text-muted-foreground">فاکتور رزرو</p>
-            <p className="text-sm font-bold text-foreground">{court.name}</p>
+      <div className="relative overflow-hidden rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/10 via-background to-background p-4">
+        <div className="absolute -left-10 -top-10 h-28 w-28 rounded-full bg-primary/20 blur-3xl" />
+        <div className="relative flex items-center gap-3">
+          <div className="h-14 w-14 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center text-3xl shadow-lg shadow-primary/25">
+            {SPORT_ICONS[court.sportType] ?? "🏅"}
           </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-bold text-primary mb-1">فاکتور رزرو</p>
+            <h3 className="text-lg font-black text-foreground truncate">{court.name}</h3>
+            <p className="text-xs text-muted-foreground mt-1">{formatDateFa(date)} · {slot.start} تا {slot.end}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-3xl border border-border bg-card overflow-hidden shadow-sm">
+        <div className="grid grid-cols-2 divide-x divide-x-reverse divide-border border-b border-border">
+          <div className="p-4 text-center">
+            <CalendarIcon className="w-5 h-5 text-primary mx-auto mb-2" />
+            <p className="text-[11px] text-muted-foreground mb-1">تاریخ</p>
+            <p className="text-sm font-black text-foreground leading-6">{formatDateFa(date)}</p>
+          </div>
+          <div className="p-4 text-center">
+            <ClockIcon className="w-5 h-5 text-primary mx-auto mb-2" />
+            <p className="text-[11px] text-muted-foreground mb-1">زمان</p>
+            <p className="text-sm font-black text-foreground">{slot.start} — {slot.end}</p>
+            <p className="text-xs text-muted-foreground mt-1">{durationHours.toLocaleString("fa-IR")} ساعت</p>
+          </div>
+        </div>
+
+        <div className="px-4 py-3 border-b border-border bg-muted/30 flex items-center gap-2">
+          <BanknoteIcon className="w-4 h-4 text-primary" />
+          <p className="text-xs font-black text-foreground">جزئیات پرداخت</p>
         </div>
 
         <div className="divide-y divide-border">
@@ -303,16 +411,16 @@ function BookingSummaryStep({ court, date, slot, clubId, onConfirm, onBack, subm
           ))}
         </div>
 
-        <div className="flex items-center justify-between px-4 py-4 bg-primary/5 border-t-2 border-primary/20">
-          <span className="text-primary font-bold text-sm">مبلغ نهایی</span>
+        <div className="flex items-center justify-between px-4 py-5 bg-primary/8 border-t-2 border-primary/25">
+          <span className="text-primary font-black text-sm">مبلغ نهایی</span>
           <div className="text-right">
             {voucherDiscount > 0 && (
               <p className="text-xs text-muted-foreground line-through leading-none mb-0.5">
                 {formatPrice(Math.round(baseTotal * 1.09))} ت
               </p>
             )}
-            <span className="text-primary font-black text-xl">
-              {formatPrice(finalTotal)} <span className="text-sm font-medium">تومان</span>
+            <span className="text-primary font-black text-2xl">
+              {formatPrice(finalTotal)} <span className="text-sm font-bold">تومان</span>
             </span>
           </div>
         </div>
@@ -378,6 +486,55 @@ function BookingSummaryStep({ court, date, slot, clubId, onConfirm, onBack, subm
         </div>
       )}
 
+      <div className="rounded-3xl border border-border bg-card p-3 space-y-2">
+        <div className="flex items-center gap-2 px-1">
+          <WalletIcon className="w-4 h-4 text-primary" />
+          <p className="text-sm font-black text-foreground">روش پرداخت</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setPaymentMethod("none")}
+          className={cn(
+            "w-full rounded-2xl border-2 p-3 text-right transition-all",
+            paymentMethod === "none" ? "border-primary bg-primary/10" : "border-border bg-muted/30"
+          )}
+        >
+          <div className="flex items-center gap-3">
+            <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center", paymentMethod === "none" ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground")}>
+              <CreditCardIcon className="w-5 h-5" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-black text-foreground">پرداخت عادی</p>
+              <p className="text-xs text-muted-foreground mt-0.5">رزرو ثبت می‌شود و تسویه طبق روال مجموعه انجام می‌شود</p>
+            </div>
+            {paymentMethod === "none" && <CheckCircleIcon className="w-5 h-5 text-primary" />}
+          </div>
+        </button>
+        <button
+          type="button"
+          onClick={() => canPayWithWallet && setPaymentMethod("wallet")}
+          disabled={!canPayWithWallet || walletLoading}
+          className={cn(
+            "w-full rounded-2xl border-2 p-3 text-right transition-all disabled:opacity-55",
+            paymentMethod === "wallet" ? "border-primary bg-primary/10" : "border-border bg-muted/30"
+          )}
+        >
+          <div className="flex items-center gap-3">
+            <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center", paymentMethod === "wallet" ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground")}>
+              <WalletIcon className="w-5 h-5" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-black text-foreground">پرداخت با کیف پول</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {walletLoading ? "در حال دریافت موجودی..." : `موجودی: ${formatPrice(walletBalance)} تومان`}
+                {!walletLoading && !canPayWithWallet ? " · موجودی کافی نیست" : ""}
+              </p>
+            </div>
+            {paymentMethod === "wallet" && <CheckCircleIcon className="w-5 h-5 text-primary" />}
+          </div>
+        </button>
+      </div>
+
       <div>
         <label className="text-xs text-muted-foreground mb-2 block">یادداشت (اختیاری)</label>
         <textarea
@@ -398,7 +555,7 @@ function BookingSummaryStep({ court, date, slot, clubId, onConfirm, onBack, subm
           بازگشت
         </Button>
         <Button
-          onClick={() => onConfirm(notes, discountState?.valid ? discountState.code : undefined)}
+          onClick={() => onConfirm(notes, discountState?.valid ? discountState.code : undefined, paymentMethod)}
           disabled={submitting}
           className="flex-1 rounded-xl font-bold text-sm h-12"
         >
@@ -479,7 +636,7 @@ const STEP_TITLES = {
 
 export default function ClubBookingSheet({ open, onClose, club, initialCourt = null }) {
   const navigate = useNavigate();
-  const today = new Date().toISOString().split("T")[0];
+  const today = toLocalDateValue(new Date());
 
   const courts = club?.courts ?? [];
 
@@ -543,7 +700,7 @@ export default function ClubBookingSheet({ open, onClose, club, initialCourt = n
       .finally(() => setSlotsLoading(false));
   }, [selectedCourt, selectedDate, step]);
 
-  const handleConfirm = async (notes, discountCode) => {
+  const handleConfirm = async (notes, discountCode, paymentMethod = "none") => {
     if (!selectedCourt || !selectedDate || !selectedSlot) return;
     setSubmitting(true);
     try {
@@ -553,9 +710,13 @@ export default function ClubBookingSheet({ open, onClose, club, initialCourt = n
         startTime: selectedSlot.start,
         endTime: selectedSlot.end,
         notes,
+        paymentMethod,
         ...(discountCode ? { discountCode } : {}),
       });
       if (res.ok) {
+        if (res.data?.wallet) {
+          window.dispatchEvent(new CustomEvent("wallet:updated", { detail: res.data.wallet }));
+        }
         setCreatedBooking({ ...res.data.booking, court: selectedCourt, date: selectedDate, startTime: selectedSlot.start, endTime: selectedSlot.end });
         setStep("success");
       } else {

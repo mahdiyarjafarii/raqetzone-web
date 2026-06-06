@@ -41,11 +41,12 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
+import PersianTimePicker from "@/components/PersianTimePicker";
 import { cn } from "@/lib/utils";
 
 const SPORT_ICONS = { padel:"🏓", tennis:"🎾", squash:"🟡", badminton:"🏸", "ping-pong":"🏓" };
 const SPORTS = [
-  { value:"padel",     label:"پادل",     icon:"🏓" },
+  { value:"padel",     label:"پدل",     icon:"🏓" },
   { value:"tennis",    label:"تنیس",     icon:"🎾" },
   { value:"squash",    label:"اسکواش",   icon:"🟡" },
   { value:"badminton", label:"بدمینتون", icon:"🏸" },
@@ -74,6 +75,71 @@ const emptyForm = {
 const inputClass =
   "rounded-xl border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-violet-500 transition-colors w-full resize-none";
 
+const dateTimeFormatFa = new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
+  weekday: "short",
+  year: "numeric",
+  month: "long",
+  day: "numeric",
+});
+
+function toLocalDateTimeValue(date) {
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function getDatePart(value) {
+  return value?.split("T")[0] ?? "";
+}
+
+function getTimePart(value) {
+  return value?.split("T")[1] ?? "12:00";
+}
+
+function buildDateOptions(daysAhead = 730) {
+  const today = new Date();
+  today.setHours(12, 0, 0, 0);
+  return Array.from({ length: daysAhead }, (_, index) => {
+    const date = new Date(today);
+    date.setDate(today.getDate() + index);
+    return {
+      value: toLocalDateTimeValue(date).split("T")[0],
+      label: dateTimeFormatFa.format(date),
+    };
+  });
+}
+
+const persianDateOptions = buildDateOptions();
+
+function PersianDateTimeInput({ value, onChange }) {
+  const datePart = getDatePart(value);
+  const timePart = getTimePart(value);
+
+  function emit(nextDate, nextTime) {
+    if (!nextDate) return;
+    onChange(`${nextDate}T${nextTime}`);
+  }
+
+  return (
+    <div className="grid grid-cols-[1fr_auto] gap-2">
+      <select
+        dir="rtl"
+        value={datePart}
+        onChange={(e) => emit(e.target.value, timePart)}
+        className={inputClass}
+      >
+        <option value="">انتخاب تاریخ...</option>
+        {persianDateOptions.map((option) => (
+          <option key={option.value} value={option.value}>{option.label}</option>
+        ))}
+      </select>
+      <PersianTimePicker
+        value={timePart}
+        onChange={(nextTime) => emit(datePart, nextTime)}
+      />
+    </div>
+  );
+}
+
 function WizardField({ label, hint, children }) {
   return (
     <div className="space-y-1.5">
@@ -92,7 +158,7 @@ function WStep1({ form, setForm }) {
   return (
     <div className="space-y-4">
       <WizardField label="عنوان تورنومنت *">
-        <input autoFocus className={inputClass} placeholder="مثال: مسابقات پادل بهاره"
+        <input autoFocus className={inputClass} placeholder="مثال: مسابقات پدل بهاره"
           value={form.title} onChange={e => setForm(p => ({...p, title: e.target.value}))} />
       </WizardField>
 
@@ -137,16 +203,22 @@ function WStep2({ form, setForm }) {
   return (
     <div className="space-y-4">
       <WizardField label="مهلت ثبت‌نام *" hint="باید قبل از شروع مسابقه باشد">
-        <input type="datetime-local" className={inputClass}
-          value={form.registrationDeadline} onChange={e => setForm(p => ({...p, registrationDeadline: e.target.value}))} />
+        <PersianDateTimeInput
+          value={form.registrationDeadline}
+          onChange={value => setForm(p => ({...p, registrationDeadline: value}))}
+        />
       </WizardField>
       <WizardField label="تاریخ شروع *">
-        <input type="datetime-local" className={inputClass}
-          value={form.startDate} onChange={e => setForm(p => ({...p, startDate: e.target.value}))} />
+        <PersianDateTimeInput
+          value={form.startDate}
+          onChange={value => setForm(p => ({...p, startDate: value}))}
+        />
       </WizardField>
       <WizardField label="تاریخ پایان *">
-        <input type="datetime-local" className={inputClass}
-          value={form.endDate} onChange={e => setForm(p => ({...p, endDate: e.target.value}))} />
+        <PersianDateTimeInput
+          value={form.endDate}
+          onChange={value => setForm(p => ({...p, endDate: value}))}
+        />
       </WizardField>
 
       {allSet && (

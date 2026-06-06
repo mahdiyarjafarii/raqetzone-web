@@ -7,7 +7,7 @@ async function seed() {
   await db.insert(promotions).values([
     {
       title: "زمین‌های جدید اکباتان",
-      subtitle: "۳ زمین پادل سرپوشیده با امکانات کامل",
+      subtitle: "۳ زمین پدل سرپوشیده با امکانات کامل",
       badgeText: "تازه افتتاح",
       ctaText: "رزرو کن",
       ctaHref: "/mybooking",
@@ -18,7 +18,7 @@ async function seed() {
       sortOrder: 0,
     },
     {
-      title: "تورنومنت پادل تابستان ۱۴۰۳",
+      title: "تورنومنت پدل تابستان ۱۴۰۳",
       subtitle: "ثبت‌نام تا ۱۵ تیر، ۳۲ تیم شرکت‌کننده",
       badgeText: "محدود",
       ctaText: "ثبت‌نام",

@@ -14,6 +14,7 @@ import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
 import CourtSlotsModal from "@/components/CourtSlotsModal";
+import PersianTimePicker from "@/components/PersianTimePicker";
 import { fmt, cn } from "@/lib/utils";
 
 const API_BASE = import.meta.env.VITE_API_URL?.replace("/api", "") ?? "http://localhost:3000";
@@ -21,7 +22,7 @@ const API_BASE = import.meta.env.VITE_API_URL?.replace("/api", "") ?? "http://lo
 const SPORTS   = ["padel","tennis","squash","badminton","ping-pong"];
 const SURFACES = ["artificial","clay","hard","grass"];
 const SPORT_ICONS = { padel:"🏓", tennis:"🎾", squash:"🟡", badminton:"🏸", "ping-pong":"🏓" };
-const SPORT_LABELS = { padel:"پادل", tennis:"تنیس", squash:"اسکواش", badminton:"بدمینتون", "ping-pong":"پینگ‌پنگ" };
+const SPORT_LABELS = { padel:"پدل", tennis:"تنیس", squash:"اسکواش", badminton:"بدمینتون", "ping-pong":"پینگ‌پنگ" };
 const SURFACE_LABELS = { artificial:"چمن مصنوعی", clay:"خاک رس", hard:"سخت", grass:"چمن طبیعی" };
 
 const emptyForm = {
@@ -97,10 +98,10 @@ function CourtForm({ form, setForm, onSubmit, loading, submitLabel, isEdit = fal
             </select>
           </div>
         </div>
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <Input label="قیمت/ساعت (ت) *" type="number" value={form.pricePerHour} onChange={e=>f("pricePerHour",e.target.value)} required />
-          <Input label="باز شدن" type="time" value={form.openTime} onChange={e=>f("openTime",e.target.value)} />
-          <Input label="بستن" type="time" value={form.closeTime} onChange={e=>f("closeTime",e.target.value)} />
+          <PersianTimePicker label="باز شدن" value={form.openTime} onChange={value=>f("openTime",value)} />
+          <PersianTimePicker label="بستن" value={form.closeTime} onChange={value=>f("closeTime",value)} />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <Input label="مدت اسلات (دقیقه)" type="number" value={form.slotDuration} onChange={e=>f("slotDuration",e.target.value)} />
@@ -128,7 +129,7 @@ function CourtForm({ form, setForm, onSubmit, loading, submitLabel, isEdit = fal
             <p className="text-sm font-semibold text-foreground">اطلاعات اصلی زمین</p>
             <p className="text-xs text-muted-foreground mt-0.5">نام و نوع ورزش این زمین را مشخص کنید</p>
           </div>
-          <Input label="نام زمین *" value={form.name} onChange={e=>f("name",e.target.value)} placeholder="مثلاً: زمین پادل ۱" />
+          <Input label="نام زمین *" value={form.name} onChange={e=>f("name",e.target.value)} placeholder="مثلاً: زمین پدل ۱" />
           <Input label="موقعیت (نمایشی)" value={form.location} onChange={e=>f("location",e.target.value)} placeholder="مثلاً: طبقه اول" />
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
@@ -158,9 +159,9 @@ function CourtForm({ form, setForm, onSubmit, loading, submitLabel, isEdit = fal
           </div>
           <Input label="قیمت به ازای هر ساعت (تومان) *" type="number" value={form.pricePerHour}
             onChange={e=>f("pricePerHour",e.target.value)} placeholder="مثلاً: 500000" />
-          <div className="grid grid-cols-2 gap-3">
-            <Input label="ساعت باز شدن" type="time" value={form.openTime} onChange={e=>f("openTime",e.target.value)} />
-            <Input label="ساعت بستن" type="time" value={form.closeTime} onChange={e=>f("closeTime",e.target.value)} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <PersianTimePicker label="ساعت باز شدن" value={form.openTime} onChange={value=>f("openTime",value)} />
+            <PersianTimePicker label="ساعت بستن" value={form.closeTime} onChange={value=>f("closeTime",value)} />
           </div>
           {form.pricePerHour && (
             <div className="rounded-xl bg-primary/5 border border-primary/20 p-3 text-center">

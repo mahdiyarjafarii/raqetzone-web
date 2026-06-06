@@ -42,7 +42,7 @@ async function fillCertifiedMatches() {
         .limit(50);
 
       const sportsLabel = {
-        padel: "پادل", tennis: "تنیس", squash: "اسکواش",
+        padel: "پدل", tennis: "تنیس", squash: "اسکواش",
         badminton: "بدمینتون", "ping-pong": "پینگ‌پنگ",
       };
       const smsText =

@@ -3,7 +3,7 @@ import { matches } from "../db/schema.js";
 
 const demos = [
   {
-    title: "مسابقه دوستانه پادل",
+    title: "مسابقه دوستانه پدل",
     sportType: "padel",
     location: "تهران، پارک لاله",
     courtName: "زمین شماره ۱",

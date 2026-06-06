@@ -18,7 +18,7 @@ import CreateTournamentSheet from "./CreateTournamentSheet";
 
 const SPORTS = [
   { value: null, label: "همه" },
-  { value: "padel", label: "🏓 پادل" },
+  { value: "padel", label: "🏓 پدل" },
   { value: "tennis", label: "🎾 تنیس" },
   { value: "squash", label: "🟡 اسکواش" },
   { value: "badminton", label: "🏸 بدمینتون" },
