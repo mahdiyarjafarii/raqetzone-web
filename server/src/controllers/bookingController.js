@@ -81,6 +81,16 @@ export const createBookingController = async (req, res) => {
   try {
     const userId = req.user.id;
     const { courtId, date, startTime, endTime, notes, discountCode, paymentMethod = "none" } = req.body;
+    console.log("[CreateBooking] request body:", {
+      userId,
+      courtId,
+      date,
+      startTime,
+      endTime,
+      notes,
+      discountCode,
+      paymentMethod,
+    });
 
     if (!courtId || !date || !startTime || !endTime) {
       return res.status(400).json({ message: "اطلاعات ناقص است" });
@@ -144,6 +154,17 @@ export const createBookingController = async (req, res) => {
 
     const durationHours = (endMin - startMin) / 60;
     const basePrice = Math.round(court.pricePerHour * durationHours);
+    console.log("[CreateBooking] calculated values:", {
+      startMin,
+      endMin,
+      durationHours,
+      durationHoursType: typeof durationHours,
+      pricePerHour: court.pricePerHour,
+      pricePerHourType: typeof court.pricePerHour,
+      basePrice,
+      basePriceType: typeof basePrice,
+      slotDuration: court.slotDuration,
+    });
 
     // Apply discount code if provided
     let discountCodeRow = null;
@@ -189,6 +210,21 @@ export const createBookingController = async (req, res) => {
 
     const totalPrice = Math.max(0, basePrice - discountAmount);
     const trackingCode = generateTrackingCode();
+    console.log("[CreateBooking] insert values:", {
+      userId,
+      courtId,
+      date,
+      startTime,
+      endTime,
+      durationHours,
+      totalPrice,
+      notes,
+      trackingCode,
+      paymentMethod: paymentMethod === "wallet" ? "wallet" : "none",
+      paymentStatus: totalPrice === 0 ? "paid" : "unpaid",
+      discountAmount,
+      discountCodeId: discountCodeRow?.id ?? null,
+    });
 
     const { booking, walletPayment } = await db.transaction(async (tx) => {
       const [createdBooking] = await tx
@@ -259,7 +295,13 @@ export const createBookingController = async (req, res) => {
     const enriched = { ...booking, court };
     return res.status(201).json({ booking: enriched, wallet: walletPayment?.wallet });
   } catch (error) {
-    console.error("createBooking error:", error);
+    console.error("createBooking error:", {
+      message: error.message,
+      code: error.code,
+      detail: error.detail,
+      where: error.where,
+      stack: error.stack,
+    });
     return res.status(error.statusCode ?? 500).json({ message: error.statusCode ? error.message : "خطای سرور" });
   }
 };
