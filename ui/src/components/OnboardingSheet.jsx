@@ -28,17 +28,24 @@ const LEVELS = [
   { value: "pro",          label: "حرفه‌ای",  desc: "سطح فدراسیونی",            emoji: "🏆" },
 ];
 
-const DURATIONS = [
-  { value: "60",  label: "۱ ساعت",          emoji: "⏱" },
-  { value: "90",  label: "۱.۵ ساعت",        emoji: "⏱" },
-  { value: "120", label: "۲ ساعت",          emoji: "⏰" },
-  { value: "180", label: "بیشتر از ۲ ساعت", emoji: "🕐" },
+const WEEKLY_HOURS = [
+  { value: "1",  label: "۱ ساعت در هفته",          emoji: "⏱" },
+  { value: "2",  label: "۲ ساعت در هفته",          emoji: "⏰" },
+  { value: "4",  label: "۳ تا ۴ ساعت در هفته",     emoji: "🕐" },
+  { value: "6",  label: "بیشتر از ۵ ساعت در هفته", emoji: "�" },
 ];
 
 // 0=welcome, 1=name, 2=photo, 3=sport, 4=level, 5=duration
 const TOTAL_STEPS = 6;
 const MAX_ONBOARDING_IMAGE_SIZE_MB = 5;
 const MAX_ONBOARDING_IMAGE_SIZE_BYTES = MAX_ONBOARDING_IMAGE_SIZE_MB * 1024 * 1024;
+
+const getOnboardingUserImage = (image) => {
+  if (!image) return null;
+  if (image.startsWith("http")) return encodeURI(image);
+  const encodedImage = image.split("/").map(encodeURIComponent).join("/");
+  return `${import.meta.env.VITE_WEBSITE_URL}/uploads/user/${encodedImage}`;
+};
 
 const sendOnboardingUploadDebugLog = async (event, payload = {}) => {
   try {
@@ -181,32 +188,47 @@ function StepPhoto({ preview, onSelect, uploading }) {
 }
 
 function StepSport({ value, onChange }) {
+  const selectedSports = Array.isArray(value) ? value : [value].filter(Boolean);
+  const toggleSport = (sport) => {
+    onChange(
+      selectedSports.includes(sport)
+        ? selectedSports.filter((item) => item !== sport)
+        : [...selectedSports, sport]
+    );
+  };
+
   return (
     <div className="space-y-6 text-center">
       <div>
         <div className="text-5xl mb-4">🏅</div>
-        <h2 className="text-xl font-black text-foreground">رشته اصلیت چیه؟</h2>
-        <p className="text-muted-foreground text-sm mt-2">می‌تونی بعداً عوضش کنی</p>
+        <h2 className="text-xl font-black text-foreground">چه ورزش‌هایی بازی می‌کنی؟</h2>
+        <p className="text-muted-foreground text-sm mt-2">می‌تونی چند گزینه انتخاب کنی</p>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        {SPORTS.map(s => (
-          <button
-            key={s.value}
-            type="button"
-            onClick={() => onChange(s.value)}
-            className={cn(
-              "flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all",
-              value === s.value
-                ? "border-primary bg-primary/5 shadow-sm shadow-primary/20"
-                : "border-border bg-card"
-            )}
-          >
-            <span className="text-3xl">{s.emoji}</span>
-            <span className={cn("font-bold text-sm", value === s.value ? "text-primary" : "text-foreground")}>
-              {s.label}
-            </span>
-          </button>
-        ))}
+        {SPORTS.map(s => {
+          const selected = selectedSports.includes(s.value);
+          return (
+            <button
+              key={s.value}
+              type="button"
+              onClick={() => toggleSport(s.value)}
+              className={cn(
+                "relative flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all",
+                selected
+                  ? "border-primary bg-primary/5 shadow-sm shadow-primary/20"
+                  : "border-border bg-card"
+              )}
+            >
+              {selected && (
+                <span className="absolute top-2 left-2 w-5 h-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center">✓</span>
+              )}
+              <span className="text-3xl">{s.emoji}</span>
+              <span className={cn("font-bold text-sm", selected ? "text-primary" : "text-foreground")}>
+                {s.label}
+              </span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -254,16 +276,16 @@ function StepLevel({ value, onChange }) {
   );
 }
 
-function StepDuration({ value, onChange }) {
+function StepWeeklyHours({ value, onChange }) {
   return (
     <div className="space-y-6 text-center">
       <div>
         <div className="text-5xl mb-4">⏰</div>
-        <h2 className="text-xl font-black text-foreground">هر بار چقدر بازی می‌کنی؟</h2>
-        <p className="text-muted-foreground text-sm mt-2">معمولاً هر جلسه چه مدته؟</p>
+        <h2 className="text-xl font-black text-foreground">معمولاً چقدر در هفته بازی می‌کنی؟</h2>
+        <p className="text-muted-foreground text-sm mt-2">به ساعت انتخاب کن</p>
       </div>
       <div className="grid grid-cols-2 gap-3">
-        {DURATIONS.map(d => (
+        {WEEKLY_HOURS.map(d => (
           <button
             key={d.value}
             type="button"
@@ -313,9 +335,9 @@ export default function OnboardingSheet() {
   const [name, setName] = useState("");
   const [photoPreview, setPhotoPreview] = useState(null);
   const [photoUploading, setPhotoUploading] = useState(false);
-  const [sport, setSport] = useState("padel");
+  const [sports, setSports] = useState(["padel"]);
   const [level, setLevel] = useState("beginner");
-  const [duration, setDuration] = useState("90");
+  const [weeklyHours, setWeeklyHours] = useState("2");
   const [saving, setSaving] = useState(false);
 
   const isLastStep = step === TOTAL_STEPS - 1;
@@ -323,6 +345,7 @@ export default function OnboardingSheet() {
   const canNext = () => {
     if (step === 1) return name.trim().length >= 2;
     if (step === 2) return !!photoPreview && !photoUploading;
+    if (step === 3) return sports.length > 0;
     return true;
   };
 
@@ -378,6 +401,8 @@ export default function OnboardingSheet() {
         setPhotoPreview(null);
       } else if (data?.user) {
         setCurrentUser(data.user);
+        const uploadedImageUrl = getOnboardingUserImage(data.user.image);
+        if (uploadedImageUrl) setPhotoPreview(`${uploadedImageUrl}?v=${Date.now()}`);
       }
     } catch (error) {
       console.error("Onboarding image upload failed:", error);
@@ -398,7 +423,7 @@ export default function OnboardingSheet() {
     setSaving(true);
     const { ok, data } = await apiClient.patch("/users/me", {
       name: name.trim(),
-      favoriteSport: sport,
+      favoriteSport: sports[0],
       skillLevel: level,
     });
     setSaving(false);
@@ -443,9 +468,9 @@ export default function OnboardingSheet() {
                 uploading={photoUploading}
               />
             )}
-            {step === 3 && <StepSport value={sport} onChange={setSport} />}
+            {step === 3 && <StepSport value={sports} onChange={setSports} />}
             {step === 4 && <StepLevel value={level} onChange={setLevel} />}
-            {step === 5 && <StepDuration value={duration} onChange={setDuration} />}
+            {step === 5 && <StepWeeklyHours value={weeklyHours} onChange={setWeeklyHours} />}
           </motion.div>
         </AnimatePresence>
 

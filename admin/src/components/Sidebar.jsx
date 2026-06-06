@@ -113,9 +113,7 @@ export default function Sidebar() {
 
         {user && (
           <div className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-muted/60">
-            <div className="h-7 w-7 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-              <span className="text-primary text-xs font-bold">{(user.name ?? user.phone ?? "U")[0]}</span>
-            </div>
+            
             <div className="min-w-0 flex-1">
               <p className="text-xs font-semibold text-foreground truncate">{user.name ?? "کاربر"}</p>
               <p className="text-[10px] text-muted-foreground truncate" dir="ltr">{user.phone}</p>

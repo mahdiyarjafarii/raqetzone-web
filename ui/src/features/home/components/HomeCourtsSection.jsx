@@ -1,7 +1,7 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { MapPinIcon, StarIcon, ArrowLeftIcon } from "lucide-react";
+import { MapPinIcon, ArrowLeftIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import SectionHeader from "./SectionHeader";
 import { useClubs } from "@/features/clubs/hooks/useClubs";
@@ -23,6 +23,7 @@ function formatPrice(p) {
 function ClubCardHome({ club, index }) {
   const [imgError, setImgError] = React.useState(false);
   const cover = imgUrl(club.coverImage ?? club.images?.[0]);
+  const location = club.location ?? club.address ?? "";
 
   return (
     <motion.div
@@ -53,16 +54,17 @@ function ClubCardHome({ club, index }) {
           <div className="flex-1 min-w-0 py-3.5 pr-0">
             <div className="flex items-start justify-between gap-2">
               <p className="font-black text-foreground text-sm leading-snug truncate">{club.name}</p>
-              <div className="flex items-center gap-0.5 shrink-0 bg-amber-400/12 px-1.5 py-0.5 rounded-full">
-                <StarIcon className="w-3 h-3 fill-amber-400 text-amber-400" />
-                <span className="text-xs font-bold text-foreground">{club.rating}</span>
+              <div className="shrink-0 bg-amber-400/12 px-2 py-0.5 rounded-full">
+                <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400">محبوب</span>
               </div>
             </div>
 
-            <div className="flex items-center gap-1 mt-1 text-muted-foreground text-xs font-medium">
-              <MapPinIcon className="w-3 h-3 shrink-0" />
-              <span className="truncate">{club.location}</span>
-            </div>
+            {location && (
+              <div className="flex items-center gap-1 mt-1 text-muted-foreground text-xs font-medium">
+                <MapPinIcon className="w-3 h-3 shrink-0" />
+                <span className="truncate">{location}</span>
+              </div>
+            )}
 
             <div className="flex items-center justify-between mt-2">
               <div className="flex gap-1 flex-wrap">

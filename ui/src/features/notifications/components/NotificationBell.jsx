@@ -1,6 +1,7 @@
 import React, { useRef, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { BellIcon, CheckCheckIcon, ArrowLeftIcon } from "lucide-react";
+import { BellIcon, CheckCheckIcon, ArrowLeftIcon, InboxIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAtom } from "jotai";
 
@@ -13,6 +14,7 @@ export default function NotificationBell() {
   const [open, setOpen]       = useAtom(notifPanelOpenAtom);
   const [unread]              = useAtom(unreadCountAtom);
   const panelRef              = useRef(null);
+  const popoverRef            = useRef(null);
 
   const { notifications, markRead, markAllRead, remove } = useNotifications({ poll: true });
   const preview = notifications.slice(0, 5);
@@ -20,7 +22,9 @@ export default function NotificationBell() {
   // Close on outside click
   useEffect(() => {
     const handler = (e) => {
-      if (panelRef.current && !panelRef.current.contains(e.target)) setOpen(false);
+      const clickedTrigger = panelRef.current?.contains(e.target);
+      const clickedPopover = popoverRef.current?.contains(e.target);
+      if (!clickedTrigger && !clickedPopover) setOpen(false);
     };
     if (open) document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -32,8 +36,8 @@ export default function NotificationBell() {
       <button
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          "relative h-8 w-8 rounded-full flex items-center justify-center transition-colors",
-          open ? "bg-primary/10 text-primary" : "hover:bg-muted text-foreground"
+          "relative h-10 w-10 rounded-2xl flex items-center justify-center transition-all",
+          open ? "bg-primary/10 text-primary shadow-sm" : "hover:bg-muted text-foreground"
         )}
       >
         <motion.div animate={unread > 0 ? { rotate: [0, -15, 15, -10, 10, 0] } : {}} transition={{ duration: 0.5 }}>
@@ -52,39 +56,48 @@ export default function NotificationBell() {
         )}
       </button>
 
-      {/* Dropdown panel */}
-      <AnimatePresence>
+      {createPortal((
+        <AnimatePresence>
         {open && (
           <motion.div
+            ref={popoverRef}
             initial={{ opacity: 0, y: -8, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -8, scale: 0.96 }}
             transition={{ duration: 0.18 }}
-            className="absolute left-0 top-10 w-80 max-h-[70vh] overflow-y-auto no-scrollbar rounded-2xl border border-border bg-background shadow-xl z-50"
+            className="fixed left-3 right-3 top-12 z-[2147483647] mx-auto max-w-[380px] overflow-hidden rounded-3xl border border-border/80 bg-background/95 shadow-2xl shadow-black/10 backdrop-blur-xl sm:left-6 sm:right-auto sm:mx-0 sm:w-[360px]"
             style={{ transformOrigin: "top right" }}
           >
             {/* Header */}
-            <div className="sticky top-0 bg-background/95 backdrop-blur-sm px-4 py-3 border-b border-border flex items-center justify-between">
-              <h3 className="font-bold text-sm text-foreground">اعلان‌ها</h3>
+            <div className="bg-background/95 px-4 py-3.5 border-b border-border/70 flex items-center justify-between gap-3">
+              <div>
+                <h3 className="font-black text-base text-foreground">اعلان‌ها</h3>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  {unread > 0 ? `${unread} اعلان خوانده‌نشده` : "همه اعلان‌ها خوانده شده‌اند"}
+                </p>
+              </div>
               <div className="flex items-center gap-2">
                 {unread > 0 && (
                   <button
                     onClick={markAllRead}
-                    className="flex items-center gap-1 text-xs text-primary hover:text-primary/80"
+                    className="h-8 px-2.5 rounded-xl bg-primary/10 flex items-center gap-1 text-[11px] font-bold text-primary hover:bg-primary/15 transition-colors"
                   >
                     <CheckCheckIcon className="w-3.5 h-3.5" />
-                    همه خوانده شد
+                    خواندن همه
                   </button>
                 )}
               </div>
             </div>
 
             {/* Notifications list */}
-            <div className="p-2 space-y-1.5">
+            <div className="max-h-[min(520px,70vh)] overflow-y-auto no-scrollbar p-2.5 space-y-2">
               {preview.length === 0 ? (
-                <div className="text-center py-10">
-                  <span className="text-3xl block mb-2">🔔</span>
-                  <p className="text-muted-foreground text-xs">اعلانی ندارید</p>
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className="h-14 w-14 rounded-2xl bg-muted flex items-center justify-center mb-3">
+                    <InboxIcon className="w-6 h-6 text-muted-foreground" />
+                  </div>
+                  <p className="font-bold text-sm text-foreground">اعلانی ندارید</p>
+                  <p className="text-muted-foreground text-xs mt-1">اینجا پیام‌ها و هدیه‌ها نمایش داده می‌شوند</p>
                 </div>
               ) : (
                 preview.map((n) => (
@@ -100,21 +113,20 @@ export default function NotificationBell() {
             </div>
 
             {/* Footer */}
-            {notifications.length > 5 && (
-              <div className="sticky bottom-0 bg-background/95 backdrop-blur-sm border-t border-border px-4 py-2.5">
-                <Link
-                  to="/notifications"
-                  onClick={() => setOpen(false)}
-                  className="flex items-center justify-center gap-1.5 text-xs text-primary font-semibold w-full"
-                >
-                  مشاهده همه اعلان‌ها
-                  <ArrowLeftIcon className="w-3.5 h-3.5" />
-                </Link>
-              </div>
-            )}
+            <div className="bg-background/95 border-t border-border/70 p-2.5">
+              <Link
+                to="/notifications"
+                onClick={() => setOpen(false)}
+                className="h-10 rounded-2xl bg-muted/70 hover:bg-muted flex items-center justify-center gap-1.5 text-xs text-primary font-black w-full transition-colors"
+              >
+                مشاهده همه اعلان‌ها
+                <ArrowLeftIcon className="w-3.5 h-3.5" />
+              </Link>
+            </div>
           </motion.div>
         )}
-      </AnimatePresence>
+        </AnimatePresence>
+      ), document.body)}
     </div>
   );
 }

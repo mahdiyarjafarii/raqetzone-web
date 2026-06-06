@@ -30,6 +30,34 @@ const emptyForm = {
   pricePerHour:"", openTime:"", closeTime:"", slotDuration:"60", description:"", managerPhone:"",
 };
 
+function timeToMinutes(time) {
+  const [hour, minute] = (time || "").split(":").map(Number);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+  return hour * 60 + minute;
+}
+
+function validateCourtTimes(courtForm, club) {
+  const courtOpen = timeToMinutes(courtForm.openTime);
+  const courtClose = timeToMinutes(courtForm.closeTime);
+  if (courtOpen === null || courtClose === null) return "ساعت شروع و پایان زمین را درست وارد کنید";
+  if (courtOpen >= courtClose) return "ساعت پایان کار زمین باید بعد از ساعت شروع باشد";
+
+  const clubOpen = timeToMinutes(club?.openTime);
+  const clubClose = timeToMinutes(club?.closeTime);
+  if (clubOpen === null || clubClose === null) return null;
+  if (courtOpen < clubOpen || courtClose > clubClose) return "ساعت کاری زمین باید داخل بازه ساعت کاری باشگاه باشد";
+
+  return null;
+}
+
+function isTennisSport(sportType) {
+  return sportType === "tennis";
+}
+
+function normalizeCourtPayload(courtForm) {
+  return isTennisSport(courtForm.sportType) ? courtForm : { ...courtForm, surfaceType: null };
+}
+
 const COURT_STEPS = [
   { id: 1, label: "هویت",   desc: "نام و نوع" },
   { id: 2, label: "قیمت",   desc: "ساعت و قیمت" },
@@ -71,6 +99,7 @@ function CourtStepIndicator({ current }) {
 
 function CourtForm({ form, setForm, onSubmit, loading, submitLabel, isEdit = false }) {
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
+  const handleSportTypeChange = (sportType) => setForm(p => ({ ...p, sportType, surfaceType: isTennisSport(sportType) ? p.surfaceType ?? "hard" : null }));
   const [step, setStep] = useState(1);
   const next = () => setStep(s => s + 1);
   const prev = () => setStep(s => s - 1);
@@ -82,21 +111,23 @@ function CourtForm({ form, setForm, onSubmit, loading, submitLabel, isEdit = fal
           <Input label="نام زمین *" value={form.name} onChange={e=>f("name",e.target.value)} required />
           <Input label="موقعیت (نمایشی)" value={form.location} onChange={e=>f("location",e.target.value)} />
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className={cn("grid gap-3", isTennisSport(form.sportType) ? "grid-cols-2" : "grid-cols-1")}>
           <div className="flex flex-col gap-1">
             <label className="text-xs font-medium text-muted-foreground">نوع ورزش</label>
-            <select value={form.sportType} onChange={e=>f("sportType",e.target.value)}
+            <select value={form.sportType} onChange={e=>handleSportTypeChange(e.target.value)}
               className="h-9 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none">
               {SPORTS.map(s=><option key={s} value={s}>{SPORT_ICONS[s]} {SPORT_LABELS[s]??s}</option>)}
             </select>
           </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-muted-foreground">نوع سطح</label>
-            <select value={form.surfaceType} onChange={e=>f("surfaceType",e.target.value)}
-              className="h-9 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none">
-              {SURFACES.map(s=><option key={s} value={s}>{SURFACE_LABELS[s]??s}</option>)}
-            </select>
-          </div>
+          {isTennisSport(form.sportType) && (
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-muted-foreground">نوع سطح</label>
+              <select value={form.surfaceType ?? "hard"} onChange={e=>f("surfaceType",e.target.value)}
+                className="h-9 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none">
+                {SURFACES.map(s=><option key={s} value={s}>{SURFACE_LABELS[s]??s}</option>)}
+              </select>
+            </div>
+          )}
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <Input label="قیمت/ساعت (ت) *" type="number" value={form.pricePerHour} onChange={e=>f("pricePerHour",e.target.value)} required />
@@ -131,21 +162,23 @@ function CourtForm({ form, setForm, onSubmit, loading, submitLabel, isEdit = fal
           </div>
           <Input label="نام زمین *" value={form.name} onChange={e=>f("name",e.target.value)} placeholder="مثلاً: زمین پدل ۱" />
           <Input label="موقعیت (نمایشی)" value={form.location} onChange={e=>f("location",e.target.value)} placeholder="مثلاً: طبقه اول" />
-          <div className="grid grid-cols-2 gap-3">
+          <div className={cn("grid gap-3", isTennisSport(form.sportType) ? "grid-cols-2" : "grid-cols-1")}>
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium text-muted-foreground">نوع ورزش</label>
-              <select value={form.sportType} onChange={e=>f("sportType",e.target.value)}
+              <select value={form.sportType} onChange={e=>handleSportTypeChange(e.target.value)}
                 className="h-9 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none">
                 {SPORTS.map(s=><option key={s} value={s}>{SPORT_ICONS[s]} {SPORT_LABELS[s]??s}</option>)}
               </select>
             </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-muted-foreground">نوع سطح</label>
-              <select value={form.surfaceType} onChange={e=>f("surfaceType",e.target.value)}
-                className="h-9 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none">
-                {SURFACES.map(s=><option key={s} value={s}>{SURFACE_LABELS[s]??s}</option>)}
-              </select>
-            </div>
+            {isTennisSport(form.sportType) && (
+              <div className="flex flex-col gap-1">
+                <label className="text-xs font-medium text-muted-foreground">نوع سطح</label>
+                <select value={form.surfaceType ?? "hard"} onChange={e=>f("surfaceType",e.target.value)}
+                  className="h-9 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none">
+                  {SURFACES.map(s=><option key={s} value={s}>{SURFACE_LABELS[s]??s}</option>)}
+                </select>
+              </div>
+            )}
           </div>
           <Button type="button" disabled={!form.name} onClick={next} className="w-full">بعدی ←</Button>
         </motion.div>
@@ -251,8 +284,10 @@ export default function ClubDetailPage() {
 
   const handleCreate = async (e) => {
     e.preventDefault();
+    const timeError = validateCourtTimes(form, club);
+    if (timeError) return toast.error(timeError);
     setSaving(true);
-    const { ok, data } = await apiClient.post(`/club-panel/clubs/${clubId}/courts`, form);
+    const { ok, data } = await apiClient.post(`/club-panel/clubs/${clubId}/courts`, normalizeCourtPayload(form));
     setSaving(false);
     if (!ok) return toast.error(data?.message ?? "خطا");
     toast.success("زمین اضافه شد ✅");
@@ -261,8 +296,10 @@ export default function ClubDetailPage() {
 
   const handleEdit = async (e) => {
     e.preventDefault();
+    const timeError = validateCourtTimes(form, club);
+    if (timeError) return toast.error(timeError);
     setSaving(true);
-    const { ok, data } = await apiClient.patch(`/club-panel/courts/${editTarget.id}`, form);
+    const { ok, data } = await apiClient.patch(`/club-panel/courts/${editTarget.id}`, normalizeCourtPayload(form));
     setSaving(false);
     if (!ok) return toast.error(data?.message ?? "خطا");
     toast.success("زمین ویرایش شد ✅");

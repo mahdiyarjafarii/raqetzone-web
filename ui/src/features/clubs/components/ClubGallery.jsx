@@ -12,26 +12,33 @@ function FullscreenViewer({ images, startIndex, onClose }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 bg-black flex items-center justify-center"
+      onClick={onClose}
+      className="fixed inset-0 z-[2147483646] bg-black/92 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6"
     >
       <button
         onClick={onClose}
-        className="absolute top-4 right-4 z-10 h-9 w-9 rounded-full bg-white/20 backdrop-blur flex items-center justify-center"
+        className="absolute top-4 right-4 z-20 h-11 w-11 rounded-full bg-white/15 backdrop-blur-md border border-white/15 flex items-center justify-center text-white shadow-lg transition-colors hover:bg-white/25"
       >
-        <XIcon className="w-5 h-5 text-white" />
+        <XIcon className="w-5 h-5" />
       </button>
 
       <Swiper
         modules={[Pagination, A11y]}
         initialSlide={startIndex}
         pagination={{ clickable: true, bulletActiveClass: "!bg-white !opacity-100 !w-5", bulletClass: "swiper-pagination-bullet !bg-white/50 !opacity-100 !h-1.5 !w-1.5 !rounded-full !transition-all" }}
-        className="w-full h-full [&_.swiper-pagination]:!bottom-6"
+        className="w-full h-full [&_.swiper-pagination]:!bottom-4 sm:[&_.swiper-pagination]:!bottom-6"
         spaceBetween={0}
         slidesPerView={1}
       >
         {images.map((src, i) => (
-          <SwiperSlide key={i} className="flex items-center justify-center">
-            <img src={imgUrl(src)} alt="" className="max-w-full max-h-full object-contain" />
+          <SwiperSlide key={i} className="!flex items-center justify-center">
+            <div className="flex h-full w-full items-center justify-center" onClick={(e) => e.stopPropagation()}>
+              <img
+                src={imgUrl(src)}
+                alt=""
+                className="max-h-[78vh] max-w-[94vw] rounded-2xl object-contain shadow-2xl sm:max-h-[84vh] sm:max-w-[88vw]"
+              />
+            </div>
           </SwiperSlide>
         ))}
       </Swiper>

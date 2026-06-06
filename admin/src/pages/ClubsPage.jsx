@@ -29,6 +29,20 @@ const emptyClub = {
   openTime: "07:00", closeTime: "23:00",
 };
 
+function timeToMinutes(time) {
+  const [hour, minute] = (time || "").split(":").map(Number);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+  return hour * 60 + minute;
+}
+
+function validateClubTimes({ openTime, closeTime }) {
+  const openMinutes = timeToMinutes(openTime);
+  const closeMinutes = timeToMinutes(closeTime);
+  if (openMinutes === null || closeMinutes === null) return "ساعت شروع و پایان باشگاه را درست وارد کنید";
+  if (openMinutes >= closeMinutes) return "ساعت پایان کار باشگاه باید بعد از ساعت شروع باشد";
+  return null;
+}
+
 function MultiCheck({ label, options, labelMap, value, onChange }) {
   const toggle = (v) => onChange(value.includes(v) ? value.filter(x => x !== v) : [...value, v]);
   return (
@@ -403,6 +417,8 @@ export default function ClubsPage() {
   useEffect(() => { fetch(); }, []);
 
   const handleCreate = async () => {
+    const timeError = validateClubTimes(form);
+    if (timeError) return toast.error(timeError);
     setSaving(true);
     const { ok, data } = await apiClient.post("/club-panel/clubs", form);
     setSaving(false);
@@ -414,6 +430,8 @@ export default function ClubsPage() {
   };
 
   const handleEdit = async () => {
+    const timeError = validateClubTimes(form);
+    if (timeError) return toast.error(timeError);
     setSaving(true);
     const { ok, data } = await apiClient.patch(`/club-panel/clubs/${editTarget.id}`, form);
     setSaving(false);

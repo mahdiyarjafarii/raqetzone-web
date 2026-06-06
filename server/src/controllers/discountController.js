@@ -3,6 +3,8 @@ import { db } from "../db/index.js";
 import { discountCodes, discountCodeUsages, clubs, courts, bookings, users, tournaments, tournamentRegistrations } from "../db/schema.js";
 import { sendSMS } from "../utils/sms.js";
 
+const WELCOME_DISCOUNT_CODE = "WELCOME20";
+
 async function assertClubOwnership(req, clubId) {
   if (req.user.isAdmin) return true;
   const [club] = await db
@@ -18,6 +20,62 @@ function generateCode(length = 8) {
   let code = "";
   for (let i = 0; i < length; i++) code += chars[Math.floor(Math.random() * chars.length)];
   return code;
+}
+
+async function getUserPhone(userId) {
+  const [user] = await db
+    .select({ phone: users.phone })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  return user?.phone ?? null;
+}
+
+async function getDiscountUsageCountByPhone(discountCodeId, phone) {
+  if (!phone) return 0;
+  const [usageCount] = await db
+    .select({ cnt: count() })
+    .from(discountCodeUsages)
+    .innerJoin(users, eq(discountCodeUsages.userId, users.id))
+    .where(and(
+      eq(discountCodeUsages.discountCodeId, discountCodeId),
+      eq(users.phone, phone),
+    ));
+  return usageCount?.cnt ?? 0;
+}
+
+async function findOrCreateWelcomeDiscount(clubId) {
+  const [existing] = await db
+    .select()
+    .from(discountCodes)
+    .where(eq(discountCodes.code, WELCOME_DISCOUNT_CODE))
+    .limit(1);
+  if (existing) return existing;
+  if (!clubId) return null;
+
+  const [created] = await db
+    .insert(discountCodes)
+    .values({
+      clubId,
+      code: WELCOME_DISCOUNT_CODE,
+      discountType: "percent",
+      discountValue: 20,
+      maxUses: null,
+      perUserLimit: 1,
+      minBookingPrice: 0,
+      description: "تخفیف خوش‌آمدگویی کاربران جدید",
+    })
+    .onConflictDoNothing({ target: discountCodes.code })
+    .returning();
+
+  if (created) return created;
+
+  const [row] = await db
+    .select()
+    .from(discountCodes)
+    .where(eq(discountCodes.code, WELCOME_DISCOUNT_CODE))
+    .limit(1);
+  return row ?? null;
 }
 
 // ─── Club Panel: CRUD ─────────────────────────────────────────────────────────
@@ -388,16 +446,22 @@ export const validateDiscountCodeController = async (req, res) => {
   try {
     const userId = req.user.id;
     const { code, clubId, bookingPrice } = req.body;
+    const normalizedCode = code?.toUpperCase().trim();
 
-    if (!code || !clubId) {
+    if (!normalizedCode || (!clubId && normalizedCode !== WELCOME_DISCOUNT_CODE)) {
       return res.status(400).json({ message: "اطلاعات ناقص است" });
     }
 
-    const [discountCode] = await db
-      .select()
-      .from(discountCodes)
-      .where(and(eq(discountCodes.code, code.toUpperCase().trim()), eq(discountCodes.clubId, clubId)))
-      .limit(1);
+    const [regularDiscountCode] = normalizedCode === WELCOME_DISCOUNT_CODE
+      ? []
+      : await db
+          .select()
+          .from(discountCodes)
+          .where(and(eq(discountCodes.code, normalizedCode), eq(discountCodes.clubId, clubId)))
+          .limit(1);
+    const discountCode = normalizedCode === WELCOME_DISCOUNT_CODE
+      ? await findOrCreateWelcomeDiscount(clubId)
+      : regularDiscountCode;
 
     if (!discountCode) {
       return res.status(404).json({ message: "کد تخفیف معتبر نیست" });
@@ -421,15 +485,17 @@ export const validateDiscountCodeController = async (req, res) => {
       });
     }
 
-    const [userUsageCount] = await db
-      .select({ cnt: count() })
-      .from(discountCodeUsages)
-      .where(and(
-        eq(discountCodeUsages.discountCodeId, discountCode.id),
-        eq(discountCodeUsages.userId, userId),
-      ));
+    const usageCount = normalizedCode === WELCOME_DISCOUNT_CODE
+      ? await getDiscountUsageCountByPhone(discountCode.id, await getUserPhone(userId))
+      : (await db
+          .select({ cnt: count() })
+          .from(discountCodeUsages)
+          .where(and(
+            eq(discountCodeUsages.discountCodeId, discountCode.id),
+            eq(discountCodeUsages.userId, userId),
+          )))[0]?.cnt ?? 0;
 
-    if ((userUsageCount?.cnt ?? 0) >= discountCode.perUserLimit) {
+    if (usageCount >= discountCode.perUserLimit) {
       return res.status(400).json({ message: "قبلاً از این کد تخفیف استفاده کرده‌اید" });
     }
 

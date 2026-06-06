@@ -5,6 +5,8 @@ import { sendNotification } from "../utils/sendNotification.js";
 import { sendSMS } from "../utils/sms.js";
 import { payBookingWithWallet } from "./walletController.js";
 
+const WELCOME_DISCOUNT_CODE = "WELCOME20";
+
 function generateTrackingCode() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let code = "RZ-";
@@ -15,6 +17,62 @@ function generateTrackingCode() {
 function timeToMinutes(t) {
   const [h, m] = t.split(":").map(Number);
   return h * 60 + m;
+}
+
+async function getUserPhone(userId) {
+  const [user] = await db
+    .select({ phone: users.phone })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  return user?.phone ?? null;
+}
+
+async function getDiscountUsageCountByPhone(discountCodeId, phone) {
+  if (!phone) return 0;
+  const [usageCount] = await db
+    .select({ cnt: count() })
+    .from(discountCodeUsages)
+    .innerJoin(users, eq(discountCodeUsages.userId, users.id))
+    .where(and(
+      eq(discountCodeUsages.discountCodeId, discountCodeId),
+      eq(users.phone, phone),
+    ));
+  return usageCount?.cnt ?? 0;
+}
+
+async function findOrCreateWelcomeDiscount(clubId) {
+  const [existing] = await db
+    .select()
+    .from(discountCodes)
+    .where(eq(discountCodes.code, WELCOME_DISCOUNT_CODE))
+    .limit(1);
+  if (existing) return existing;
+  if (!clubId) return null;
+
+  const [created] = await db
+    .insert(discountCodes)
+    .values({
+      clubId,
+      code: WELCOME_DISCOUNT_CODE,
+      discountType: "percent",
+      discountValue: 20,
+      maxUses: null,
+      perUserLimit: 1,
+      minBookingPrice: 0,
+      description: "تخفیف خوش‌آمدگویی کاربران جدید",
+    })
+    .onConflictDoNothing({ target: discountCodes.code })
+    .returning();
+
+  if (created) return created;
+
+  const [row] = await db
+    .select()
+    .from(discountCodes)
+    .where(eq(discountCodes.code, WELCOME_DISCOUNT_CODE))
+    .limit(1);
+  return row ?? null;
 }
 
 // ─── User endpoints ───────────────────────────────────────────────────────────
@@ -49,7 +107,7 @@ export const createBookingController = async (req, res) => {
     }
 
     const [court] = await db
-      .select({ id: courts.id, name: courts.name, location: courts.location, address: courts.address,
+      .select({ id: courts.id, clubId: courts.clubId, name: courts.name, location: courts.location, address: courts.address,
                 surfaceType: courts.surfaceType, sportType: courts.sportType, pricePerHour: courts.pricePerHour,
                 image: courts.image, managerPhone: courts.managerPhone, openTime: courts.openTime,
                 closeTime: courts.closeTime, slotDuration: courts.slotDuration, isActive: courts.isActive,
@@ -91,25 +149,36 @@ export const createBookingController = async (req, res) => {
     let discountCodeRow = null;
     let discountAmount = 0;
     if (discountCode) {
-      [discountCodeRow] = await db
-        .select()
-        .from(discountCodes)
-        .where(and(eq(discountCodes.code, discountCode.toUpperCase().trim()), eq(discountCodes.isActive, true)))
-        .limit(1);
+      const normalizedDiscountCode = discountCode.toUpperCase().trim();
+      if (normalizedDiscountCode === WELCOME_DISCOUNT_CODE) {
+        discountCodeRow = await findOrCreateWelcomeDiscount(court.clubId);
+      } else {
+        [discountCodeRow] = await db
+          .select()
+          .from(discountCodes)
+          .where(and(
+            eq(discountCodes.code, normalizedDiscountCode),
+            eq(discountCodes.clubId, court.clubId),
+            eq(discountCodes.isActive, true),
+          ))
+          .limit(1);
+      }
 
-      if (discountCodeRow) {
+      if (discountCodeRow?.isActive) {
         const now = new Date();
         const expired = discountCodeRow.expiresAt && now > new Date(discountCodeRow.expiresAt);
         const maxedOut = discountCodeRow.maxUses !== null && discountCodeRow.usedCount >= discountCodeRow.maxUses;
         const belowMin = discountCodeRow.minBookingPrice && basePrice < discountCodeRow.minBookingPrice;
 
         if (!expired && !maxedOut && !belowMin) {
-          const [userUsageCount] = await db
-            .select({ cnt: count() })
-            .from(discountCodeUsages)
-            .where(and(eq(discountCodeUsages.discountCodeId, discountCodeRow.id), eq(discountCodeUsages.userId, userId)));
+          const usageCount = normalizedDiscountCode === WELCOME_DISCOUNT_CODE
+            ? await getDiscountUsageCountByPhone(discountCodeRow.id, await getUserPhone(userId))
+            : (await db
+                .select({ cnt: count() })
+                .from(discountCodeUsages)
+                .where(and(eq(discountCodeUsages.discountCodeId, discountCodeRow.id), eq(discountCodeUsages.userId, userId))))[0]?.cnt ?? 0;
 
-          if ((userUsageCount?.cnt ?? 0) < discountCodeRow.perUserLimit) {
+          if (usageCount < discountCodeRow.perUserLimit) {
             discountAmount = discountCodeRow.discountType === "percent"
               ? Math.round(basePrice * discountCodeRow.discountValue / 100)
               : Math.min(discountCodeRow.discountValue, basePrice);

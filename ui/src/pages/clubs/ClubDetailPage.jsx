@@ -12,6 +12,7 @@ import {
   ClockIcon,
   CalendarCheckIcon,
 } from "lucide-react";
+import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
 import { getClubById, SPORT_META } from "@/features/clubs/data/mockClubs";
 import { useClub } from "@/features/clubs/hooks/useClubs";
@@ -34,22 +35,6 @@ function formatPrice(p) {
   return new Intl.NumberFormat("fa-IR").format(p);
 }
 
-function StarRating({ rating }) {
-  return (
-    <div className="flex items-center gap-0.5">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <StarIcon
-          key={i}
-          className={cn(
-            "w-3.5 h-3.5",
-            i < Math.floor(rating) ? "fill-amber-400 text-amber-400" : "fill-muted text-muted"
-          )}
-        />
-      ))}
-    </div>
-  );
-}
-
 function CourtRow({ court, index, onBook }) {
   return (
     <motion.button
@@ -58,16 +43,16 @@ function CourtRow({ court, index, onBook }) {
       transition={{ delay: index * 0.07 }}
       whileTap={{ scale: 0.98 }}
       onClick={() => onBook(court)}
-      className="w-full flex items-center gap-3 bg-muted/40 rounded-2xl p-3 active:bg-muted transition-colors text-right"
+      className="w-full flex items-center gap-3 rounded-2xl border border-border/70 bg-card p-3 text-right shadow-sm transition-colors active:bg-muted"
     >
-      <div className="h-10 w-10 rounded-xl bg-card flex items-center justify-center text-xl shrink-0">
+      <div className="h-11 w-11 rounded-2xl bg-primary/10 flex items-center justify-center text-xl shrink-0">
         {SPORT_ICONS[court.sportType] ?? "🏅"}
       </div>
       <div className="flex-1 min-w-0">
         <p className="font-bold text-sm text-foreground leading-snug">{court.name}</p>
-        <div className="flex items-center gap-1.5 mt-0.5">
+        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
           {court.surfaceType && (
-            <span className={cn("text-[10px] px-1.5 py-0.5 rounded-full font-medium", SURFACE_COLOR[court.surfaceType] ?? "bg-muted text-muted-foreground")}>
+            <span className={cn("text-[10px] px-2 py-0.5 rounded-full font-medium", SURFACE_COLOR[court.surfaceType] ?? "bg-muted text-muted-foreground")}>
               {SURFACE_LABEL[court.surfaceType] ?? court.surfaceType}
             </span>
           )}
@@ -98,6 +83,24 @@ export default function ClubDetailPage() {
   const openBooking = (court = null) => {
     setBookingCourt(court);
     setBookingOpen(true);
+  };
+
+  const handleShare = async () => {
+    const shareData = {
+      title: club?.name ?? "رکت زون",
+      text: club?.name ? `باشگاه ${club.name} در رکت زون` : "باشگاه در رکت زون",
+      url: window.location.href,
+    };
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+        return;
+      }
+      await navigator.clipboard.writeText(shareData.url);
+      toast.success("لینک باشگاه کپی شد");
+    } catch (err) {
+      if (err?.name !== "AbortError") toast.error("خطا در اشتراک‌گذاری");
+    }
   };
 
   // Try API first, fall back to mock data
@@ -131,33 +134,34 @@ export default function ClubDetailPage() {
 
   return (
     <div className="min-h-screen bg-background pb-32">
-      {/* ── Gallery with floating header ── */}
       <div className="relative">
         <ClubGallery images={club.images} clubName={club.name} />
 
-        {/* Floating nav buttons */}
-        <div className="absolute top-4 right-4 z-1 flex items-center gap-2">
+        <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
           <button
             onClick={() => navigate("/clubs")}
-            className="h-9 w-9 rounded-full bg-white/90 backdrop-blur shadow-sm flex items-center justify-center active:scale-90 transition-transform"
+            className="h-10 w-10 rounded-2xl bg-white/90 backdrop-blur-md shadow-lg shadow-black/10 flex items-center justify-center active:scale-90 transition-transform"
           >
             <ArrowRightIcon className="w-4 h-4 text-gray-800" />
           </button>
         </div>
 
-        <div className="absolute top-4 left-4 z-1 flex items-center gap-2">
+        <div className="absolute top-4 left-4 z-10 flex items-center gap-2">
           <button
             onClick={() => setLiked((v) => !v)}
-            className="h-9 w-9 rounded-full bg-white/90 backdrop-blur shadow-sm flex items-center justify-center active:scale-90 transition-transform"
+            className="h-10 w-10 rounded-2xl bg-white/90 backdrop-blur-md shadow-lg shadow-black/10 flex items-center justify-center active:scale-90 transition-transform"
           >
             <HeartIcon className={cn("w-4 h-4 transition-colors", liked ? "fill-red-500 text-red-500" : "text-gray-600")} />
           </button>
-          <button className="h-9 w-9 rounded-full bg-white/90 backdrop-blur shadow-sm flex items-center justify-center active:scale-90 transition-transform">
+          <button
+            type="button"
+            onClick={handleShare}
+            className="h-10 w-10 rounded-2xl bg-white/90 backdrop-blur-md shadow-lg shadow-black/10 flex items-center justify-center active:scale-90 transition-transform"
+          >
             <ShareIcon className="w-4 h-4 text-gray-600" />
           </button>
         </div>
 
-        {/* Rating badge on gallery */}
         {reviewStats.total > 0 && (
           <div className="absolute bottom-3 right-3 z-20 flex items-center gap-1.5 bg-black/60 backdrop-blur-sm rounded-full px-3 py-1.5">
             <StarIcon className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
@@ -167,30 +171,26 @@ export default function ClubDetailPage() {
         )}
       </div>
 
-      {/* ── Club info ── */}
       <div className="px-4 pt-5 pb-4">
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-          {/* Name + Rating */}
           <div className="flex items-start justify-between gap-3 mb-2">
-            <h1 className="text-xl font-black text-foreground leading-snug flex-1">{club.name}</h1>
+            <h1 className="text-2xl font-black text-foreground leading-snug flex-1">{club.name}</h1>
             {reviewStats.total > 0 && (
-              <div className="text-right shrink-0">
-                <div className="flex items-center gap-1 justify-end">
-                  <StarRating rating={reviewStats.average} />
+              <div className="shrink-0 rounded-2xl bg-amber-500/10 px-3 py-2 text-right">
+                <div className="flex items-center gap-1 justify-end mb-0.5">
+                  <StarIcon className="w-4 h-4 fill-amber-400 text-amber-400" />
                   <span className="font-black text-foreground text-sm">{reviewStats.average}</span>
                 </div>
-                <p className="text-muted-foreground text-[10px] text-left">{reviewStats.total} نظر</p>
+                <p className="text-muted-foreground text-[10px]">{reviewStats.total} نظر</p>
               </div>
             )}
           </div>
 
-          {/* Location */}
-          <div className="flex items-center gap-1.5 text-muted-foreground text-sm mb-3">
-            <MapPinIcon className="w-3.5 h-3.5 text-primary shrink-0" />
-            <span>{club.address}</span>
+          <div className="flex items-start gap-1.5 text-muted-foreground text-sm mb-3">
+            <MapPinIcon className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+            <span className="leading-6">{club.address}</span>
           </div>
 
-          {/* Sport type + Hours */}
           <div className="flex items-center gap-2 flex-wrap mb-4">
             {club.sportTypes.map((sport) => {
               const meta = SPORT_META[sport];
@@ -200,13 +200,12 @@ export default function ClubDetailPage() {
                 </span>
               ) : null;
             })}
-            <span className="flex items-center gap-1 text-muted-foreground text-xs">
+            <span className="flex items-center gap-1 rounded-full bg-muted px-3 py-1 text-muted-foreground text-xs font-medium">
               <ClockIcon className="w-3.5 h-3.5" />
               {club.openTime} – {club.closeTime}
             </span>
           </div>
 
-          {/* Price from */}
           <div className="flex items-center gap-2 bg-primary/5 border border-primary/15 rounded-2xl px-4 py-3 mb-5">
             <CalendarCheckIcon className="w-4 h-4 text-primary shrink-0" />
             <span className="text-muted-foreground text-sm">شروع قیمت از</span>
@@ -216,30 +215,37 @@ export default function ClubDetailPage() {
           </div>
         </motion.div>
 
-        {/* ── Divider ── */}
-        <div className="h-px bg-border mb-5" />
-
-        {/* ── Description ── */}
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.1 }}
+          className="rounded-3xl border border-border/70 bg-card p-4 shadow-sm"
+        >
           <h2 className="font-bold text-foreground text-base mb-2">درباره مجموعه</h2>
           <p className="text-muted-foreground text-sm leading-relaxed">{club.description}</p>
         </motion.div>
 
-        <div className="h-px bg-border my-5" />
+        {club.amenities?.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.15 }}
+            className="mt-4 rounded-3xl border border-border/70 bg-card p-4 shadow-sm"
+          >
+            <ClubAmenities amenities={club.amenities} />
+          </motion.div>
+        )}
 
-        {/* ── Amenities ── */}
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }}>
-          <ClubAmenities amenities={club.amenities} />
-        </motion.div>
-
-        <div className="h-px bg-border my-5" />
-
-        {/* ── Courts ── */}
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}>
-          <h2 className="font-bold text-foreground text-base mb-3">
-            زمین‌های موجود
-            <span className="text-muted-foreground font-normal text-sm mr-2">({club.courts.length} زمین)</span>
-          </h2>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.2 }}
+          className="mt-4"
+        >
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="font-bold text-foreground text-base">زمین‌های موجود</h2>
+            <span className="rounded-full bg-muted px-3 py-1 text-xs font-bold text-muted-foreground">{club.courts.length} زمین</span>
+          </div>
           <div className="space-y-2.5">
             {club.courts.map((court, i) => (
               <CourtRow key={court.id} court={court} index={i} onBook={openBooking} />
@@ -247,15 +253,16 @@ export default function ClubDetailPage() {
           </div>
         </motion.div>
 
-        <div className="h-px bg-border my-5" />
-
-        {/* ── Reviews ── */}
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.25 }}>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.25 }}
+          className="mt-5"
+        >
           <ClubReviews clubId={clubId} onStatsLoad={setReviewStats} />
         </motion.div>
       </div>
 
-      {/* ── Sticky CTA — hidden while booking or onboarding sheet is open ── */}
       {!bookingOpen && !onboarding && (
         <div className="fixed bottom-0 inset-x-0 z-30 bg-background/95 backdrop-blur-md border-t border-border px-4 py-3 safe-area-bottom">
           <div className="flex items-center gap-3">
