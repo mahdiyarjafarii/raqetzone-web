@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { CheckCircleIcon, XCircleIcon, SearchIcon, FilterIcon } from "lucide-react";
+import { motion } from "framer-motion";
+import { CheckCircleIcon, XCircleIcon, SearchIcon } from "lucide-react";
 import toast from "react-hot-toast";
 import apiClient from "@/lib/apiClient";
 import PageHeader from "@/components/PageHeader";
@@ -17,10 +17,11 @@ function UserAvatar({ image, name }) {
   const src = image
     ? image.startsWith("http") ? image : `${ADMIN_BASE}/uploads/user/${image}`
     : null;
+  const isUnsupportedImage = /\.(heic|heif)$/i.test(src ?? "");
 
   return (
     <div className="w-9 h-9 rounded-full overflow-hidden shrink-0 border border-border">
-      {src ? (
+      {src && !isUnsupportedImage ? (
         <img
           src={src}
           alt={name ?? ""}
@@ -33,7 +34,7 @@ function UserAvatar({ image, name }) {
       ) : null}
       <div
         className="w-full h-full bg-gradient-to-br from-violet-600 to-indigo-500 text-white text-xs font-bold items-center justify-center"
-        style={{ display: src ? "none" : "flex" }}
+        style={{ display: src && !isUnsupportedImage ? "none" : "flex" }}
       >
         {name?.[0]?.toUpperCase() ?? "?"}
       </div>
@@ -175,7 +176,7 @@ export default function BookingsPage() {
                           <div className="font-medium text-foreground">{b.court?.name}</div>
                           <div className="text-xs text-muted-foreground">{b.court?.location}</div>
                         </td>
-                        <td className="px-4 py-3 text-muted-foreground">{b.date}</td>
+                        <td className="px-4 py-3 text-muted-foreground">{fmtDate(b.date)}</td>
                         <td className="px-4 py-3 text-muted-foreground" dir="ltr">{b.startTime}–{b.endTime}</td>
                         <td className="px-4 py-3 font-semibold text-foreground">{fmt(b.totalPrice)} ت</td>
                         <td className="px-4 py-3"><Badge variant={sb.variant}>{sb.label}</Badge></td>
