@@ -135,6 +135,18 @@ export const uploadProfileImageController = async (req, res) => {
       .where(eq(users.id, userId))
       .limit(1);
 
+    console.log("Profile image current user state:", {
+      userId,
+      currentImage: currentUser?.image,
+      newFile: {
+        originalname: file.originalname,
+        filename: file.filename,
+        mimetype: file.mimetype,
+        size: file.size,
+        path: file.path,
+      },
+    });
+
     // Delete previous image if it exists
     if (currentUser?.image) {
       try {
@@ -149,6 +161,9 @@ export const uploadProfileImageController = async (req, res) => {
           const urlParts = relativePath.split("/uploads/");
           if (urlParts.length > 1) {
             relativePath = urlParts[1];
+            if (relativePath.startsWith("user/")) {
+              relativePath = relativePath.slice("user/".length);
+            }
           } else {
             // External URL (like Google), skip deletion
             relativePath = null;
@@ -166,6 +181,9 @@ export const uploadProfileImageController = async (req, res) => {
           // Check if file exists and delete it
           if (fs.existsSync(filePath)) {
             fs.unlinkSync(filePath);
+            console.log("Deleted old profile image:", { filePath });
+          } else {
+            console.log("Old profile image file not found, skipping delete:", { filePath });
           }
         }
       } catch (deleteError) {
@@ -187,6 +205,17 @@ export const uploadProfileImageController = async (req, res) => {
       })
       .where(eq(users.id, userId))
       .returning();
+
+    console.log("Profile image database update result:", {
+      userId,
+      relativeImagePath,
+      updatedImage: updatedUser?.image,
+      updatedUserFound: !!updatedUser,
+    });
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "کاربر پیدا نشد" });
+    }
 
     return res.status(200).json({
       user: {

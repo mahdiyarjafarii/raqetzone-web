@@ -47,6 +47,15 @@ router.use(authMiddleware);
 router.get("/users/me", getCurrentUserController);
 router.patch("/users/me", updateProfileController);
 router.post("/users/upload-image", uploadProfileImage, uploadProfileImageController);
+router.post("/users/upload-image/debug-log", (req, res) => {
+  console.log("Profile image frontend debug:", {
+    userId: req.user?.id,
+    body: req.body,
+    contentType: req.headers["content-type"],
+    userAgent: req.headers["user-agent"],
+  });
+  return res.json({ ok: true });
+});
 
 export default router;
 

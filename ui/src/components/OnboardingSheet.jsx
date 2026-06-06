@@ -38,6 +38,32 @@ const DURATIONS = [
 // 0=welcome, 1=name, 2=photo, 3=sport, 4=level, 5=duration
 const TOTAL_STEPS = 6;
 
+const sendOnboardingUploadDebugLog = async (event, payload = {}) => {
+  try {
+    const token = authStorage.getToken();
+    await fetch(`${import.meta.env.VITE_WEBSITE_URL}/api/users/upload-image/debug-log`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-auth-token": token ?? "",
+      },
+      body: JSON.stringify({
+        source: "onboarding",
+        event,
+        payload,
+        pageUrl: window.location.href,
+        userAgent: navigator.userAgent,
+        platform: navigator.platform,
+        language: navigator.language,
+        online: navigator.onLine,
+        timestamp: new Date().toISOString(),
+      }),
+    });
+  } catch (error) {
+    console.error("Onboarding image debug log failed:", error);
+  }
+};
+
 // ── Steps ─────────────────────────────────────────────────────────────────────
 
 function StepWelcome() {
@@ -303,6 +329,15 @@ export default function OnboardingSheet() {
     setPhotoPreview(localUrl);
     setPhotoUploading(true);
     try {
+      const startPayload = {
+        name: file?.name,
+        type: file?.type,
+        size: file?.size,
+        lastModified: file?.lastModified,
+      };
+      console.log("Onboarding image upload start:", startPayload);
+      sendOnboardingUploadDebugLog("onboarding_upload_start", startPayload);
+
       const form = new FormData();
       form.append("image", file);
       const res = await fetch(`${import.meta.env.VITE_WEBSITE_URL}/api/users/upload-image`, {
@@ -311,13 +346,26 @@ export default function OnboardingSheet() {
         body: form,
       });
       const data = await res.json().catch(() => ({}));
+      const responsePayload = {
+        status: res.status,
+        ok: res.ok,
+        data,
+      };
+      console.log("Onboarding image upload response:", responsePayload);
+      sendOnboardingUploadDebugLog("onboarding_upload_response", responsePayload);
+
       if (!res.ok) {
         toast.error(data?.message ?? "خطا در آپلود عکس");
         setPhotoPreview(null);
       } else if (data?.user) {
         setCurrentUser(data.user);
       }
-    } catch {
+    } catch (error) {
+      console.error("Onboarding image upload failed:", error);
+      sendOnboardingUploadDebugLog("onboarding_upload_failed", {
+        message: error?.message,
+        name: error?.name,
+      });
       toast.error("خطا در اتصال");
       setPhotoPreview(null);
     } finally {
