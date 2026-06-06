@@ -220,6 +220,10 @@ export const createClubCourtController = async (req, res) => {
 
     const { name, location, address, surfaceType, sportType, pricePerHour, openTime, closeTime, slotDuration, description, managerPhone } = req.body;
     if (!name || !pricePerHour) return res.status(400).json({ message: "نام و قیمت الزامی است" });
+    const parsedSlotDuration = parseInt(slotDuration ?? "60", 10);
+    if (![60, 90].includes(parsedSlotDuration)) {
+      return res.status(400).json({ message: "مدت اسلات فقط می‌تواند ۶۰ یا ۹۰ دقیقه باشد" });
+    }
 
     // Fetch club to use as default location
     const [club] = await db.select().from(clubs).where(eq(clubs.id, clubId)).limit(1);
@@ -236,7 +240,7 @@ export const createClubCourtController = async (req, res) => {
         pricePerHour: parseInt(pricePerHour, 10),
         openTime: openTime || club?.openTime || "07:00",
         closeTime: closeTime || club?.closeTime || "23:00",
-        slotDuration: parseInt(slotDuration ?? "60", 10),
+        slotDuration: parsedSlotDuration,
         description: description || null,
         managerPhone: managerPhone || club?.phone || null,
       })
@@ -260,9 +264,15 @@ export const updateClubCourtController = async (req, res) => {
     const updates = {};
     for (const f of fields) {
       if (req.body[f] !== undefined) {
-        updates[f] = f === "pricePerHour" || f === "slotDuration"
-          ? parseInt(req.body[f], 10)
-          : req.body[f];
+        if (f === "slotDuration") {
+          const parsedSlotDuration = parseInt(req.body[f], 10);
+          if (![60, 90].includes(parsedSlotDuration)) {
+            return res.status(400).json({ message: "مدت اسلات فقط می‌تواند ۶۰ یا ۹۰ دقیقه باشد" });
+          }
+          updates[f] = parsedSlotDuration;
+        } else {
+          updates[f] = f === "pricePerHour" ? parseInt(req.body[f], 10) : req.body[f];
+        }
       }
     }
 

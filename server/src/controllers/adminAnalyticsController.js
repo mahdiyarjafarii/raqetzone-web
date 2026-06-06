@@ -140,6 +140,10 @@ export const createAdminCourtController = async (req, res) => {
   try {
     const { name, location, address, surfaceType, sportType, pricePerHour, description, openTime, closeTime, slotDuration } = req.body;
     if (!name || !location || !sportType || !pricePerHour) return res.status(400).json({ message: "اطلاعات ناقص است" });
+    const parsedSlotDuration = parseInt(slotDuration ?? "60", 10);
+    if (![60, 90].includes(parsedSlotDuration)) {
+      return res.status(400).json({ message: "مدت اسلات فقط می‌تواند ۶۰ یا ۹۰ دقیقه باشد" });
+    }
 
     const [court] = await db.insert(courts).values({
       name, location, address, surfaceType, sportType,
@@ -147,7 +151,7 @@ export const createAdminCourtController = async (req, res) => {
       description,
       openTime: openTime ?? "08:00",
       closeTime: closeTime ?? "23:00",
-      slotDuration: slotDuration ? parseInt(slotDuration) : 60,
+      slotDuration: parsedSlotDuration,
     }).returning();
 
     return res.status(201).json({ court });
@@ -164,6 +168,14 @@ export const updateAdminCourtController = async (req, res) => {
 
     const allowed = ["name","location","address","surfaceType","sportType","pricePerHour","description","openTime","closeTime","slotDuration","isActive"];
     const clean = Object.fromEntries(Object.entries(updates).filter(([k]) => allowed.includes(k)));
+    if (clean.slotDuration !== undefined) {
+      const parsedSlotDuration = parseInt(clean.slotDuration, 10);
+      if (![60, 90].includes(parsedSlotDuration)) {
+        return res.status(400).json({ message: "مدت اسلات فقط می‌تواند ۶۰ یا ۹۰ دقیقه باشد" });
+      }
+      clean.slotDuration = parsedSlotDuration;
+    }
+    if (clean.pricePerHour !== undefined) clean.pricePerHour = parseInt(clean.pricePerHour, 10);
 
     const [court] = await db.update(courts).set(clean).where(eq(courts.id, id)).returning();
     if (!court) return res.status(404).json({ message: "زمین یافت نشد" });

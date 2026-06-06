@@ -64,6 +64,11 @@ const COURT_STEPS = [
   { id: 3, label: "تنظیمات", desc: "اسلات و توضیح" },
 ];
 
+const SLOT_DURATION_OPTIONS = [
+  { value: "60", label: "۶۰ دقیقه" },
+  { value: "90", label: "۹۰ دقیقه" },
+];
+
 function CourtStepIndicator({ current }) {
   return (
     <div className="flex items-center gap-1 mb-6">
@@ -135,7 +140,13 @@ function CourtForm({ form, setForm, onSubmit, loading, submitLabel, isEdit = fal
           <PersianTimePicker label="بستن" value={form.closeTime} onChange={value=>f("closeTime",value)} />
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <Input label="مدت اسلات (دقیقه)" type="number" value={form.slotDuration} onChange={e=>f("slotDuration",e.target.value)} />
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-medium text-muted-foreground">مدت اسلات</label>
+            <select value={form.slotDuration} onChange={e=>f("slotDuration",e.target.value)}
+              className="h-9 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none">
+              {SLOT_DURATION_OPTIONS.map(option=><option key={option.value} value={option.value}>{option.label}</option>)}
+            </select>
+          </div>
           <Input label="شماره مدیر" type="tel" value={form.managerPhone} onChange={e=>f("managerPhone",e.target.value)} dir="ltr" />
         </div>
         <div className="flex flex-col gap-1">
@@ -216,7 +227,13 @@ function CourtForm({ form, setForm, onSubmit, loading, submitLabel, isEdit = fal
             <p className="text-xs text-muted-foreground mt-0.5">مدت هر اسلات و اطلاعات تکمیلی را وارد کنید</p>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <Input label="مدت هر اسلات (دقیقه)" type="number" value={form.slotDuration} onChange={e=>f("slotDuration",e.target.value)} />
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-medium text-muted-foreground">مدت هر اسلات</label>
+              <select value={form.slotDuration} onChange={e=>f("slotDuration",e.target.value)}
+                className="h-9 rounded-xl border border-input bg-background px-3 text-sm focus:outline-none">
+                {SLOT_DURATION_OPTIONS.map(option=><option key={option.value} value={option.value}>{option.label}</option>)}
+              </select>
+            </div>
             <Input label="شماره مدیر زمین" type="tel" value={form.managerPhone} onChange={e=>f("managerPhone",e.target.value)} dir="ltr" />
           </div>
           <div className="flex flex-col gap-1">

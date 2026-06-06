@@ -153,11 +153,13 @@ export const createBookingController = async (req, res) => {
     }
 
     const durationHours = (endMin - startMin) / 60;
+    const storedDurationHours = Math.ceil(durationHours);
     const basePrice = Math.round(court.pricePerHour * durationHours);
     console.log("[CreateBooking] calculated values:", {
       startMin,
       endMin,
       durationHours,
+      storedDurationHours,
       durationHoursType: typeof durationHours,
       pricePerHour: court.pricePerHour,
       pricePerHourType: typeof court.pricePerHour,
@@ -216,7 +218,8 @@ export const createBookingController = async (req, res) => {
       date,
       startTime,
       endTime,
-      durationHours,
+      durationHours: storedDurationHours,
+      actualDurationHours: durationHours,
       totalPrice,
       notes,
       trackingCode,
@@ -235,7 +238,7 @@ export const createBookingController = async (req, res) => {
           date,
           startTime,
           endTime,
-          durationHours,
+          durationHours: storedDurationHours,
           totalPrice,
           notes,
           trackingCode,
