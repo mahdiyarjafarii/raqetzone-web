@@ -1,6 +1,9 @@
 import apiClient from "@/lib/apiClient";
 import authStorage from "@/auth/storage";
 
+const MAX_PROFILE_IMAGE_SIZE_MB = 5;
+const MAX_PROFILE_IMAGE_SIZE_BYTES = MAX_PROFILE_IMAGE_SIZE_MB * 1024 * 1024;
+
 const sendUploadDebugLog = async (event, payload = {}) => {
   try {
     const token = authStorage.getToken();
@@ -42,6 +45,15 @@ export const profileService = {
       console.log("Profile image upload start:", startPayload);
       sendUploadDebugLog("upload_start", startPayload);
 
+      if (file?.size > MAX_PROFILE_IMAGE_SIZE_BYTES) {
+        const message = `حجم عکس نباید بیشتر از ${MAX_PROFILE_IMAGE_SIZE_MB} مگابایت باشد`;
+        sendUploadDebugLog("upload_rejected_client_size", {
+          ...startPayload,
+          maxSizeMb: MAX_PROFILE_IMAGE_SIZE_MB,
+        });
+        return { ok: false, data: { message } };
+      }
+
       const res = await fetch(`${import.meta.env.VITE_WEBSITE_URL}/api/users/upload-image`, {
         method: "POST",
         headers: { "x-auth-token": authStorage.getToken() ?? "" },
@@ -55,6 +67,13 @@ export const profileService = {
       };
       console.log("Profile image upload response:", responsePayload);
       sendUploadDebugLog("upload_response", responsePayload);
+
+      if (res.status === 413 && !data?.message) {
+        return {
+          ok: false,
+          data: { message: `حجم عکس نباید بیشتر از ${MAX_PROFILE_IMAGE_SIZE_MB} مگابایت باشد` },
+        };
+      }
 
       return { ok: res.ok, data };
     } catch (error) {

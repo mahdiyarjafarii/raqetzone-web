@@ -6,7 +6,7 @@ import {
   uploadProfileImageController,
 } from "../controllers/userController.js";
 import { authMiddleware } from "../middleware/auth.js";
-import { createUpload } from "../config/multer.js";
+import { createUpload, MAX_UPLOAD_SIZE_MB } from "../config/multer.js";
 
 const upload = createUpload("user");
 
@@ -15,6 +15,9 @@ const router = express.Router();
 const uploadProfileImage = (req, res, next) => {
   upload.single("image")(req, res, (error) => {
     if (error) {
+      const message = error.code === "LIMIT_FILE_SIZE"
+        ? `حجم عکس نباید بیشتر از ${MAX_UPLOAD_SIZE_MB} مگابایت باشد`
+        : error.message || "خطا در آپلود عکس";
       console.error("Profile image multer error:", {
         message: error.message,
         code: error.code,
@@ -23,7 +26,7 @@ const uploadProfileImage = (req, res, next) => {
         contentLength: req.headers["content-length"],
         userAgent: req.headers["user-agent"],
       });
-      return res.status(400).json({ message: error.message || "خطا در آپلود عکس" });
+      return res.status(400).json({ message });
     }
 
     console.log("Profile image upload received:", {

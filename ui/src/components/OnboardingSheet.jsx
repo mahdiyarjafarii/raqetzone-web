@@ -37,6 +37,8 @@ const DURATIONS = [
 
 // 0=welcome, 1=name, 2=photo, 3=sport, 4=level, 5=duration
 const TOTAL_STEPS = 6;
+const MAX_ONBOARDING_IMAGE_SIZE_MB = 5;
+const MAX_ONBOARDING_IMAGE_SIZE_BYTES = MAX_ONBOARDING_IMAGE_SIZE_MB * 1024 * 1024;
 
 const sendOnboardingUploadDebugLog = async (event, payload = {}) => {
   try {
@@ -338,6 +340,17 @@ export default function OnboardingSheet() {
       console.log("Onboarding image upload start:", startPayload);
       sendOnboardingUploadDebugLog("onboarding_upload_start", startPayload);
 
+      if (file?.size > MAX_ONBOARDING_IMAGE_SIZE_BYTES) {
+        const message = `حجم عکس نباید بیشتر از ${MAX_ONBOARDING_IMAGE_SIZE_MB} مگابایت باشد`;
+        sendOnboardingUploadDebugLog("onboarding_upload_rejected_client_size", {
+          ...startPayload,
+          maxSizeMb: MAX_ONBOARDING_IMAGE_SIZE_MB,
+        });
+        toast.error(message);
+        setPhotoPreview(null);
+        return;
+      }
+
       const form = new FormData();
       form.append("image", file);
       const res = await fetch(`${import.meta.env.VITE_WEBSITE_URL}/api/users/upload-image`, {
@@ -353,6 +366,12 @@ export default function OnboardingSheet() {
       };
       console.log("Onboarding image upload response:", responsePayload);
       sendOnboardingUploadDebugLog("onboarding_upload_response", responsePayload);
+
+      if (res.status === 413 && !data?.message) {
+        toast.error(`حجم عکس نباید بیشتر از ${MAX_ONBOARDING_IMAGE_SIZE_MB} مگابایت باشد`);
+        setPhotoPreview(null);
+        return;
+      }
 
       if (!res.ok) {
         toast.error(data?.message ?? "خطا در آپلود عکس");

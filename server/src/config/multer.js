@@ -33,6 +33,9 @@ const allowedImageExtensions = new Set([
   ".tiff",
 ]);
 
+export const MAX_UPLOAD_SIZE_MB = 5;
+export const MAX_UPLOAD_SIZE_BYTES = MAX_UPLOAD_SIZE_MB * 1024 * 1024;
+
 // File filter
 const fileFilter = (req, file, cb) => {
   // Accept images and common document formats
@@ -101,7 +104,7 @@ export const createUpload = (folderName) => {
     storage,
     fileFilter,
     limits: {
-      fileSize: 10 * 1024 * 1024, // 10MB
+      fileSize: MAX_UPLOAD_SIZE_BYTES,
     },
   });
 };
@@ -130,6 +133,6 @@ export const upload = multer({
   storage: defaultStorage,
   fileFilter,
   limits: {
-    fileSize: 10 * 1024 * 1024, // 10MB
+    fileSize: MAX_UPLOAD_SIZE_BYTES,
   },
 });
