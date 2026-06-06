@@ -134,7 +134,7 @@ export default function ProfilePage() {
       setCurrentUser((prev) => ({ ...prev, image: res.data.user.image }));
       toast.success("عکس پروفایل به‌روز شد");
     } else {
-      toast.error("خطا در آپلود عکس");
+      toast.error(res.data?.message ?? "خطا در آپلود عکس");
     }
   };
 
@@ -217,7 +217,7 @@ export default function ProfilePage() {
               >
                 <CameraIcon className="w-4 h-4" />
               </button>
-              <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageUpload(f); }} />
+              <input ref={fileRef} type="file" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/heic,image/heif,image/avif,image/bmp,image/tiff" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageUpload(f); }} />
             </div>
 
             {loading ? (

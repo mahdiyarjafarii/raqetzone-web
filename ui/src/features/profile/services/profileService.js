@@ -13,7 +13,7 @@ export const profileService = {
         headers: { "x-auth-token": authStorage.getToken() ?? "" },
         body: form,
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       return { ok: res.ok, data };
     } catch {
       return { ok: false, data: { message: "خطا در اتصال" } };

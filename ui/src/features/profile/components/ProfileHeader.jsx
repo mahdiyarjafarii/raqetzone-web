@@ -57,7 +57,7 @@ export default function ProfileHeader({ user, rank, onEditClick, onImageUpload }
           >
             <CameraIcon className="w-3 h-3" />
           </button>
-          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+          <input ref={fileRef} type="file" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/heic,image/heif,image/avif,image/bmp,image/tiff" className="hidden" onChange={handleFileChange} />
         </motion.div>
 
         {/* Name + info */}

@@ -19,6 +19,20 @@ const sanitizeFileName = (name) =>
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "") || "file";
 
+const allowedImageExtensions = new Set([
+  ".jpg",
+  ".jpeg",
+  ".png",
+  ".gif",
+  ".webp",
+  ".heic",
+  ".heif",
+  ".avif",
+  ".bmp",
+  ".tif",
+  ".tiff",
+]);
+
 // File filter
 const fileFilter = (req, file, cb) => {
   // Accept images and common document formats
@@ -28,6 +42,11 @@ const fileFilter = (req, file, cb) => {
     "image/png",
     "image/gif",
     "image/webp",
+    "image/heic",
+    "image/heif",
+    "image/avif",
+    "image/bmp",
+    "image/tiff",
     "application/pdf",
     "application/msword",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -37,7 +56,15 @@ const fileFilter = (req, file, cb) => {
     "text/csv",
   ];
 
-  if (allowedMimes.includes(file.mimetype)) {
+  const ext = path.extname(file.originalname || "").toLowerCase();
+  const isImageByExtension = allowedImageExtensions.has(ext);
+  const hasUnreliableMobileMime =
+    !file.mimetype || file.mimetype === "application/octet-stream";
+
+  if (
+    allowedMimes.includes(file.mimetype) ||
+    (hasUnreliableMobileMime && isImageByExtension)
+  ) {
     cb(null, true);
   } else {
     cb(new Error("فرمت فایل پشتیبانی نمی‌شود"), false);

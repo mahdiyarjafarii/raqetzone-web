@@ -130,7 +130,7 @@ function StepPhoto({ preview, onSelect, uploading }) {
         <input
           ref={inputRef}
           type="file"
-          accept="image/*"
+          accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/heic,image/heif,image/avif,image/bmp,image/tiff"
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0];
@@ -310,9 +310,9 @@ export default function OnboardingSheet() {
         headers: { "x-auth-token": authStorage.getToken() ?? "" },
         body: form,
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        toast.error("خطا در آپلود عکس");
+        toast.error(data?.message ?? "خطا در آپلود عکس");
         setPhotoPreview(null);
       } else if (data?.user) {
         setCurrentUser(data.user);
