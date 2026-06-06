@@ -90,6 +90,7 @@ export default function ProfilePage() {
 
   const { data: profileData, loading, setData } = useProfileData();
   const [editOpen, setEditOpen] = useState(false);
+  const [imageVersion, setImageVersion] = useState(Date.now());
   const [showAllPayments, setShowAllPayments] = useState(false);
   const [payments, setPayments] = useState([]);
   const [paymentsLoading, setPaymentsLoading] = useState(false);
@@ -131,7 +132,10 @@ export default function ProfilePage() {
   const handleImageUpload = async (file) => {
     const res = await profileService.uploadImage(file);
     if (res.ok) {
-      setCurrentUser((prev) => ({ ...prev, image: res.data.user.image }));
+      const updatedUser = res.data.user;
+      setCurrentUser((prev) => ({ ...prev, ...updatedUser }));
+      setData((prev) => prev ? { ...prev, user: { ...prev.user, ...updatedUser } } : prev);
+      setImageVersion(Date.now());
       toast.success("عکس پروفایل به‌روز شد");
     } else {
       toast.error(res.data?.message ?? "خطا در آپلود عکس");
@@ -206,7 +210,7 @@ export default function ProfilePage() {
                   initial={{ scale: 0.85, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ type: "spring", stiffness: 200 }}
-                  src={getUserImage(user?.image)}
+                  src={`${getUserImage(user?.image)}?v=${imageVersion}`}
                   alt={user?.name}
                   className="w-28 h-28 rounded-[34px] object-cover border-4 border-white dark:border-background shadow-xl shadow-slate-300/60 dark:shadow-black/30"
                 />
