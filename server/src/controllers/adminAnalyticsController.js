@@ -16,7 +16,7 @@ function dateStr(d) {
 export const getAdminStatsController = async (req, res) => {
   try {
     // ── Booking counts by status
-    const allBookings = await db.select({ status: bookings.status, totalPrice: bookings.totalPrice, date: bookings.date, startTime: bookings.startTime, createdAt: bookings.createdAt }).from(bookings);
+    const allBookings = await db.select({ status: bookings.status, totalPrice: bookings.totalPrice, date: bookings.date, startTime: bookings.startTime, createdAt: bookings.createdAt, courtId: bookings.courtId }).from(bookings);
 
     const totalBookings   = allBookings.length;
     const pendingCount    = allBookings.filter(b => b.status === "pending").length;

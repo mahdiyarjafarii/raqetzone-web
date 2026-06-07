@@ -14,6 +14,20 @@ const SPORT_TYPES = ["padel", "tennis", "squash", "badminton", "ping-pong"];
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 async function enrichMatch(match) {
+  let creator = null;
+  if (match.createdBy) {
+    const [creatorRow] = await db
+      .select({
+        id: users.id,
+        name: users.name,
+        image: users.image,
+      })
+      .from(users)
+      .where(eq(users.id, match.createdBy))
+      .limit(1);
+    creator = creatorRow ?? null;
+  }
+
   const participants = await db
     .select({
       id: matchParticipants.id,
@@ -31,7 +45,7 @@ async function enrichMatch(match) {
   const teamA = participants.filter((p) => p.team === "A");
   const teamB = participants.filter((p) => p.team === "B");
 
-  return { ...match, teamA, teamB };
+  return { ...match, creator, teamA, teamB };
 }
 
 // ─── Controllers ─────────────────────────────────────────────────────────────

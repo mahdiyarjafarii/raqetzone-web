@@ -210,6 +210,12 @@ export const updateTournamentController = async (req, res) => {
     for (const key of allowed) {
       if (updates[key] !== undefined) patch[key] = updates[key];
     }
+    if (patch.entryFee !== undefined) patch.entryFee = Number(patch.entryFee);
+    if (patch.maxParticipants !== undefined) patch.maxParticipants = Number(patch.maxParticipants);
+    if (patch.minLevel !== undefined) patch.minLevel = Number(patch.minLevel);
+    if (patch.registrationDeadline !== undefined) patch.registrationDeadline = new Date(patch.registrationDeadline);
+    if (patch.startDate !== undefined) patch.startDate = new Date(patch.startDate);
+    if (patch.endDate !== undefined) patch.endDate = new Date(patch.endDate);
     patch.updatedAt = new Date();
 
     const [updated] = await db

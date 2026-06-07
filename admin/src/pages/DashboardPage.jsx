@@ -8,21 +8,20 @@ import {
 import {
   CalendarCheckIcon, ClockIcon, MapPinIcon, UsersIcon,
   BanknoteIcon, Building2Icon, TrendingUpIcon, CheckCircle2Icon,
-  XCircleIcon, AlertCircleIcon,
+  XCircleIcon, AlertCircleIcon, RefreshCwIcon, ActivityIcon,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import apiClient from "@/lib/apiClient";
 import PageHeader from "@/components/PageHeader";
 import { fmt, cn } from "@/lib/utils";
 
+const PIE_COLORS = ["#10B981", "#F59E0B", "#EF4444"];
 const STATUS_MAP = {
   approved:  { label: "تأیید شده",  color: "text-emerald-600", bg: "bg-emerald-500/10", icon: CheckCircle2Icon },
   pending:   { label: "در انتظار",  color: "text-amber-600",   bg: "bg-amber-500/10",   icon: AlertCircleIcon  },
   rejected:  { label: "رد شده",     color: "text-red-500",     bg: "bg-red-500/10",     icon: XCircleIcon      },
   cancelled: { label: "لغو شده",    color: "text-red-500",     bg: "bg-red-500/10",     icon: XCircleIcon      },
 };
-
-const PIE_COLORS = ["#10B981", "#F59E0B", "#EF4444"];
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -70,6 +69,22 @@ function ChartCard({ title, subtitle, children, className = "" }) {
   );
 }
 
+function InsightCard({ label, value, sub, tone = "violet" }) {
+  const tones = {
+    violet: "from-violet-600/15 to-indigo-500/10 border-violet-500/20 text-violet-600",
+    emerald: "from-emerald-500/15 to-teal-500/10 border-emerald-500/20 text-emerald-600",
+    amber: "from-amber-500/15 to-orange-500/10 border-amber-500/20 text-amber-600",
+    blue: "from-blue-500/15 to-cyan-500/10 border-blue-500/20 text-blue-600",
+  };
+  return (
+    <div className={cn("rounded-2xl border bg-gradient-to-br p-4", tones[tone])}>
+      <p className="text-xs font-semibold opacity-80">{label}</p>
+      <p className="mt-2 text-2xl font-black text-foreground">{value}</p>
+      {sub && <p className="mt-1 text-[11px] text-muted-foreground">{sub}</p>}
+    </div>
+  );
+}
+
 const CustomTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   return (
@@ -99,15 +114,25 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const [data, setData]     = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(null);
 
-  useEffect(() => {
-    (async () => {
-      const res = await apiClient.get("/club-panel/stats");
-      if (res.ok) setData(res.data);
-      else toast.error("خطا در بارگذاری آمار");
-      setLoading(false);
-    })();
-  }, []);
+  async function loadDashboard({ silent = false } = {}) {
+    if (silent) setRefreshing(true);
+    else setLoading(true);
+    const res = await apiClient.get("/club-panel/stats");
+    if (res.ok) {
+      setData(res.data);
+      setLastUpdated(new Date());
+      if (silent) toast.success("دیتای داشبورد بروزرسانی شد");
+    } else {
+      toast.error("خطا در بارگذاری آمار");
+    }
+    setLoading(false);
+    setRefreshing(false);
+  }
+
+  useEffect(() => { loadDashboard(); }, []);
 
   if (loading) {
     return (
@@ -123,13 +148,18 @@ export default function DashboardPage() {
   }
 
   const s = data?.stats ?? {};
+  const approvalRate = s.totalBookings ? Math.round((s.approvedBookings / s.totalBookings) * 100) : 0;
+  const pendingRate = s.totalBookings ? Math.round((s.pendingBookings / s.totalBookings) * 100) : 0;
+  const avgRevenue = s.approvedBookings ? Math.round(s.totalRevenue / s.approvedBookings) : 0;
+  const topCourt = (data?.courtUtilization ?? [])[0];
+  const busiestHour = (data?.peakHours ?? []).reduce((best, item) => item.count > (best?.count ?? -1) ? item : best, null);
 
   // ── stat cards ──────────────────────────────────────────────────────────
   const statCards = [
     {
       label: "درآمد این ماه",
       value: `${fmt(s.thisMonthRevenue ?? 0)} ت`,
-      sub: `کل: ${fmt(s.totalRevenue ?? 0)} تومان`,
+      sub: `میانگین هر رزرو: ${fmt(avgRevenue)} تومان`,
       icon: BanknoteIcon,
       color: "text-primary",
       bg: "bg-primary/10",
@@ -162,7 +192,7 @@ export default function DashboardPage() {
     {
       label: "باشگاه‌ها",
       value: fmt(s.totalClubs ?? 0),
-      sub: null,
+      sub: "باشگاه‌های این اکانت",
       icon: Building2Icon,
       color: "text-emerald-500",
       bg: "bg-emerald-500/10",
@@ -205,7 +235,6 @@ export default function DashboardPage() {
   const utilizationData = (data?.courtUtilization ?? []).slice(0, 8).map(c => ({
     name: c.name.length > 10 ? c.name.slice(0, 10) + "…" : c.name,
     رزرو: c.bookings,
-    "درآمد (هزار)": Math.round(c.revenue / 1000),
   }));
 
   const hasUtilization = utilizationData.some(d => d["رزرو"] > 0);
@@ -222,17 +251,46 @@ export default function DashboardPage() {
     { label: "در انتظار",  count: s.pendingBookings   ?? 0 },
     { label: "لغو/رد شده", count: s.cancelledBookings ?? 0 },
   ].filter(d => d.count > 0);
-
   const recentBookings = data?.recentBookings ?? [];
 
   return (
     <div dir="rtl">
       <PageHeader
         title="داشبورد"
-        description={`امروز ${new Date().toLocaleDateString("fa-IR", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}`}
+        description={lastUpdated ? `آخرین بروزرسانی: ${lastUpdated.toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" })}` : `امروز ${new Date().toLocaleDateString("fa-IR", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}`}
+        actions={
+          <button
+            type="button"
+            onClick={() => loadDashboard({ silent: true })}
+            disabled={refreshing}
+            className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground shadow-sm transition-all hover:shadow-md disabled:opacity-60"
+          >
+            <RefreshCwIcon className={cn("h-4 w-4", refreshing && "animate-spin")} />
+            {refreshing ? "در حال بروزرسانی..." : "بروزرسانی دیتا"}
+          </button>
+        }
       />
 
       <div className="p-6 space-y-6">
+
+        <div className="rounded-3xl border border-primary/15 bg-gradient-to-br from-primary/10 via-violet-500/5 to-transparent p-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
+                <ActivityIcon className="h-3.5 w-3.5" />
+                نمای زنده عملکرد پلتفرم
+              </div>
+              <h2 className="text-2xl font-black text-foreground">وضعیت امروز رکت‌زون</h2>
+              <p className="mt-1 text-sm text-muted-foreground">رزروها، درآمد، کاربران و ظرفیت عملیاتی را یکجا ببین.</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3 lg:w-[520px]">
+              <InsightCard label="نرخ تایید رزرو" value={`${approvalRate}٪`} sub={`${fmt(s.approvedBookings)} از ${fmt(s.totalBookings)} رزرو`} tone="emerald" />
+              <InsightCard label="در انتظار اقدام" value={`${fmt(s.pendingBookings)}`} sub={`${pendingRate}٪ از کل رزروها`} tone="amber" />
+              <InsightCard label="شلوغ‌ترین ساعت" value={busiestHour?.count ? busiestHour.hour : "—"} sub={busiestHour?.count ? `${fmt(busiestHour.count)} رزرو` : "داده کافی نیست"} tone="blue" />
+              <InsightCard label="زمین محبوب" value={topCourt?.name ?? "—"} sub={topCourt ? `${fmt(topCourt.bookings)} رزرو تایید شده` : "داده کافی نیست"} tone="violet" />
+            </div>
+          </div>
+        </div>
 
         {/* ── stat cards ── */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -309,9 +367,7 @@ export default function DashboardPage() {
                   <XAxis dataKey="name" tick={{ fontSize: 10 }} stroke="var(--color-muted-foreground)" />
                   <YAxis tick={{ fontSize: 10 }} stroke="var(--color-muted-foreground)" />
                   <Tooltip content={<CustomTooltip />} />
-                  <Legend wrapperStyle={{ fontSize: 11 }} />
                   <Bar dataKey="رزرو" fill="#2B0FD9" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="درآمد (هزار)" fill="#10B981" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
@@ -339,9 +395,8 @@ export default function DashboardPage() {
           </ChartCard>
         </div>
 
-        {/* ── recent bookings ── */}
         {recentBookings.length > 0 && (
-          <ChartCard title="آخرین رزروها" subtitle="۵ رزرو اخیر باشگاه">
+          <ChartCard title="آخرین رزروها" subtitle="۵ رزرو اخیر همین اکانت">
             <div className="space-y-2">
               {recentBookings.map((b, i) => {
                 const cfg = STATUS_MAP[b.status] ?? STATUS_MAP.pending;

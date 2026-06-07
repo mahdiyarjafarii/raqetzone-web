@@ -5,8 +5,14 @@ import {
   CoinsIcon, StarIcon, XIcon, DownloadIcon,
   LockIcon, PlayIcon, FlagIcon, ChevronRightIcon,
   ChevronLeftIcon, CheckIcon, GiftIcon, ShieldCheckIcon,
-  ZapIcon, Trash2Icon,
+  ZapIcon, Trash2Icon, ClockIcon, PencilIcon,
 } from "lucide-react";
+import toast from "react-hot-toast";
+import apiClient from "@/lib/apiClient";
+import PageHeader from "@/components/PageHeader";
+import Button from "@/components/ui/Button";
+import Modal from "@/components/ui/Modal";
+import { cn } from "@/lib/utils";
 
 const ADMIN_BASE = import.meta.env.VITE_API_URL?.replace("/api", "") ?? "http://localhost:3000";
 
@@ -34,15 +40,6 @@ function UserAvatar({ image, name, className, fallbackClassName }) {
     </div>
   );
 }
-import toast from "react-hot-toast";
-import apiClient from "@/lib/apiClient";
-import PageHeader from "@/components/PageHeader";
-import Badge from "@/components/ui/Badge";
-import Button from "@/components/ui/Button";
-import Modal from "@/components/ui/Modal";
-import Input from "@/components/ui/Input";
-import PersianTimePicker from "@/components/PersianTimePicker";
-import { cn } from "@/lib/utils";
 
 const SPORT_ICONS = { padel:"🏓", tennis:"🎾", squash:"🟡", badminton:"🏸", "ping-pong":"🏓" };
 const SPORTS = [
@@ -67,7 +64,7 @@ const WIZARD_STEPS = [
 
 const emptyForm = {
   title:"", description:"", sportType:"padel",
-  isFree: true, entryFee:0, maxParticipants:16,
+  isFree: true, entryFee:"", maxParticipants:16,
   registrationDeadline:"", startDate:"", endDate:"",
   minLevel:1, prize:"", rules:"",
 };
@@ -92,7 +89,30 @@ function getDatePart(value) {
 }
 
 function getTimePart(value) {
-  return value?.split("T")[1] ?? "12:00";
+  return value?.split("T")[1]?.slice(0, 5) ?? "12:00";
+}
+
+function toFormDateTime(value) {
+  if (!value) return "";
+  return toLocalDateTimeValue(new Date(value));
+}
+
+function tournamentToForm(tournament) {
+  const entryFee = Number(tournament.entryFee ?? 0);
+  return {
+    title: tournament.title ?? "",
+    description: tournament.description ?? "",
+    sportType: tournament.sportType ?? "padel",
+    isFree: entryFee === 0,
+    entryFee: entryFee === 0 ? "" : String(entryFee),
+    maxParticipants: tournament.maxParticipants ?? 16,
+    registrationDeadline: toFormDateTime(tournament.registrationDeadline),
+    startDate: toFormDateTime(tournament.startDate),
+    endDate: toFormDateTime(tournament.endDate),
+    minLevel: tournament.minLevel ?? 1,
+    prize: tournament.prize ?? "",
+    rules: tournament.rules ?? "",
+  };
 }
 
 function buildDateOptions(daysAhead = 730) {
@@ -109,33 +129,187 @@ function buildDateOptions(daysAhead = 730) {
 }
 
 const persianDateOptions = buildDateOptions();
+const persianNumberFormat = new Intl.NumberFormat("fa-IR", { minimumIntegerDigits: 2 });
+const hourOptions = Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, "0"));
+const minuteOptions = Array.from({ length: 12 }, (_, index) => String(index * 5).padStart(2, "0"));
 
 function PersianDateTimeInput({ value, onChange }) {
+  const [open, setOpen] = useState(false);
+  const [pickerStep, setPickerStep] = useState("date");
   const datePart = getDatePart(value);
   const timePart = getTimePart(value);
+  const selectedDateLabel = persianDateOptions.find((option) => option.value === datePart)?.label;
+  const [hour = "12", minute = "00"] = timePart.split(":");
 
   function emit(nextDate, nextTime) {
     if (!nextDate) return;
     onChange(`${nextDate}T${nextTime}`);
   }
 
+  function handleDateSelect(nextDate) {
+    emit(nextDate, timePart);
+    setPickerStep("time");
+  }
+
   return (
-    <div className="grid grid-cols-[1fr_auto] gap-2">
-      <select
-        dir="rtl"
-        value={datePart}
-        onChange={(e) => emit(e.target.value, timePart)}
-        className={inputClass}
+    <div>
+      <button
+        type="button"
+        onClick={() => {
+          setPickerStep(datePart ? "time" : "date");
+          setOpen(true);
+        }}
+        className={cn(
+          "w-full rounded-2xl border bg-background px-4 py-3 text-right transition-all hover:border-violet-500/50 active:scale-[0.99]",
+          datePart ? "border-violet-500/40 shadow-lg shadow-violet-500/10" : "border-input"
+        )}
       >
-        <option value="">انتخاب تاریخ...</option>
-        {persianDateOptions.map((option) => (
-          <option key={option.value} value={option.value}>{option.label}</option>
-        ))}
-      </select>
-      <PersianTimePicker
-        value={timePart}
-        onChange={(nextTime) => emit(datePart, nextTime)}
-      />
+        <div className="flex items-center gap-3">
+          <div className="h-10 w-10 rounded-2xl bg-violet-500/10 text-violet-600 flex items-center justify-center shrink-0">
+            <CalendarIcon className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="mb-1 text-[11px] font-semibold text-muted-foreground">تاریخ و ساعت</p>
+            <p className={cn("truncate text-sm font-black", datePart ? "text-foreground" : "text-muted-foreground")}>
+              {datePart ? `${selectedDateLabel}، ساعت ${persianNumberFormat.format(Number(hour))}:${persianNumberFormat.format(Number(minute))}` : "انتخاب تاریخ و ساعت"}
+            </p>
+          </div>
+          <ChevronRightIcon className="h-5 w-5 text-muted-foreground rotate-180" />
+        </div>
+      </button>
+
+      <AnimatePresence>
+        {open && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setOpen(false)}
+              className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ opacity: 0, y: 24, scale: 0.98 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 24, scale: 0.98 }}
+              transition={{ type: "spring", damping: 26, stiffness: 320 }}
+              className="fixed left-1/2 top-1/2 z-[110] w-[min(92vw,520px)] max-h-[86vh] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-3xl border border-border bg-background shadow-2xl"
+            >
+              <div className="px-4 pt-4 pb-5 overflow-y-auto max-h-[86vh]">
+                <div className="mb-4 flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setOpen(false)}
+                    className="h-9 w-9 rounded-full bg-muted text-muted-foreground flex items-center justify-center hover:text-foreground"
+                  >
+                    <XIcon className="h-4 w-4" />
+                  </button>
+                  <div className="flex-1 text-right">
+                    <h3 className="text-base font-black text-foreground">انتخاب زمان تورنومنت</h3>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      {pickerStep === "date" ? "اول تاریخ را انتخاب کنید" : "حالا ساعت را مشخص کنید"}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 mb-4 rounded-2xl bg-muted/50 p-1">
+                  <button
+                    type="button"
+                    onClick={() => setPickerStep("date")}
+                    className={cn("py-2.5 rounded-xl text-xs font-bold transition-all", pickerStep === "date" ? "bg-background text-violet-600 shadow-sm" : "text-muted-foreground")}
+                  >
+                    ۱. تاریخ
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!datePart}
+                    onClick={() => setPickerStep("time")}
+                    className={cn("py-2.5 rounded-xl text-xs font-bold transition-all", pickerStep === "time" ? "bg-background text-violet-600 shadow-sm" : "text-muted-foreground", !datePart && "opacity-40")}
+                  >
+                    ۲. ساعت
+                  </button>
+                </div>
+
+                {pickerStep === "date" ? (
+                  <div className="space-y-2 max-h-[52vh] overflow-y-auto pr-1">
+                    {persianDateOptions.slice(0, 90).map((option) => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => handleDateSelect(option.value)}
+                        className={cn(
+                          "w-full flex items-center gap-3 rounded-2xl border-2 p-3 text-right transition-all",
+                          datePart === option.value ? "border-violet-500 bg-violet-500/10" : "border-border bg-muted/30 hover:border-violet-500/40"
+                        )}
+                      >
+                        <div className={cn("h-9 w-9 rounded-xl flex items-center justify-center shrink-0", datePart === option.value ? "bg-violet-600 text-white" : "bg-muted text-muted-foreground")}>
+                          {datePart === option.value ? <CheckIcon className="h-4 w-4" /> : <CalendarIcon className="h-4 w-4" />}
+                        </div>
+                        <span className="text-sm font-bold text-foreground">{option.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="space-y-5">
+                    <div className="rounded-3xl border border-violet-500/20 bg-violet-500/5 p-4 text-center">
+                      <p className="mb-1 text-xs text-muted-foreground">تاریخ انتخاب‌شده</p>
+                      <p className="text-sm font-black text-foreground">{selectedDateLabel}</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-muted-foreground">
+                          <ClockIcon className="h-3.5 w-3.5" />
+                          ساعت
+                        </div>
+                        <div className="grid max-h-52 grid-cols-3 gap-2 overflow-y-auto rounded-2xl bg-muted/30 p-2">
+                          {hourOptions.map((option) => (
+                            <button
+                              key={option}
+                              type="button"
+                              onClick={() => emit(datePart, `${option}:${minute}`)}
+                              className={cn("rounded-xl border py-2.5 text-sm font-black transition-all", hour === option ? "border-violet-600 bg-violet-600 text-white shadow-lg shadow-violet-500/20" : "border-border bg-background text-foreground hover:border-violet-500/40")}
+                            >
+                              {persianNumberFormat.format(Number(option))}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-muted-foreground">
+                          <ClockIcon className="h-3.5 w-3.5" />
+                          دقیقه
+                        </div>
+                        <div className="grid max-h-52 grid-cols-2 gap-2 overflow-y-auto rounded-2xl bg-muted/30 p-2">
+                          {minuteOptions.map((option) => (
+                            <button
+                              key={option}
+                              type="button"
+                              onClick={() => emit(datePart, `${hour}:${option}`)}
+                              className={cn("rounded-xl border py-2.5 text-sm font-black transition-all", minute === option ? "border-violet-600 bg-violet-600 text-white shadow-lg shadow-violet-500/20" : "border-border bg-background text-foreground hover:border-violet-500/40")}
+                            >
+                              {persianNumberFormat.format(Number(option))}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setOpen(false)}
+                      className="h-12 w-full rounded-2xl bg-violet-600 text-sm font-black text-white shadow-lg shadow-violet-500/25 transition-all active:scale-[0.98]"
+                    >
+                      تایید زمان
+                    </button>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -262,7 +436,7 @@ function WStep3({ form, setForm }) {
         <div className="grid grid-cols-2 gap-2">
           {[{v:true,l:"🎁 رایگان",a:"bg-emerald-600 border-emerald-600 text-white"},{v:false,l:"💰 پولی",a:"bg-violet-600 border-violet-600 text-white"}].map(({v,l,a}) => (
             <button key={String(v)} type="button"
-              onClick={() => setForm(p => ({...p, isFree:v}))}
+              onClick={() => setForm(p => ({...p, isFree:v, entryFee: v ? "" : p.entryFee}))}
               className={cn("py-3 rounded-2xl text-sm font-bold border-2 transition-all",
                 form.isFree === v ? a : "bg-muted border-border text-muted-foreground")}
             >{l}</button>
@@ -273,7 +447,7 @@ function WStep3({ form, setForm }) {
       {!form.isFree && (
         <WizardField label="مبلغ ورودیه (تومان) *">
           <input type="number" min={1000} step={1000} className={inputClass} placeholder="۵۰۰۰۰"
-            value={form.entryFee} onChange={e => setForm(p => ({...p, entryFee: Number(e.target.value)}))} />
+            value={form.entryFee} onChange={e => setForm(p => ({...p, entryFee: e.target.value}))} />
         </WizardField>
       )}
 
@@ -514,7 +688,7 @@ function DeleteModal({ tournament, onClose, onDeleted }) {
 
 // ─── Tournament Card ───────────────────────────────────────────────────────────
 
-function TournamentAdminCard({ tournament, onStatusChange, onViewParticipants, onDelete }) {
+function TournamentAdminCard({ tournament, onStatusChange, onViewParticipants, onEdit, onDelete }) {
   const [actionLoading, setActionLoading] = useState(null);
   const phase = tournament.phase ?? "registration";
   const phaseCfg = PHASE_CONFIG[phase] ?? PHASE_CONFIG.registration;
@@ -551,6 +725,13 @@ function TournamentAdminCard({ tournament, onStatusChange, onViewParticipants, o
               <span className={cn("w-1.5 h-1.5 rounded-full", phaseCfg.dot)} />
               {phaseCfg.label}
             </span>
+            <button
+              onClick={onEdit}
+              className="w-6 h-6 rounded-lg bg-violet-500/10 hover:bg-violet-500/20 flex items-center justify-center transition-colors"
+              title="ویرایش تورنومنت"
+            >
+              <PencilIcon className="w-3.5 h-3.5 text-violet-500" />
+            </button>
             <button
               onClick={onDelete}
               className="w-6 h-6 rounded-lg bg-red-500/10 hover:bg-red-500/20 flex items-center justify-center transition-colors"
@@ -641,6 +822,7 @@ export default function TournamentsPage() {
   const [tournaments, setTournaments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
+  const [editingTournament, setEditingTournament] = useState(null);
   const [wizardStep, setWizardStep] = useState(0);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
@@ -658,6 +840,14 @@ export default function TournamentsPage() {
 
   function openCreate() {
     setForm(emptyForm);
+    setEditingTournament(null);
+    setWizardStep(0);
+    setCreateOpen(true);
+  }
+
+  function openEdit(tournament) {
+    setForm(tournamentToForm(tournament));
+    setEditingTournament(tournament);
     setWizardStep(0);
     setCreateOpen(true);
   }
@@ -685,18 +875,22 @@ export default function TournamentsPage() {
     if (wizardStep < WIZARD_STEPS.length - 1) setWizardStep(s => s + 1);
   }
 
-  const handleCreate = async () => {
+  const handleSubmit = async () => {
     setSaving(true);
-    const { ok, data } = await apiClient.post("/tournaments", {
+    const payload = {
       ...form,
       entryFee: form.isFree ? 0 : Number(form.entryFee),
       maxParticipants: Number(form.maxParticipants),
       minLevel: Number(form.minLevel),
-    });
+    };
+    const { ok, data } = editingTournament
+      ? await apiClient.patch(`/tournaments/${editingTournament.id}`, payload)
+      : await apiClient.post("/tournaments", payload);
     setSaving(false);
     if (!ok) return toast.error(data?.message ?? "خطا");
-    toast.success("تورنومنت ایجاد شد 🏆");
+    toast.success(editingTournament ? "تورنومنت ویرایش شد" : "تورنومنت ایجاد شد 🏆");
     setCreateOpen(false);
+    setEditingTournament(null);
     fetchTournaments();
   };
 
@@ -754,6 +948,7 @@ export default function TournamentsPage() {
               tournament={t}
               onStatusChange={fetchTournaments}
               onViewParticipants={() => setParticipantsModal(t)}
+              onEdit={() => openEdit(t)}
               onDelete={() => setDeleteModal(t)}
             />
           ))
@@ -780,7 +975,10 @@ export default function TournamentsPage() {
       {/* Create modal — multi-step wizard */}
       <Modal
         open={createOpen}
-        onClose={() => setCreateOpen(false)}
+        onClose={() => {
+          setCreateOpen(false);
+          setEditingTournament(null);
+        }}
         title={null}
         size="lg"
       >
@@ -788,7 +986,7 @@ export default function TournamentsPage() {
           {/* Wizard header */}
           <div className="flex items-center justify-between mb-1">
             <div>
-              <h2 className="font-black text-lg text-foreground">ایجاد تورنومنت</h2>
+              <h2 className="font-black text-lg text-foreground">{editingTournament ? "ویرایش تورنومنت" : "ایجاد تورنومنت"}</h2>
               <p className="text-xs text-muted-foreground">مرحله {wizardStep + 1} از {WIZARD_STEPS.length}</p>
             </div>
           </div>
@@ -838,12 +1036,12 @@ export default function TournamentsPage() {
             )}
             <button
               type="button"
-              onClick={isLast ? handleCreate : nextWizardStep}
+              onClick={isLast ? handleSubmit : nextWizardStep}
               disabled={saving}
               className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-sm font-bold shadow-md shadow-violet-500/20 disabled:opacity-60 transition-all"
             >
-              {saving ? "در حال ایجاد..." : isLast ? (
-                <><TrophyIcon className="w-4 h-4" /> ایجاد تورنومنت</>
+              {saving ? (editingTournament ? "در حال ذخیره..." : "در حال ایجاد...") : isLast ? (
+                <><TrophyIcon className="w-4 h-4" /> {editingTournament ? "ذخیره تغییرات" : "ایجاد تورنومنت"}</>
               ) : (
                 <>بعدی <ChevronLeftIcon className="w-4 h-4" /></>
               )}

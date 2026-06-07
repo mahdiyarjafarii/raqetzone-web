@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { MapPinIcon, CalendarIcon, UsersIcon, ChevronRightIcon, ClockIcon } from "lucide-react";
+import { MapPinIcon, CalendarIcon, UsersIcon, ChevronRightIcon, ClockIcon, UserIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import UserAvatar from "@/components/ui/UserAvatar";
 
@@ -75,6 +75,7 @@ export default function MatchCard({ match, onClick, index = 0 }) {
   const sportIcon = SPORT_ICONS[match.sportType] ?? "🏅";
   const accentBorder = SPORT_ACCENT[match.sportType] ?? "border-l-primary";
   const countdown = useCountdown(match.scheduledAt);
+  const creator = match.creator ?? match.createdByUser ?? match.owner ?? null;
 
   return (
     <motion.div
@@ -122,6 +123,22 @@ export default function MatchCard({ match, onClick, index = 0 }) {
 
           {/* Info */}
           <div className="space-y-1.5 mb-4">
+            {creator?.name && (
+              <div className="flex items-center gap-2 text-muted-foreground text-xs">
+                {creator.image ? (
+                  <UserAvatar
+                    image={creator.image}
+                    name={creator.name}
+                    className="h-5 w-5 rounded-full text-[9px] text-white"
+                    fallbackClassName="h-5 w-5 rounded-full bg-primary text-primary-foreground text-[9px]"
+                  />
+                ) : (
+                  <UserIcon className="w-3.5 h-3.5 shrink-0" />
+                )}
+                <span className="shrink-0">ساخته‌شده توسط:</span>
+                <span className="font-bold text-foreground truncate">{creator.name}</span>
+              </div>
+            )}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-muted-foreground text-xs">
                 <CalendarIcon className="w-3.5 h-3.5 shrink-0" />
