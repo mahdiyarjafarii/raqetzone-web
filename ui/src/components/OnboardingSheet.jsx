@@ -5,7 +5,7 @@ import { BottomSheet } from "react-spring-bottom-sheet";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAtom } from "jotai";
 import toast from "react-hot-toast";
-import { CameraIcon, UserCircleIcon } from "lucide-react";
+import { CameraIcon, MapPinIcon, UserCircleIcon } from "lucide-react";
 
 import { showOnboardingSheetAtom, currentUserAtom } from "@/config/state";
 import apiClient from "@/lib/apiClient";
@@ -35,7 +35,7 @@ const WEEKLY_HOURS = [
   { value: "6",  label: "بیشتر از ۵ ساعت در هفته", emoji: "�" },
 ];
 
-// 0=welcome, 1=name, 2=photo, 3=sport, 4=level, 5=duration
+// 0=welcome, 1=profile, 2=photo, 3=sport, 4=level, 5=duration
 const TOTAL_STEPS = 6;
 const MAX_ONBOARDING_IMAGE_SIZE_MB = 5;
 const MAX_ONBOARDING_IMAGE_SIZE_BYTES = MAX_ONBOARDING_IMAGE_SIZE_MB * 1024 * 1024;
@@ -110,23 +110,44 @@ function StepWelcome() {
   );
 }
 
-function StepName({ value, onChange }) {
+function StepProfileInfo({ firstName, lastName, city, onFirstNameChange, onLastNameChange, onCityChange }) {
   return (
     <div className="space-y-6 text-center">
       <div>
         <div className="text-5xl mb-4">👋</div>
-        <h2 className="text-xl font-black text-foreground">اسمت چیه؟</h2>
-        <p className="text-muted-foreground text-sm mt-2">با چه اسمی صدات کنیم؟</p>
+        <h2 className="text-xl font-black text-foreground">خودت رو معرفی کن</h2>
+        <p className="text-muted-foreground text-sm mt-2">نام، نام خانوادگی و شهرت رو وارد کن</p>
       </div>
-      <input
-        autoFocus
-        type="text"
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        placeholder="اسم یا نام مستعار"
-        className="w-full bg-muted border-0 rounded-2xl px-4 py-4 text-center text-lg font-bold text-foreground placeholder:text-muted-foreground placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
-        maxLength={40}
-      />
+      <div className="space-y-3">
+        <input
+          autoFocus
+          type="text"
+          value={firstName}
+          onChange={e => onFirstNameChange(e.target.value)}
+          placeholder="نام"
+          className="w-full bg-muted border-0 rounded-2xl px-4 py-4 text-center text-lg font-bold text-foreground placeholder:text-muted-foreground placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+          maxLength={40}
+        />
+        <input
+          type="text"
+          value={lastName}
+          onChange={e => onLastNameChange(e.target.value)}
+          placeholder="نام خانوادگی"
+          className="w-full bg-muted border-0 rounded-2xl px-4 py-4 text-center text-lg font-bold text-foreground placeholder:text-muted-foreground placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+          maxLength={60}
+        />
+        <div className="relative">
+          <MapPinIcon className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
+          <input
+            type="text"
+            value={city}
+            onChange={e => onCityChange(e.target.value)}
+            placeholder="شهر، مثل تهران"
+            className="w-full bg-muted border-0 rounded-2xl px-4 py-4 pr-11 text-center text-lg font-bold text-foreground placeholder:text-muted-foreground placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+            maxLength={60}
+          />
+        </div>
+      </div>
     </div>
   );
 }
@@ -332,7 +353,9 @@ export default function OnboardingSheet() {
   const [, setCurrentUser] = useAtom(currentUserAtom);
 
   const [step, setStep] = useState(0);
-  const [name, setName] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [city, setCity] = useState("");
   const [photoPreview, setPhotoPreview] = useState(null);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [sports, setSports] = useState(["padel"]);
@@ -343,7 +366,7 @@ export default function OnboardingSheet() {
   const isLastStep = step === TOTAL_STEPS - 1;
 
   const canNext = () => {
-    if (step === 1) return name.trim().length >= 2;
+    if (step === 1) return firstName.trim().length >= 2 && lastName.trim().length >= 2 && city.trim().length >= 2;
     if (step === 2) return !!photoPreview && !photoUploading;
     if (step === 3) return sports.length > 0;
     return true;
@@ -421,8 +444,14 @@ export default function OnboardingSheet() {
     if (!isLastStep) { setStep(s => s + 1); return; }
 
     setSaving(true);
+    const trimmedFirstName = firstName.trim();
+    const trimmedLastName = lastName.trim();
+    const displayName = `${trimmedFirstName} ${trimmedLastName}`.trim();
     const { ok, data } = await apiClient.patch("/users/me", {
-      name: name.trim(),
+      name: displayName,
+      firstName: trimmedFirstName,
+      lastName: trimmedLastName,
+      city: city.trim(),
       favoriteSport: sports[0],
       skillLevel: level,
     });
@@ -430,7 +459,7 @@ export default function OnboardingSheet() {
     if (!ok) return toast.error("خطا در ذخیره اطلاعات");
     if (data?.user) setCurrentUser(data.user);
     setOpen(false);
-    toast.success(`خوش اومدی ${name.trim()} 🎉`);
+    toast.success(`خوش اومدی ${trimmedFirstName} 🎉`);
   };
 
   const btnLabel = () => {
@@ -460,7 +489,16 @@ export default function OnboardingSheet() {
             transition={{ duration: 0.22 }}
           >
             {step === 0 && <StepWelcome />}
-            {step === 1 && <StepName value={name} onChange={setName} />}
+            {step === 1 && (
+              <StepProfileInfo
+                firstName={firstName}
+                lastName={lastName}
+                city={city}
+                onFirstNameChange={setFirstName}
+                onLastNameChange={setLastName}
+                onCityChange={setCity}
+              />
+            )}
             {step === 2 && (
               <StepPhoto
                 preview={photoPreview}

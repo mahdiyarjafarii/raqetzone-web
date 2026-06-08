@@ -268,10 +268,40 @@ export const createMatchController = async (req, res) => {
       .where(eq(matches.id, match.id))
       .returning();
 
+    // Auto-join creator to team A
+    await db.insert(matchParticipants).values({ matchId: match.id, userId, team: "A" });
+
     const enriched = await enrichMatch(withToken);
     return res.status(201).json({ match: enriched });
   } catch (error) {
     console.error("createMatch error:", error);
+    return res.status(500).json({ message: "خطای سرور" });
+  }
+};
+
+// ─── Delete Match (creator only) ─────────────────────────────────────────────
+
+export const deleteMatchController = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const [match] = await db
+      .select()
+      .from(matches)
+      .where(eq(matches.id, id))
+      .limit(1);
+
+    if (!match) return res.status(404).json({ message: "مسابقه یافت نشد" });
+    if (match.createdBy !== userId) return res.status(403).json({ message: "فقط سازنده می‌تواند بازی را حذف کند" });
+    if (match.status === "completed") return res.status(400).json({ message: "بازی‌های تمام‌شده قابل حذف نیستند" });
+
+    await db.delete(matchParticipants).where(eq(matchParticipants.matchId, id));
+    await db.delete(matches).where(eq(matches.id, id));
+
+    return res.status(200).json({ message: "بازی با موفقیت حذف شد" });
+  } catch (error) {
+    console.error("deleteMatch error:", error);
     return res.status(500).json({ message: "خطای سرور" });
   }
 };

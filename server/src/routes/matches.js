@@ -7,6 +7,7 @@ import {
   joinMatchController,
   leaveMatchController,
   createMatchController,
+  deleteMatchController,
   certifyMatchController,
   emergencySubController,
   rateMatchController,
@@ -20,6 +21,7 @@ const router = Router();
 router.get("/matches", authMiddleware, getMatchesController);
 router.get("/matches/:id", authMiddleware, getMatchByIdController);
 router.post("/matches", authMiddleware, createMatchController);
+router.delete("/matches/:id", authMiddleware, deleteMatchController);
 router.post("/matches/:id/join", authMiddleware, joinMatchController);
 router.delete("/matches/:id/leave", authMiddleware, leaveMatchController);
 

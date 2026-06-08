@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import React, { useState, useEffect } from "react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { useAtomValue } from "jotai";
 import { showOnboardingSheetAtom } from "@/config/state";
 import { motion } from "framer-motion";
@@ -74,14 +74,17 @@ function CourtRow({ court, index, onBook }) {
 export default function ClubDetailPage() {
   const { clubId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [liked, setLiked] = useState(false);
   const [bookingOpen, setBookingOpen] = useState(false);
   const onboarding = useAtomValue(showOnboardingSheetAtom);
   const [bookingCourt, setBookingCourt] = useState(null);
+  const [bookingDate, setBookingDate] = useState(null);
   const [reviewStats, setReviewStats] = useState({ average: 0, total: 0 });
 
-  const openBooking = (court = null) => {
+  const openBooking = (court = null, date = null) => {
     setBookingCourt(court);
+    setBookingDate(date);
     setBookingOpen(true);
   };
 
@@ -107,6 +110,18 @@ export default function ClubDetailPage() {
   const { club: apiClub, loading: apiLoading } = useClub(clubId);
   const mockClub = getClubById(clubId);
   const club = apiClub ?? mockClub;
+
+  // Auto-open the booking sheet when arriving from a flash deal — pre-select the
+  // deal's court and day, then clear the intent so refresh/back doesn't re-open.
+  const bookingIntent = location.state?.openBooking ? location.state : null;
+  useEffect(() => {
+    if (!bookingIntent || !club) return;
+    const court = bookingIntent.courtId
+      ? club.courts?.find((c) => c.id === bookingIntent.courtId) ?? null
+      : null;
+    openBooking(court, bookingIntent.slotDate ?? null);
+    navigate(`/clubs/${clubId}`, { replace: true, state: null });
+  }, [bookingIntent, club, clubId, navigate]);
 
   if (apiLoading && !mockClub) {
     return (
@@ -286,9 +301,10 @@ export default function ClubDetailPage() {
       {/* ── Booking Sheet ── */}
       <ClubBookingSheet
         open={bookingOpen}
-        onClose={() => { setBookingOpen(false); setBookingCourt(null); }}
+        onClose={() => { setBookingOpen(false); setBookingCourt(null); setBookingDate(null); }}
         club={club}
         initialCourt={bookingCourt}
+        initialDate={bookingDate}
       />
     </div>
   );

@@ -35,6 +35,12 @@ function generateSlots(openTime, closeTime, slotDuration) {
   return slots;
 }
 
+function getSlotDurationHours(slot) {
+  const [sh, sm] = slot.start.split(":").map(Number);
+  const [eh, em] = slot.end.split(":").map(Number);
+  return ((eh * 60 + em) - (sh * 60 + sm)) / 60;
+}
+
 const today = new Date().toISOString().split("T")[0];
 const DAYS = Array.from({ length: 7 }, (_, i) => addDays(today, i));
 
@@ -45,7 +51,7 @@ const STATUS_CONFIG = {
 };
 
 // Edit panel shown below the grid
-function SlotEditPanel({ slot, override, courtPrice, onSave, onClose }) {
+function SlotEditPanel({ slot, override, booking, courtPrice, slotDurationHours, onSave, onClose }) {
   const current = override ?? { status: "available", price: null, discountPercent: 0 };
   const [status, setStatus] = useState(current.status);
   const [price, setPrice] = useState(current.price ?? "");
@@ -59,7 +65,8 @@ function SlotEditPanel({ slot, override, courtPrice, onSave, onClose }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slot?.start, override]);
 
-  const effectivePrice = price !== "" ? Number(price) : courtPrice;
+  const effectiveHourlyPrice = price !== "" ? Number(price) : courtPrice;
+  const effectivePrice = Math.round(effectiveHourlyPrice * slotDurationHours);
   const finalPrice = discount > 0 ? Math.round(effectivePrice * (1 - discount / 100)) : effectivePrice;
 
   const handleSave = async () => {
@@ -89,6 +96,24 @@ function SlotEditPanel({ slot, override, courtPrice, onSave, onClose }) {
       </div>
 
       <div className="p-4 space-y-4">
+        {/* Booking customer info */}
+        {booking && (
+          <div className="rounded-xl bg-orange-500/8 border border-orange-300/40 px-4 py-3 space-y-1.5">
+            <p className="text-xs font-bold text-orange-700 dark:text-orange-400 flex items-center gap-1.5">
+              <UserCheckIcon className="w-3.5 h-3.5" />
+              رزرو شده توسط:
+            </p>
+            <p className="text-sm font-bold text-foreground">{booking.userName || "—"}</p>
+            <p className="text-xs text-muted-foreground" dir="ltr">{booking.userPhone}</p>
+            {booking.trackingCode && (
+              <p className="text-[10px] text-muted-foreground">کد رهگیری: <span className="font-mono font-semibold">{booking.trackingCode}</span></p>
+            )}
+            {booking.totalPrice > 0 && (
+              <p className="text-[10px] text-muted-foreground">مبلغ: {fmt(booking.totalPrice)} تومان</p>
+            )}
+          </div>
+        )}
+
         {/* Status */}
         <div>
           <p className="text-xs font-medium text-muted-foreground mb-2">وضعیت سانس</p>
@@ -116,7 +141,7 @@ function SlotEditPanel({ slot, override, courtPrice, onSave, onClose }) {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-xs font-medium text-muted-foreground block mb-1.5">
-              قیمت (تومان)
+              قیمت/ساعت (تومان)
               <span className="font-normal mr-1 text-[10px]">خالی = پیش‌فرض</span>
             </label>
             <input
@@ -167,6 +192,7 @@ function SlotEditPanel({ slot, override, courtPrice, onSave, onClose }) {
 export default function CourtSlotsModal({ open, onClose, court }) {
   const [selectedDay, setSelectedDay] = useState(today);
   const [overridesMap, setOverridesMap] = useState({}); // "date|startTime" -> override obj
+  const [bookingsMap, setBookingsMap] = useState({}); // "date|startTime" -> booking+user obj
   const [loading, setLoading] = useState(false);
   const [activeSlot, setActiveSlot] = useState(null); // slot being edited
 
@@ -191,6 +217,7 @@ export default function CourtSlotsModal({ open, onClose, court }) {
         map[`${o.date}|${o.startTime}`] = o;
       });
       setOverridesMap(map);
+      setBookingsMap(data.bookingsBySlot ?? {});
     }
     setLoading(false);
   }, [court]);
@@ -268,13 +295,17 @@ export default function CourtSlotsModal({ open, onClose, court }) {
             {slots.map((slot) => {
               const key = `${selectedDay}|${slot.start}`;
               const override = overridesMap[key];
+              const booking = bookingsMap[key];
               const status = override?.status ?? "available";
               const cfg = STATUS_CONFIG[status];
               const Icon = cfg.icon;
-              const displayPrice = override?.price ?? courtPrice;
+              const slotDurationHours = getSlotDurationHours(slot);
+              const displayHourlyPrice = override?.price ?? courtPrice;
+              const displayPrice = Math.round(displayHourlyPrice * slotDurationHours);
               const discount = override?.discountPercent ?? 0;
               const finalPrice = discount > 0 ? Math.round(displayPrice * (1 - discount / 100)) : displayPrice;
               const isActive = activeSlot?.start === slot.start;
+              const isBookedSlot = status === "booked" && booking;
 
               return (
                 <motion.button
@@ -282,20 +313,25 @@ export default function CourtSlotsModal({ open, onClose, court }) {
                   whileTap={{ scale: 0.95 }}
                   onClick={() => setActiveSlot(isActive ? null : slot)}
                   className={cn(
-                    "w-full flex flex-col items-center justify-center h-16 rounded-xl border text-xs font-medium transition-all",
+                    "w-full flex flex-col items-center justify-center rounded-xl border text-xs font-medium transition-all overflow-hidden",
+                    isBookedSlot ? "h-auto py-2 px-1 min-h-[4rem]" : "h-16",
                     cfg.bg,
                     isActive && "ring-2 ring-primary ring-offset-1 scale-105"
                   )}
                 >
-                  <Icon className="w-3 h-3 mb-0.5" />
+                  <Icon className="w-3 h-3 mb-0.5 shrink-0" />
                   <span className="font-bold">{slot.start}</span>
-                  {discount > 0 ? (
-                    <span className="text-[9px] line-through opacity-50">{fmt(displayPrice)}</span>
+                  {isBookedSlot ? (
+                    <span className="text-[9px] font-semibold truncate max-w-full px-1 mt-0.5 leading-tight text-center opacity-80">
+                      {booking.userName || booking.userPhone}
+                    </span>
+                  ) : discount > 0 ? (
+                    <>
+                      <span className="text-[9px] line-through opacity-50">{fmt(displayPrice)}</span>
+                      <span className="text-[9px] text-primary font-bold">{fmt(finalPrice)}ت</span>
+                    </>
                   ) : (
                     <span className="text-[9px] opacity-70">{fmt(finalPrice)}ت</span>
-                  )}
-                  {discount > 0 && (
-                    <span className="text-[9px] text-primary font-bold">{fmt(finalPrice)}ت</span>
                   )}
                 </motion.button>
               );
@@ -307,7 +343,9 @@ export default function CourtSlotsModal({ open, onClose, court }) {
               <SlotEditPanel
                 slot={activeSlot}
                 override={overridesMap[`${selectedDay}|${activeSlot.start}`]}
+                booking={bookingsMap[`${selectedDay}|${activeSlot.start}`]}
                 courtPrice={courtPrice}
+                slotDurationHours={getSlotDurationHours(activeSlot)}
                 onSave={(vals) => handleSave(activeSlot, vals)}
                 onClose={() => setActiveSlot(null)}
               />

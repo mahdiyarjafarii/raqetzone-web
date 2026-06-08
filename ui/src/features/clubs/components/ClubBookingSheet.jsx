@@ -48,6 +48,12 @@ function addDays(dateStr, n) {
   return toLocalDateValue(d);
 }
 
+function getSlotDurationHours(slot) {
+  const [sh, sm] = slot.start.split(":").map(Number);
+  const [eh, em] = slot.end.split(":").map(Number);
+  return ((eh * 60 + em) - (sh * 60 + sm)) / 60;
+}
+
 const WEEKDAY_FA = ["یک", "دو", "سه", "چهار", "پنج", "جمعه", "شنبه"];
 function formatDayShort(dateStr) {
   const d = parseLocalDate(dateStr);
@@ -220,7 +226,12 @@ function DateSlotsStep({ court, selectedDate, onDateChange, slots, slotsLoading,
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {slots.map((slot, i) => {
+            {slots.filter(slot => {
+              if (selectedDate !== today) return true;
+              const nowMins = new Date().getHours() * 60 + new Date().getMinutes();
+              const [sh, sm] = slot.start.split(":").map(Number);
+              return (sh * 60 + sm) > nowMins;
+            }).map((slot, i) => {
               const isSelected = selectedSlot?.start === slot.start;
               const isBooked = slot.isBooked;
               const isBlocked = slot.isBlocked;
@@ -228,6 +239,9 @@ function DateSlotsStep({ court, selectedDate, onDateChange, slots, slotsLoading,
               const isPending = slot.isPending;
               const hasDiscount = slot.discount > 0 && slot.originalPrice;
               const unavailable = isBooked || isPending;
+              const durationHours = getSlotDurationHours(slot);
+              const displayPrice = Math.round(slot.price * durationHours);
+              const displayOriginalPrice = slot.originalPrice ? Math.round(slot.originalPrice * durationHours) : null;
 
               let label = `تا ${slot.end}`;
               if (isBlocked) label = "بسته";
@@ -271,8 +285,8 @@ function DateSlotsStep({ court, selectedDate, onDateChange, slots, slotsLoading,
                     <span className={cn("mt-1 text-[10px] font-black leading-none",
                       isSelected ? "text-primary-foreground/80" : hasDiscount ? "text-emerald-600" : "text-primary"
                     )}>
-                      {hasDiscount && <span className="line-through opacity-50 ml-1">{formatPrice(slot.originalPrice)}</span>}
-                      {formatPrice(slot.price)}ت
+                      {hasDiscount && <span className="line-through opacity-50 ml-1">{formatPrice(displayOriginalPrice)}</span>}
+                      {formatPrice(displayPrice)}ت
                     </span>
                   )}
                 </motion.button>
@@ -634,7 +648,7 @@ const STEP_TITLES = {
   success: "رزرو ثبت شد",
 };
 
-export default function ClubBookingSheet({ open, onClose, club, initialCourt = null }) {
+export default function ClubBookingSheet({ open, onClose, club, initialCourt = null, initialDate = null }) {
   const navigate = useNavigate();
   const today = toLocalDateValue(new Date());
 
@@ -655,7 +669,7 @@ export default function ClubBookingSheet({ open, onClose, club, initialCourt = n
   }, []);
 
   const reset = useCallback(() => {
-    setSelectedDate(today);
+    setSelectedDate(initialDate ?? today);
     setSelectedSlot(null);
     setSlots([]);
     setCreatedBooking(null);
@@ -669,7 +683,7 @@ export default function ClubBookingSheet({ open, onClose, club, initialCourt = n
       setSelectedCourt(null);
       setStep("court");
     }
-  }, [courts, initialCourt, today]);
+  }, [courts, initialCourt, initialDate, today]);
 
   // Init on open
   useEffect(() => {
@@ -677,7 +691,7 @@ export default function ClubBookingSheet({ open, onClose, club, initialCourt = n
     const court = initialCourt ?? (courts.length === 1 ? courts[0] : null);
     setSelectedSlot(null);
     setCreatedBooking(null);
-    setSelectedDate(today);
+    setSelectedDate(initialDate ?? today);
     if (court) {
       setSelectedCourt(court);
       setStep("booking");

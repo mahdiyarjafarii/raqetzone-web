@@ -1,6 +1,7 @@
 import { eq, and, gte, lte, desc, asc, sql, count } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { bookings, courts, users, matches, matchParticipants, notifications, deals } from "../db/schema.js";
+import { formatBookingDateTimeFa } from "../utils/bookingTime.js";
 
 function subtractDays(n) {
   const d = new Date();
@@ -209,14 +210,15 @@ export const approveBookingController = async (req, res) => {
 
     const { sendNotification } = await import("../utils/sendNotification.js");
     const trackingCode = booking.trackingCode;
+    const bookingDateTime = formatBookingDateTimeFa(booking);
     sendNotification(booking.userId, {
       title: "رزرو شما تأیید شد ✅",
-      message: `رزرو زمین برای ${booking.date} ساعت ${booking.startTime} تأیید شد.${trackingCode ? ` کد پیگیری: ${trackingCode}` : ""}`,
+      message: `رزرو زمین برای ${bookingDateTime} تأیید شد.${trackingCode ? ` کد پیگیری: ${trackingCode}` : ""}`,
       type: "BOOKING", isPinned: true,
       metadata: { bookingId: id, trackingCode, ctaHref: trackingCode ? `/booking/track/${trackingCode}` : "/mybooking", ctaLabel: "مشاهده رزرو" },
       smsText: trackingCode
-        ? `پلتفرم رکت‌زون: رزرو شما تایید شد. کد پیگیری: ${trackingCode}. به امید دیدار مجدد!`
-        : `پلتفرم رکت‌زون: رزرو شما برای ${booking.date} ساعت ${booking.startTime} تایید شد. به امید دیدار مجدد!`,
+        ? `پلتفرم رکت‌زون: رزرو شما برای ${bookingDateTime} تایید شد. کد پیگیری: ${trackingCode}. به امید دیدار مجدد!`
+        : `پلتفرم رکت‌زون: رزرو شما برای ${bookingDateTime} تایید شد. به امید دیدار مجدد!`,
     }).catch(() => {});
 
     return res.status(200).json({ booking: updated });
@@ -237,12 +239,13 @@ export const rejectBookingController = async (req, res) => {
     const [updated] = await db.update(bookings).set({ status: "rejected", adminNote: adminNote ?? null, updatedAt: new Date() }).where(eq(bookings.id, id)).returning();
 
     const { sendNotification } = await import("../utils/sendNotification.js");
+    const bookingDateTime = formatBookingDateTimeFa(booking);
     sendNotification(booking.userId, {
       title: "رزرو شما رد شد ❌",
-      message: `متأسفانه رزرو ${booking.date} ساعت ${booking.startTime} رد شد.${adminNote ? ` دلیل: ${adminNote}` : ""}`,
+      message: `متأسفانه رزرو ${bookingDateTime} رد شد.${adminNote ? ` دلیل: ${adminNote}` : ""}`,
       type: "BOOKING",
       metadata: { bookingId: id, ctaHref: "/mybooking", ctaLabel: "مشاهده رزروها" },
-      smsText: `پلتفرم رکت‌زون: رزرو شما برای ${booking.date} ساعت ${booking.startTime} رد شد.${adminNote ? ` دلیل: ${adminNote}` : ""}`,
+      smsText: `پلتفرم رکت‌زون: رزرو شما برای ${bookingDateTime} رد شد.${adminNote ? ` دلیل: ${adminNote}` : ""}`,
     }).catch(() => {});
 
     return res.status(200).json({ booking: updated });

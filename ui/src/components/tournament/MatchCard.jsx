@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { MapPinIcon, CalendarIcon, UsersIcon, ChevronRightIcon, ClockIcon, UserIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import UserAvatar from "@/components/ui/UserAvatar";
+import UserProfileSheet from "@/components/ui/UserProfileSheet";
 
 function useCountdown(targetDate) {
   const [label, setLabel] = useState("");
@@ -76,8 +77,10 @@ export default function MatchCard({ match, onClick, index = 0 }) {
   const accentBorder = SPORT_ACCENT[match.sportType] ?? "border-l-primary";
   const countdown = useCountdown(match.scheduledAt);
   const creator = match.creator ?? match.createdByUser ?? match.owner ?? null;
+  const [viewingCreator, setViewingCreator] = useState(null);
 
   return (
+  <>
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
@@ -124,20 +127,26 @@ export default function MatchCard({ match, onClick, index = 0 }) {
           {/* Info */}
           <div className="space-y-1.5 mb-4">
             {creator?.name && (
-              <div className="flex items-center gap-2 text-muted-foreground text-xs">
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setViewingCreator(creator); }}
+                className="flex items-center gap-2 text-xs w-full text-right active:opacity-70 transition-opacity"
+              >
                 {creator.image ? (
                   <UserAvatar
                     image={creator.image}
                     name={creator.name}
-                    className="h-5 w-5 rounded-full text-[9px] text-white"
-                    fallbackClassName="h-5 w-5 rounded-full bg-primary text-primary-foreground text-[9px]"
+                    className="h-5 w-5 rounded-full text-[9px] text-white shrink-0"
+                    fallbackClassName="h-5 w-5 rounded-full bg-primary text-primary-foreground text-[9px] shrink-0"
                   />
                 ) : (
-                  <UserIcon className="w-3.5 h-3.5 shrink-0" />
+                  <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center shrink-0">
+                    <UserIcon className="w-3 h-3 text-muted-foreground" />
+                  </div>
                 )}
-                <span className="shrink-0">ساخته‌شده توسط:</span>
+                <span className="text-muted-foreground shrink-0">سازنده:</span>
                 <span className="font-bold text-foreground truncate">{creator.name}</span>
-              </div>
+              </button>
             )}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-muted-foreground text-xs">
@@ -222,5 +231,14 @@ export default function MatchCard({ match, onClick, index = 0 }) {
         </div>
       </div>
     </motion.div>
+    {viewingCreator && (
+      <UserProfileSheet
+        userId={viewingCreator.id}
+        name={viewingCreator.name}
+        image={viewingCreator.image}
+        onClose={() => setViewingCreator(null)}
+      />
+    )}
+  </>
   );
 }

@@ -184,7 +184,28 @@ export default function BookingsPage() {
                         </td>
                         <td className="px-4 py-3 text-muted-foreground">{fmtDate(b.date)}</td>
                         <td className="px-4 py-3 text-muted-foreground" dir="ltr">{b.startTime}–{b.endTime}</td>
-                        <td className="px-4 py-3 font-semibold text-foreground">{fmt(b.totalPrice)} ت</td>
+                        <td className="px-4 py-3">
+                          {b.basePrice != null && b.basePrice > b.totalPrice ? (
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-xs text-muted-foreground line-through">{fmt(b.basePrice)} ت</span>
+                              <span className="font-semibold text-emerald-600">{fmt(b.totalPrice)} ت</span>
+                              <div className="flex flex-wrap gap-1 mt-0.5">
+                                {b.slotDiscountPercent > 0 && (
+                                  <span className="inline-flex items-center rounded-full bg-emerald-500/10 text-emerald-600 px-1.5 py-0.5 text-[10px] font-bold">
+                                    تخفیف زمین ٪{b.slotDiscountPercent}
+                                  </span>
+                                )}
+                                {b.discountCode && (
+                                  <span className="inline-flex items-center rounded-full bg-violet-500/10 text-violet-600 px-1.5 py-0.5 text-[10px] font-bold">
+                                    کد {b.discountCode}: -{fmt(b.discountAmount)} ت
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="font-semibold text-foreground">{fmt(b.totalPrice)} ت</span>
+                          )}
+                        </td>
                         <td className="px-4 py-3"><Badge variant={sb.variant}>{sb.label}</Badge></td>
                         <td className="px-4 py-3">
                           {b.status === "pending" && (

@@ -27,6 +27,9 @@ export const getCurrentUserController = async (req, res) => {
         id: user.id,
         phone: user.phone,
         name: user.name,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        city: user.city,
         email: user.email,
         image: user.image,
         credits: user.credits,
@@ -48,7 +51,7 @@ export const getCurrentUserController = async (req, res) => {
 export const updateProfileController = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { name, phone, email, skillLevel, favoriteSport } = req.body;
+    const { name, firstName, lastName, city, phone, email, skillLevel, favoriteSport } = req.body;
 
     // Validate phone if provided
     if (phone && !validateIranianPhone(phone)) {
@@ -90,6 +93,9 @@ export const updateProfileController = async (req, res) => {
       .update(users)
       .set({
         name: name || req.user.name,
+        firstName: firstName || req.user.firstName,
+        lastName: lastName || req.user.lastName,
+        city: city || req.user.city,
         phone: phone || req.user.phone,
         email: email || req.user.email,
         ...(skillLevel && { skillLevel }),
@@ -104,6 +110,9 @@ export const updateProfileController = async (req, res) => {
         id: updatedUser.id,
         phone: updatedUser.phone,
         name: updatedUser.name,
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
+        city: updatedUser.city,
         email: updatedUser.email,
         image: updatedUser.image,
         skillLevel: updatedUser.skillLevel,
@@ -222,6 +231,9 @@ export const uploadProfileImageController = async (req, res) => {
         id: updatedUser.id,
         phone: updatedUser.phone,
         name: updatedUser.name,
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
+        city: updatedUser.city,
         email: updatedUser.email,
         image: updatedUser.image,
       },

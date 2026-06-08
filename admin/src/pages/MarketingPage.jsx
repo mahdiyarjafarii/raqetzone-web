@@ -18,6 +18,10 @@ const SEGMENT_META = {
   tournament: { icon: TrophyIcon, color: "text-pink-600", bg: "bg-pink-500/10", title: "دعوت تورنومنتی‌ها", template: "سلام {name} قهرمان 🏆\nبرای تمرین قبل از تورنومنت بعدی، کد {code} با تخفیف {discount} فعال شد. منتظرتیم!" },
 };
 
+function hasDiscountPlaceholder(text) {
+  return /\{code\}|\{discount\}/.test(text);
+}
+
 function SegmentCard({ segment, onLaunch }) {
   const meta = SEGMENT_META[segment.key] ?? SEGMENT_META.all;
   const Icon = meta.icon;
@@ -70,12 +74,15 @@ function CampaignModal({ clubId, segment, codes, onClose }) {
   const selectedCode = codes.find(c => c.id === discountCodeId);
   const preview = message
     .replace(/\{name\}/g, "علی")
-    .replace(/\{code\}/g, selectedCode?.code ?? "CODE20")
-    .replace(/\{discount\}/g, selectedCode ? selectedCode.discountType === "percent" ? `${selectedCode.discountValue}٪` : `${fmt(selectedCode.discountValue)} تومان` : `${segment.recommendedDiscount}٪`);
+    .replace(/\{code\}/g, selectedCode?.code ?? "بدون کد")
+    .replace(/\{discount\}/g, selectedCode ? selectedCode.discountType === "percent" ? `${selectedCode.discountValue}٪` : `${fmt(selectedCode.discountValue)} تومان` : "بدون تخفیف");
 
   const send = async () => {
     if (!clubId) return toast.error("باشگاه را انتخاب کنید");
     if (!message.trim()) return toast.error("متن پیام خالی است");
+    if (!discountCodeId && hasDiscountPlaceholder(message)) {
+      return toast.error("برای این متن باید کد تخفیف انتخاب کنید یا بخش کد تخفیف را از متن حذف کنید");
+    }
     setSending(true);
     const { ok, data } = await apiClient.post(`/club-panel/clubs/${clubId}/sms-campaign`, { discountCodeId: discountCodeId || undefined, message, recipientFilter: segment.key });
     setSending(false);

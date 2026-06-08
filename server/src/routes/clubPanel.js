@@ -21,6 +21,10 @@ import {
   getAutoFillOpportunitiesController,
   runAutoFillController,
   getClubCustomersController,
+  verifyBookingController,
+  getClubDealsController,
+  createClubDealController,
+  deleteClubDealController,
 } from "../controllers/clubPanelController.js";
 import {
   getDiscountCodesController,
@@ -67,6 +71,14 @@ router.post("/club-panel/autofill/run",                      runAutoFillControll
 
 // Customers
 router.get("/club-panel/customers",                          getClubCustomersController);
+
+// Verify booking by tracking code
+router.get("/club-panel/verify-booking/:code",               verifyBookingController);
+
+// Deals
+router.get("/club-panel/deals",                              getClubDealsController);
+router.post("/club-panel/deals",                             createClubDealController);
+router.delete("/club-panel/deals/:id",                       deleteClubDealController);
 
 // Discount codes
 router.get("/club-panel/clubs/:clubId/discount-codes",                     getDiscountCodesController);

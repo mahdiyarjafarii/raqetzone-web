@@ -76,6 +76,7 @@ export const getHomeController = async (req, res) => {
         validUntil: deals.validUntil,
         court: {
           id: courts.id,
+          clubId: courts.clubId,
           name: courts.name,
           location: courts.location,
           sportType: courts.sportType,

@@ -2,7 +2,15 @@ import React from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
-export default function TimeSlotGrid({ slots, selectedSlot, onSelect, loading }) {
+function isPastSlot(dateStr, startTime) {
+  const today = new Date().toISOString().split("T")[0];
+  if (dateStr !== today) return false;
+  const [h, m] = startTime.split(":").map(Number);
+  const now = new Date();
+  return h * 60 + m <= now.getHours() * 60 + now.getMinutes();
+}
+
+export default function TimeSlotGrid({ slots, selectedSlot, onSelect, loading, selectedDate }) {
   if (loading) {
     return (
       <div className="grid grid-cols-3 gap-2 px-4 pb-4">
@@ -21,9 +29,19 @@ export default function TimeSlotGrid({ slots, selectedSlot, onSelect, loading })
     );
   }
 
+  const visibleSlots = slots.filter(slot => !isPastSlot(selectedDate, slot.start));
+
+  if (visibleSlots.length === 0) {
+    return (
+      <div className="text-center py-10 text-muted-foreground text-sm">
+        هیچ اسلاتی برای این روز وجود ندارد
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-3 gap-2 px-4 pb-4">
-      {slots.map((slot, i) => {
+      {visibleSlots.map((slot, i) => {
         const isSelected =
           selectedSlot?.start === slot.start && selectedSlot?.end === slot.end;
         const isBooked = slot.isBooked;

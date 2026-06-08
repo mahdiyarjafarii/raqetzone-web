@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
-import { SearchIcon, SlidersHorizontalIcon, MapPinIcon, RefreshCwIcon } from "lucide-react";
+import { SearchIcon, MapPinIcon, RefreshCwIcon, ChevronDownIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import ClubCard from "@/features/clubs/components/ClubCard";
 import { useClubs } from "@/features/clubs/hooks/useClubs";
@@ -13,20 +13,42 @@ const SPORT_FILTERS = [
   { key: "badminton",label: "بدمینتون"   },
 ];
 
+const IRAN_PROVINCES = [
+  "آذربایجان شرقی","آذربایجان غربی","اردبیل","اصفهان","البرز","ایلام","بوشهر","تهران",
+  "چهارمحال و بختیاری","خراسان جنوبی","خراسان رضوی","خراسان شمالی","خوزستان","زنجان",
+  "سمنان","سیستان و بلوچستان","فارس","قزوین","قم","کردستان","کرمان","کرمانشاه",
+  "کهگیلویه و بویراحمد","گلستان","گیلان","لرستان","مازندران","مرکزی","هرمزگان","همدان","یزد",
+];
+
+const PROVINCE_KEY = "raqetzone_province";
+
+function getStoredProvince() {
+  try { return localStorage.getItem(PROVINCE_KEY) ?? ""; } catch { return ""; }
+}
+
 export default function ClubsPage() {
   const { clubs, loading, refetch } = useClubs();
   const [search, setSearch]         = useState("");
   const [sportFilter, setSportFilter] = useState("all");
+  const [province, setProvince]     = useState(getStoredProvince);
+  const [showProvinceMenu, setShowProvinceMenu] = useState(false);
+
+  const handleProvinceChange = (p) => {
+    setProvince(p);
+    try { if (p) localStorage.setItem(PROVINCE_KEY, p); else localStorage.removeItem(PROVINCE_KEY); } catch {}
+    setShowProvinceMenu(false);
+  };
 
   const filtered = clubs.filter((club) => {
     const types = club.sportTypes ?? [];
     const matchSport = sportFilter === "all" || types.includes(sportFilter);
+    const matchProvince = !province || club.province === province;
     const q = search.trim();
     const matchSearch = !q ||
       club.name?.includes(q) ||
       club.location?.includes(q) ||
       club.address?.includes(q);
-    return matchSport && matchSearch;
+    return matchSport && matchProvince && matchSearch;
   });
 
   return (
@@ -36,9 +58,34 @@ export default function ClubsPage() {
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
           <div className="flex items-center justify-between mb-1">
             <h1 className="text-2xl font-black text-foreground">مجموعه‌های ورزشی</h1>
-            <div className="flex items-center gap-1 text-muted-foreground text-xs">
-              <MapPinIcon className="w-3.5 h-3.5 text-primary" />
-              <span>تهران</span>
+            <div className="relative">
+              <button
+                onClick={() => setShowProvinceMenu(v => !v)}
+                className="flex items-center gap-1 text-xs font-medium text-foreground bg-muted rounded-full px-3 py-1.5 border border-border active:scale-95 transition-transform"
+              >
+                <MapPinIcon className="w-3.5 h-3.5 text-primary" />
+                <span>{province || "همه استان‌ها"}</span>
+                <ChevronDownIcon className="w-3 h-3 text-muted-foreground" />
+              </button>
+              {showProvinceMenu && (
+                <div className="absolute left-0 top-8 z-50 bg-card border border-border rounded-2xl shadow-xl overflow-hidden w-48 max-h-64 overflow-y-auto">
+                  <button
+                    onClick={() => handleProvinceChange("")}
+                    className={cn("w-full text-right text-xs px-4 py-2.5 hover:bg-muted transition-colors", !province && "font-semibold text-primary")}
+                  >
+                    همه استان‌ها
+                  </button>
+                  {IRAN_PROVINCES.map(p => (
+                    <button
+                      key={p}
+                      onClick={() => handleProvinceChange(p)}
+                      className={cn("w-full text-right text-xs px-4 py-2.5 hover:bg-muted transition-colors", province === p && "font-semibold text-primary bg-primary/5")}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
           <p className="text-muted-foreground text-sm">

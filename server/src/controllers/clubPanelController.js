@@ -1,7 +1,8 @@
-import { eq, and, desc, inArray, count, sum, gte, lte, sql } from "drizzle-orm";
+import { eq, and, asc, desc, inArray, count, sum, gte, lte, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { clubs, courts, bookings, users, slotOverrides, tournaments, tournamentRegistrations, deals } from "../db/schema.js";
 import { sendNotification } from "../utils/sendNotification.js";
+import { formatBookingDateTimeFa } from "../utils/bookingTime.js";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -116,8 +117,13 @@ export const getMyClubsController = async (req, res) => {
 
 export const createClubController = async (req, res) => {
   try {
-    const { name, description, address, phone, sportTypes, amenities, images, openTime, closeTime } = req.body;
+    const { name, description, address, phone, sportTypes, amenities, images, openTime, closeTime, province } = req.body;
     if (!name || !address) return res.status(400).json({ message: "نام و آدرس الزامی است" });
+
+    if (!req.user.isAdmin) {
+      const existing = await db.select({ id: clubs.id }).from(clubs).where(eq(clubs.ownerId, req.user.id)).limit(1);
+      if (existing.length > 0) return res.status(400).json({ message: "شما قبلاً یک باشگاه ثبت کرده‌اید" });
+    }
 
     const [club] = await db
       .insert(clubs)
@@ -127,6 +133,7 @@ export const createClubController = async (req, res) => {
         description: description || null,
         address,
         phone: phone || null,
+        province: province || null,
         sportTypes: sportTypes ?? [],
         amenities: amenities ?? [],
         images: images ?? [],
@@ -149,7 +156,7 @@ export const updateClubController = async (req, res) => {
       return res.status(403).json({ message: "دسترسی غیر مجاز" });
     }
 
-    const { name, description, address, phone, sportTypes, amenities, images, openTime, closeTime, isActive } = req.body;
+    const { name, description, address, phone, sportTypes, amenities, images, openTime, closeTime, isActive, province } = req.body;
     const [updated] = await db
       .update(clubs)
       .set({
@@ -157,6 +164,7 @@ export const updateClubController = async (req, res) => {
         ...(description !== undefined && { description }),
         ...(address !== undefined && { address }),
         ...(phone !== undefined && { phone }),
+        ...(province !== undefined && { province }),
         ...(sportTypes !== undefined && { sportTypes }),
         ...(amenities !== undefined && { amenities }),
         ...(images !== undefined && { images }),
@@ -329,6 +337,10 @@ export const getClubBookingsController = async (req, res) => {
         endTime: bookings.endTime,
         durationHours: bookings.durationHours,
         totalPrice: bookings.totalPrice,
+        basePrice: bookings.basePrice,
+        slotDiscountPercent: bookings.slotDiscountPercent,
+        discountCode: bookings.discountCode,
+        discountAmount: bookings.discountAmount,
         status: bookings.status,
         notes: bookings.notes,
         adminNote: bookings.adminNote,
@@ -400,9 +412,10 @@ export const approveClubBookingController = async (req, res) => {
     }
 
     const trackingCode = booking.trackingCode;
+    const bookingDateTime = formatBookingDateTimeFa(booking);
     sendNotification(booking.userId, {
       title: "رزرو شما تأیید شد ✅",
-      message: `رزرو زمین برای ${booking.date} ساعت ${booking.startTime} تأیید شد. به موقع حاضر باشید!${trackingCode ? ` کد پیگیری: ${trackingCode}` : ""}`,
+      message: `رزرو زمین برای ${bookingDateTime} تأیید شد. به موقع حاضر باشید!${trackingCode ? ` کد پیگیری: ${trackingCode}` : ""}`,
       type: "BOOKING",
       isPinned: true,
       metadata: { bookingId: id, date: booking.date, startTime: booking.startTime, trackingCode, ctaHref: trackingCode ? `/booking/track/${trackingCode}` : "/mybooking", ctaLabel: "مشاهده رزرو" },
@@ -410,7 +423,7 @@ export const approveClubBookingController = async (req, res) => {
         const courtInfo = court?.clubName ? `زمین ${court.name} باشگاه ${court.clubName}` : `زمین ${court?.name ?? ""}`;
         const manager = court?.managerPhone ? ` تلفن مدیر زمین: ${court.managerPhone}.` : "";
         const code = trackingCode ? ` کد پیگیری: ${trackingCode}.` : "";
-        return `پلتفرم رکت‌زون: رزرو ${courtInfo} برای ${booking.date} ساعت ${booking.startTime} تایید شد.${code}${manager} به امید دیدار مجدد!`;
+        return `پلتفرم رکت‌زون: رزرو ${courtInfo} برای ${bookingDateTime} تایید شد.${code}${manager} به امید دیدار مجدد!`;
       })(),
     }).catch(() => {});
 
@@ -445,12 +458,13 @@ export const rejectClubBookingController = async (req, res) => {
       and(eq(slotOverrides.courtId, booking.courtId), eq(slotOverrides.date, booking.date), eq(slotOverrides.startTime, booking.startTime), eq(slotOverrides.status, "booked"))
     );
 
+    const bookingDateTime = formatBookingDateTimeFa(booking);
     sendNotification(booking.userId, {
       title: "رزرو شما رد شد ❌",
-      message: `متأسفانه رزرو شما برای ${booking.date} ساعت ${booking.startTime} رد شد.${adminNote ? ` دلیل: ${adminNote}` : ""}`,
+      message: `متأسفانه رزرو شما برای ${bookingDateTime} رد شد.${adminNote ? ` دلیل: ${adminNote}` : ""}`,
       type: "BOOKING",
       metadata: { bookingId: id, ctaHref: "/mybooking", ctaLabel: "مشاهده رزروها" },
-      smsText: `پلتفرم رکت‌زون: رزرو شما برای ${booking.date} ساعت ${booking.startTime} رد شد.${adminNote ? ` دلیل: ${adminNote}` : ""}`,
+      smsText: `پلتفرم رکت‌زون: رزرو شما برای ${bookingDateTime} رد شد.${adminNote ? ` دلیل: ${adminNote}` : ""}`,
     }).catch(() => {});
 
     return res.json({ booking: updated });
@@ -608,7 +622,24 @@ export const getSlotOverridesController = async (req, res) => {
     if (to)   conditions.push(lte(slotOverrides.date, to));
 
     const rows = await db.select().from(slotOverrides).where(and(...conditions));
-    return res.json({ slotOverrides: rows });
+
+    // Fetch bookings with user info for the same date range so the admin can see who booked each slot
+    const bookingConditions = [eq(bookings.courtId, courtId), inArray(bookings.status, ["pending", "approved"])];
+    if (from) bookingConditions.push(gte(bookings.date, from));
+    if (to)   bookingConditions.push(lte(bookings.date, to));
+    const bookingRows = await db
+      .select({ id: bookings.id, date: bookings.date, startTime: bookings.startTime, endTime: bookings.endTime, status: bookings.status, totalPrice: bookings.totalPrice, trackingCode: bookings.trackingCode, userName: users.name, userPhone: users.phone })
+      .from(bookings)
+      .innerJoin(users, eq(bookings.userId, users.id))
+      .where(and(...bookingConditions));
+
+    // Index by "date|startTime" for easy lookup
+    const bookingsBySlot = {};
+    for (const b of bookingRows) {
+      bookingsBySlot[`${b.date}|${b.startTime}`] = b;
+    }
+
+    return res.json({ slotOverrides: rows, bookingsBySlot });
   } catch (error) {
     console.error("getSlotOverrides error:", error);
     return res.status(500).json({ message: "خطای سرور" });
@@ -644,7 +675,8 @@ export const getAutoFillOpportunitiesController = async (req, res) => {
           const override = overrides.get(key);
           if (targetTime <= today || booked.has(key) || override?.status === "blocked" || override?.status === "booked" || Number(override?.discountPercent ?? 0) > 0) continue;
           const discountPercent = Math.max(Number(override?.discountPercent ?? 0), recommendedDiscount(date, slot.startTime));
-          const price = override?.price ?? court.pricePerHour;
+          const hourlyPrice = override?.price ?? court.pricePerHour;
+          const price = Math.round(hourlyPrice * (minutes(slot.endTime) - minutes(slot.startTime)) / 60);
           opportunities.push({
             id: key,
             courtId: court.id,
@@ -655,6 +687,7 @@ export const getAutoFillOpportunitiesController = async (req, res) => {
             date,
             startTime: slot.startTime,
             endTime: slot.endTime,
+            hourlyPrice,
             price,
             discountPercent,
             finalPrice: Math.round(price * (1 - discountPercent / 100)),
@@ -688,9 +721,9 @@ export const runAutoFillController = async (req, res) => {
       if (existing) {
         if (["blocked", "booked"].includes(existing.status)) continue;
         if (Number(existing.discountPercent ?? 0) > 0) continue;
-        await db.update(slotOverrides).set({ status: "available", price: item.price ?? existing.price, discountPercent, updatedAt: new Date() }).where(eq(slotOverrides.id, existing.id));
+        await db.update(slotOverrides).set({ status: "available", price: item.hourlyPrice ?? existing.price, discountPercent, updatedAt: new Date() }).where(eq(slotOverrides.id, existing.id));
       } else {
-        await db.insert(slotOverrides).values({ courtId: item.courtId, date: item.date, startTime: item.startTime, endTime: item.endTime, status: "available", price: item.price ?? null, discountPercent });
+        await db.insert(slotOverrides).values({ courtId: item.courtId, date: item.date, startTime: item.startTime, endTime: item.endTime, status: "available", price: item.hourlyPrice ?? null, discountPercent });
       }
       await db.insert(deals).values({ courtId: item.courtId, slotDate: item.date, slotStart: item.startTime, slotEnd: item.endTime, discountPercent, validUntil: new Date(`${item.date}T${item.startTime}:00`) });
       applied++;
@@ -832,3 +865,206 @@ export const getClubCustomersController = async (req, res) => {
     return res.status(500).json({ message: "خطای سرور" });
   }
 };
+
+// ─── Verify booking by tracking code ─────────────────────────────────────────
+
+export const verifyBookingController = async (req, res) => {
+  try {
+    const code = (req.params.code ?? "").trim().toUpperCase();
+    if (!code) return res.status(400).json({ message: "کد پیگیری وارد نشده" });
+
+    const [row] = await db
+      .select({
+        id:           bookings.id,
+        trackingCode: bookings.trackingCode,
+        date:         bookings.date,
+        startTime:    bookings.startTime,
+        endTime:      bookings.endTime,
+        durationHours: bookings.durationHours,
+        totalPrice:   bookings.totalPrice,
+        basePrice:    bookings.basePrice,
+        slotDiscountPercent: bookings.slotDiscountPercent,
+        discountCode: bookings.discountCode,
+        discountAmount: bookings.discountAmount,
+        paymentMethod: bookings.paymentMethod,
+        paymentStatus: bookings.paymentStatus,
+        status:       bookings.status,
+        notes:        bookings.notes,
+        createdAt:    bookings.createdAt,
+        userName:     users.name,
+        userPhone:    users.phone,
+        courtId:      courts.id,
+        courtName:    courts.name,
+        sportType:    courts.sportType,
+        clubId:       clubs.id,
+        clubName:     clubs.name,
+        clubOwnerId:  clubs.ownerId,
+      })
+      .from(bookings)
+      .innerJoin(courts, eq(bookings.courtId, courts.id))
+      .innerJoin(users,  eq(bookings.userId,  users.id))
+      .innerJoin(clubs,  eq(courts.clubId,    clubs.id))
+      .where(eq(bookings.trackingCode, code))
+      .limit(1);
+
+    if (!row) return res.status(404).json({ message: "رزروی با این کد یافت نشد" });
+
+    // Club owners can only verify bookings belonging to their own clubs
+    if (!req.user.isAdmin && row.clubOwnerId !== req.user.id) {
+      return res.status(403).json({ message: "این رزرو متعلق به باشگاه شما نیست" });
+    }
+
+    const isValid = row.status === "approved";
+
+    return res.json({ booking: row, isValid });
+  } catch (error) {
+    console.error("verifyBooking error:", error);
+    return res.status(500).json({ message: "خطای سرور" });
+  }
+};
+
+export const getClubDealsController = async (req, res) => {
+  try {
+    const { active } = req.query;
+    const scope = await getOwnerCourtScope(req);
+    if (!scope) return res.status(403).json({ message: "دسترسی ندارید" });
+
+    const courtIds = scope.courtRows.map((court) => court.id);
+    if (courtIds.length === 0) return res.status(200).json({ deals: [] });
+
+    const rows = await db
+      .select({
+        id: deals.id,
+        slotDate: deals.slotDate,
+        slotStart: deals.slotStart,
+        slotEnd: deals.slotEnd,
+        discountPercent: deals.discountPercent,
+        validUntil: deals.validUntil,
+        isActive: deals.isActive,
+        createdAt: deals.createdAt,
+        court: {
+          id: courts.id,
+          name: courts.name,
+          location: courts.location,
+          sportType: courts.sportType,
+          pricePerHour: courts.pricePerHour,
+        },
+      })
+      .from(deals)
+      .innerJoin(courts, eq(deals.courtId, courts.id))
+      .where(
+        and(
+          inArray(deals.courtId, courtIds),
+          active === "true" ? and(eq(deals.isActive, true), gte(deals.validUntil, new Date())) :
+          active === "false" ? eq(deals.isActive, false) :
+          undefined
+        )
+      )
+      .orderBy(asc(deals.validUntil));
+
+    return res.status(200).json({ deals: rows });
+  } catch (error) {
+    console.error("getClubDeals error:", error);
+    return res.status(500).json({ message: "خطای سرور" });
+  }
+};
+
+export const createClubDealController = async (req, res) => {
+  try {
+    const { courtId, slotDate, slotStart, slotEnd, discountPercent, validUntil } = req.body;
+
+    if (!courtId || !slotDate || !slotStart || !slotEnd || !discountPercent || !validUntil) {
+      return res.status(400).json({ message: "تمام فیلدها الزامی هستند" });
+    }
+
+    if (discountPercent < 5 || discountPercent > 90) {
+      return res.status(400).json({ message: "درصد تخفیف باید بین ۵ تا ۹۰ باشد" });
+    }
+
+    if (!(await assertCourtOwnership(req, courtId))) {
+      return res.status(403).json({ message: "دسترسی ندارید" });
+    }
+
+    const [court] = await db
+      .select({ id: courts.id, name: courts.name, location: courts.location, sportType: courts.sportType, pricePerHour: courts.pricePerHour })
+      .from(courts)
+      .where(eq(courts.id, courtId))
+      .limit(1);
+    if (!court) return res.status(404).json({ message: "زمین یافت نشد" });
+
+    const parsedUntil = new Date(validUntil);
+    if (isNaN(parsedUntil.getTime()) || parsedUntil <= new Date()) {
+      return res.status(400).json({ message: "زمان انقضا باید در آینده باشد" });
+    }
+
+    const [deal] = await db
+      .insert(deals)
+      .values({ courtId, slotDate, slotStart, slotEnd, discountPercent: parseInt(discountPercent), validUntil: parsedUntil })
+      .returning();
+
+    const { broadcastNotification } = await import("../utils/sendNotification.js");
+    broadcastNotification({
+      title: `🔥 آفر ویژه ${discountPercent}% تخفیف — ${court.name}`,
+      message: `زمین «${court.name}» برای ${slotDate} ساعت ${slotStart} تا ${slotEnd} با ${discountPercent}٪ تخفیف! تا ${new Date(validUntil).toLocaleString("fa-IR")} فرصت داری.`,
+      type: "PROMOTION",
+      isPinned: true,
+      metadata: { discountCode: null, discountPct: discountPercent, ctaHref: "/mybooking", ctaLabel: "رزرو با تخفیف", dealId: deal.id },
+    }).catch(() => {});
+
+    return res.status(201).json({ deal: { ...deal, court } });
+  } catch (error) {
+    console.error("createClubDeal error:", error);
+    return res.status(500).json({ message: "خطای سرور" });
+  }
+};
+
+export const deleteClubDealController = async (req, res) => {
+  try {
+    const [deal] = await db
+      .select({
+        courtId: deals.courtId,
+        slotDate: deals.slotDate,
+        slotStart: deals.slotStart,
+        discountPercent: deals.discountPercent,
+      })
+      .from(deals)
+      .where(eq(deals.id, req.params.id))
+      .limit(1);
+
+    if (!deal) return res.status(404).json({ message: "آفر یافت نشد" });
+    if (!(await assertCourtOwnership(req, deal.courtId))) {
+      return res.status(403).json({ message: "دسترسی ندارید" });
+    }
+
+    await db.update(deals).set({ isActive: false }).where(eq(deals.id, req.params.id));
+    const [remainingActiveDeal] = await db
+      .select({ id: deals.id })
+      .from(deals)
+      .where(and(
+        eq(deals.courtId, deal.courtId),
+        eq(deals.slotDate, deal.slotDate),
+        eq(deals.slotStart, deal.slotStart),
+        eq(deals.isActive, true),
+        gte(deals.validUntil, new Date()),
+        sql`${deals.id} <> ${req.params.id}`
+      ))
+      .limit(1);
+
+    if (!remainingActiveDeal) {
+      await db
+        .update(slotOverrides)
+        .set({ discountPercent: 0, updatedAt: new Date() })
+        .where(and(
+          eq(slotOverrides.courtId, deal.courtId),
+          eq(slotOverrides.date, deal.slotDate),
+          eq(slotOverrides.startTime, deal.slotStart),
+          eq(slotOverrides.discountPercent, deal.discountPercent)
+        ));
+    }
+    return res.status(200).json({ success: true });
+  } catch (error) {
+    console.error("deleteClubDeal error:", error);
+    return res.status(500).json({ message: "خطای سرور" });
+  }
+};
+

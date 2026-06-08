@@ -7,6 +7,7 @@ import {
   ToggleLeftIcon, ToggleRightIcon, ImagePlusIcon, XCircleIcon,
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { useAtomValue } from "jotai";
 import apiClient from "@/lib/apiClient";
 import PageHeader from "@/components/PageHeader";
 import Badge from "@/components/ui/Badge";
@@ -15,6 +16,7 @@ import Input from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
 import PersianTimePicker from "@/components/PersianTimePicker";
 import { cn } from "@/lib/utils";
+import { adminUserAtom } from "@/store/authStore";
 
 const API_BASE = import.meta.env.VITE_API_URL?.replace("/api", "") ?? "http://localhost:3000";
 
@@ -23,8 +25,15 @@ const AMENITIES = ["parking","locker","shower","cafe","wifi","lighting","shop","
 const AMENITY_LABELS = { parking:"پارکینگ", locker:"رختکن", shower:"دوش", cafe:"کافه", wifi:"وای‌فای", lighting:"روشنایی", shop:"فروشگاه", coaching:"کوچینگ", firstaid:"کمک‌های اولیه", ac:"تهویه" };
 const SPORT_LABELS   = { padel:"پدل", tennis:"تنیس", squash:"اسکواش", badminton:"بدمینتون", "ping-pong":"پینگ‌پنگ" };
 
+const IRAN_PROVINCES = [
+  "آذربایجان شرقی","آذربایجان غربی","اردبیل","اصفهان","البرز","ایلام","بوشهر","تهران",
+  "چهارمحال و بختیاری","خراسان جنوبی","خراسان رضوی","خراسان شمالی","خوزستان","زنجان",
+  "سمنان","سیستان و بلوچستان","فارس","قزوین","قم","کردستان","کرمان","کرمانشاه",
+  "کهگیلویه و بویراحمد","گلستان","گیلان","لرستان","مازندران","مرکزی","هرمزگان","همدان","یزد",
+];
+
 const emptyClub = {
-  name: "", description: "", address: "",
+  name: "", description: "", address: "", province: "",
   sportTypes: [], amenities: [], images: [],
   openTime: "07:00", closeTime: "23:00",
 };
@@ -188,6 +197,14 @@ function ClubForm({ form, setForm, onSubmit, loading, submitLabel, isEdit = fals
         <div className="grid grid-cols-1 gap-3">
           <Input label="نام باشگاه *" value={form.name} onChange={e => f("name", e.target.value)} required />
           <Input label="آدرس کامل *" value={form.address} onChange={e => f("address", e.target.value)} required />
+          <div>
+            <label className="text-xs font-medium text-muted-foreground block mb-1">استان <span className="text-red-500">*</span></label>
+            <select value={form.province ?? ""} onChange={e => f("province", e.target.value)} required
+              className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none">
+              <option value="">انتخاب استان...</option>
+              {IRAN_PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
         </div>
         <div>
           <label className="text-xs font-medium text-muted-foreground block mb-1">توضیحات</label>
@@ -237,6 +254,14 @@ function ClubForm({ form, setForm, onSubmit, loading, submitLabel, isEdit = fals
           <Input label="نام باشگاه *" value={form.name} onChange={e => f("name", e.target.value)} />
           <Input label="آدرس کامل *" value={form.address} onChange={e => f("address", e.target.value)} />
           <div>
+            <label className="text-xs font-medium text-muted-foreground block mb-1">استان <span className="text-red-500">*</span></label>
+            <select value={form.province ?? ""} onChange={e => f("province", e.target.value)}
+              className="w-full rounded-xl border border-input bg-background px-3 py-2 text-sm text-foreground focus:outline-none">
+              <option value="">انتخاب استان...</option>
+              {IRAN_PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
+          <div>
             <label className="text-xs font-medium text-muted-foreground block mb-1">توضیحات (اختیاری)</label>
             <textarea value={form.description} onChange={e => f("description", e.target.value)} rows={3}
               placeholder="یه معرفی کوتاه از باشگاهتون بنویسید..."
@@ -244,7 +269,7 @@ function ClubForm({ form, setForm, onSubmit, loading, submitLabel, isEdit = fals
           </div>
           <div className="flex gap-2 pt-1">
             <Button type="button" variant="outline" onClick={prev} className="flex-1">← قبلی</Button>
-            <Button type="button" disabled={!form.name || !form.address} onClick={next} className="flex-1">بعدی ←</Button>
+            <Button type="button" disabled={!form.name || !form.address || !form.province} onClick={next} className="flex-1">بعدی ←</Button>
           </div>
         </motion.div>
       )}
@@ -278,6 +303,7 @@ function ClubForm({ form, setForm, onSubmit, loading, submitLabel, isEdit = fals
             <p className="font-semibold text-foreground text-sm">خلاصه باشگاه:</p>
             <p>📛 {form.name}</p>
             <p>📍 {form.address}</p>
+            {form.province && <p>🗺️ {form.province}</p>}
             <p>🕐 {form.openTime} تا {form.closeTime}</p>
             <p>🏓 {form.sportTypes.map(s => SPORT_LABELS[s]).join("، ")}</p>
             <p>🖼️ {form.images?.length} تصویر</p>
@@ -399,6 +425,8 @@ function ClubCard({ club, index, onEdit, onDelete, onToggle, onManage }) {
 
 export default function ClubsPage() {
   const navigate = useNavigate();
+  const user     = useAtomValue(adminUserAtom);
+  const isAdmin  = user?.isAdmin;
   const [clubs, setClubs]       = useState([]);
   const [loading, setLoading]   = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
@@ -461,6 +489,7 @@ export default function ClubsPage() {
       description: club.description ?? "",
       address: club.address,
       phone: club.phone ?? "",
+      province: club.province ?? "",
       sportTypes: club.sportTypes ?? [],
       amenities: club.amenities ?? [],
       images: club.images ?? [],
@@ -480,13 +509,15 @@ export default function ClubsPage() {
   return (
     <div dir="rtl">
       <PageHeader
-        title="باشگاه‌ها"
+        title={isAdmin ? "باشگاه‌ها" : "باشگاه"}
         description={`${clubs.length} باشگاه ثبت شده`}
         actions={
-          <Button onClick={() => { setForm(emptyClub); setCreateOpen(true); }}>
-            <PlusIcon className="w-4 h-4" />
-            ثبت باشگاه جدید
-          </Button>
+          (isAdmin || clubs.length === 0) && (
+            <Button onClick={() => { setForm(emptyClub); setCreateOpen(true); }}>
+              <PlusIcon className="w-4 h-4" />
+              ثبت باشگاه جدید
+            </Button>
+          )
         }
       />
 
@@ -498,7 +529,7 @@ export default function ClubsPage() {
             <p className="text-muted-foreground text-sm mb-6 max-w-xs">
               اولین باشگاه ورزشی خود را ثبت کنید و مدیریت زمین‌ها و رزروها را شروع کنید.
             </p>
-            <Button onClick={() => { setForm(emptyClub); setCreateOpen(true); }}>
+            <Button onClick={() => { setForm({ ...emptyClub }); setCreateOpen(true); }}>
               <PlusIcon className="w-4 h-4" />
               ثبت اولین باشگاه
             </Button>

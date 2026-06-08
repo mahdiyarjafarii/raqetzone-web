@@ -3,6 +3,7 @@ import { eq, and, gte, lte } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { bookings, courts, users } from "../db/schema.js";
 import { sendSMS } from "../utils/sms.js";
+import { formatBookingDateTimeFa } from "../utils/bookingTime.js";
 
 async function sendBookingReminders() {
   try {
@@ -52,7 +53,8 @@ async function sendBookingReminders() {
         if (!b.phone) return;
 
         const greeting = b.userName ? `${b.userName} عزیز، ` : "";
-        const text = `رکت‌زون ⏰: ${greeting}رزرو زمین «${b.courtName}» امروز ساعت ${b.startTime} داری. فراموش نکنی! 🎾`;
+        const bookingDateTime = formatBookingDateTimeFa(b);
+        const text = `رکت‌زون ⏰: ${greeting}رزرو زمین «${b.courtName}» برای ${bookingDateTime} داری. فراموش نکنی! 🎾`;
 
         await sendSMS(b.phone, text);
 

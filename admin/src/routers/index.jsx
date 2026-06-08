@@ -13,7 +13,8 @@ const DiscountsPage   = lazy(() => import("@/pages/DiscountsPage"));
 const MarketingPage   = lazy(() => import("@/pages/MarketingPage"));
 const ClubsPage       = lazy(() => import("@/pages/ClubsPage"));
 const ClubDetailPage  = lazy(() => import("@/pages/ClubDetailPage"));
-const ReviewsPage     = lazy(() => import("@/pages/ReviewsPage"));
+const ReviewsPage        = lazy(() => import("@/pages/ReviewsPage"));
+const VerifyBookingPage  = lazy(() => import("@/pages/VerifyBookingPage"));
 const CustomersPage   = lazy(() => import("@/pages/CustomersPage"));
 
 const S = (Page) => (
@@ -31,7 +32,8 @@ const router = createBrowserRouter(
         <Route path="bookings"  element={S(BookingsPage)} />
         <Route path="clubs"     element={S(ClubsPage)} />
         <Route path="clubs/:clubId" element={S(ClubDetailPage)} />
-        <Route path="reviews"   element={S(ReviewsPage)} />
+        <Route path="reviews"      element={S(ReviewsPage)} />
+        <Route path="verify"       element={S(VerifyBookingPage)} />
         <Route path="customers" element={S(CustomersPage)} />
         <Route path="courts"    element={S(CourtsPage)} />
         <Route path="discounts" element={S(DiscountsPage)} />

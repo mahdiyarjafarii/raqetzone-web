@@ -67,6 +67,31 @@ function buildDateOptions(daysAhead = 730) {
 
 const persianDateOptions = buildDateOptions();
 
+function formatDateFa(dateStr) {
+  if (!dateStr) return "—";
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Date(year, month - 1, day, 12).toLocaleDateString("fa-IR-u-ca-persian", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function timeToMinutes(time) {
+  const [hour, minute] = time.split(":").map(Number);
+  return hour * 60 + minute;
+}
+
+function getSlotDurationHours(startTime, endTime) {
+  return (timeToMinutes(endTime) - timeToMinutes(startTime)) / 60;
+}
+
+function formatTimeFa(time) {
+  if (!time) return "—";
+  const [hour, minute] = time.split(":").map(Number);
+  return `${fmt(hour)}:${String(minute).padStart(2, "0").replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d])}`;
+}
+
 function PersianDateInput({ value, onChange, required }) {
   const datePart = value || "";
 
@@ -143,7 +168,8 @@ const SPORT_ICONS = { padel:"🏓", tennis:"🎾", squash:"🟡", badminton:"�
 
 function DealCard({ deal, onDelete, index }) {
   const { expired } = useCountdown(deal.validUntil);
-  const discountedPrice = Math.round(deal.court.pricePerHour * (1 - deal.discountPercent / 100));
+  const slotPrice = Math.round(deal.court.pricePerHour * getSlotDurationHours(deal.slotStart, deal.slotEnd));
+  const discountedPrice = Math.round(slotPrice * (1 - deal.discountPercent / 100));
 
   return (
     <motion.div
@@ -190,12 +216,12 @@ function DealCard({ deal, onDelete, index }) {
 
         <div className="bg-muted/60 rounded-xl px-3 py-2 mb-3 flex items-center gap-2 text-xs text-muted-foreground">
           <ClockIcon className="w-3.5 h-3.5 shrink-0" />
-          <span>{deal.slotDate} — {deal.slotStart} تا {deal.slotEnd}</span>
+          <span>{formatDateFa(deal.slotDate)} — {formatTimeFa(deal.slotStart)} تا {formatTimeFa(deal.slotEnd)}</span>
         </div>
 
         <div className="flex items-end justify-between">
           <div>
-            <p className="text-xs text-muted-foreground line-through">{fmt(deal.court.pricePerHour)} تومان</p>
+            <p className="text-xs text-muted-foreground line-through">{fmt(slotPrice)} تومان</p>
             <p className="text-lg font-black text-primary">{fmt(discountedPrice)} <span className="text-xs font-medium text-muted-foreground">تومان</span></p>
           </div>
           <Button size="sm" variant="ghost" onClick={() => onDelete(deal.id)}
@@ -219,7 +245,7 @@ function CreateDealForm({ courts, onCreated, onClose }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
-    const { ok, data } = await apiClient.post("/admin/deals", {
+    const { ok, data } = await apiClient.post("/club-panel/deals", {
       ...form, discountPercent: parseInt(form.discountPercent),
     });
     setSaving(false);
@@ -768,7 +794,7 @@ export default function DiscountsPage() {
   const fetchDeals = useCallback(async () => {
     setDealsLoading(true);
     const param = dealTab === "active" ? "true" : dealTab === "expired" ? "false" : undefined;
-    const { ok, data } = await apiClient.get("/admin/deals", param != null ? { active: param } : {});
+    const { ok, data } = await apiClient.get("/club-panel/deals", param != null ? { active: param } : {});
     if (ok) setDeals(data.deals ?? []);
     setDealsLoading(false);
   }, [dealTab]);
@@ -780,10 +806,10 @@ export default function DiscountsPage() {
   const displayDeals = dealTab === "active" ? activeDeals : dealTab === "expired" ? expiredDeals : deals;
 
   const handleDeleteDeal = async (id) => {
-    const { ok } = await apiClient.delete(`/admin/deals/${id}`);
+    const { ok } = await apiClient.delete(`/club-panel/deals/${id}`);
     if (!ok) return toast.error("خطا در حذف آفر");
     toast.success("آفر غیرفعال شد");
-    setDeals(prev => prev.filter(d => d.id !== id));
+    setDeals(prev => prev.map(d => d.id === id ? { ...d, isActive: false } : d));
   };
 
   return (

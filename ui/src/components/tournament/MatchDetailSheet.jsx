@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MapPinIcon, CalendarIcon, LogOutIcon, UsersIcon, ClockIcon, ShareIcon, ZapIcon, StarIcon, ShieldCheckIcon } from "lucide-react";
+import { MapPinIcon, CalendarIcon, LogOutIcon, UsersIcon, ClockIcon, ShareIcon, ZapIcon, StarIcon, ShieldCheckIcon, Trash2Icon } from "lucide-react";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import toast from "react-hot-toast";
 
@@ -67,17 +67,22 @@ export default function MatchDetailSheet() {
   const [viewingUser, setViewingUser] = useState(null);
   const [showRating, setShowRating] = useState(false);
   const [emergencyLoading, setEmergencyLoading] = useState(false);
-  const [compatibility, setCompatibility] = useState(null);
+  const [showEmergencyConfirm, setShowEmergencyConfirm] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const isUserInMatch =
     match && [...match.teamA, ...match.teamB].some((p) => p.userId === currentUserId);
   const isCreator = match?.createdBy === currentUserId;
+  const canUseEmergencySub =
+    match && new Date(match.scheduledAt).getTime() - Date.now() <= 5 * 3600000;
 
-  useEffect(() => {
-    if (!match) return;
-    matchService.getCompatibility(match.id).then((res) => {
-      if (res.ok) setCompatibility(res.data.compatibility);
-    });
-  }, [match?.id]);
+  const handleEmergencyClick = () => {
+    if (!canUseEmergencySub) {
+      toast.error("این قابلیت ۵ ساعت مانده به شروع بازی فعال می‌شود");
+      return;
+    }
+    setShowEmergencyConfirm(true);
+  };
 
   const handleShare = async () => {
     if (!match) return;
@@ -114,6 +119,7 @@ export default function MatchDetailSheet() {
       }
     } finally {
       setEmergencyLoading(false);
+      setShowEmergencyConfirm(false);
     }
   };
 
@@ -132,6 +138,24 @@ export default function MatchDetailSheet() {
       }
     } finally {
       setJoinLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!match) return;
+    setDeleteLoading(true);
+    try {
+      const res = await matchService.deleteMatch(match.id);
+      if (res.ok) {
+        setMatches((prev) => prev.filter((m) => m.id !== match.id));
+        setSelectedMatch(null);
+        toast.success("بازی حذف شد");
+      } else {
+        toast.error(res.data?.message ?? "خطا در حذف بازی");
+      }
+    } finally {
+      setDeleteLoading(false);
+      setShowDeleteConfirm(false);
     }
   };
 
@@ -181,7 +205,7 @@ export default function MatchDetailSheet() {
                         گارانتی‌شده توسط رکت‌زون
                       </div>
                     )}
-                    <div className="flex items-center gap-2 mt-2">
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
                       <span className="text-sm font-semibold text-muted-foreground capitalize">{match.sportType}</span>
                       <span
                         className={cn(
@@ -201,38 +225,76 @@ export default function MatchDetailSheet() {
                         />
                         {match.status === "open" ? "باز" : match.status === "full" ? "پر شد" : match.status}
                       </span>
+                      {match.creator && (
+                        <button
+                          type="button"
+                          onClick={() => match.creator.id !== currentUserId && setViewingUser({ userId: match.creator.id, name: match.creator.name, image: match.creator.image })}
+                          className={cn(
+                            "inline-flex items-center gap-1.5 px-2 py-1 rounded-full border text-[11px] font-semibold bg-background/60 border-border text-muted-foreground",
+                            match.creator.id !== currentUserId && "active:scale-95 transition-all"
+                          )}
+                        >
+                          <UserAvatar
+                            image={match.creator.image}
+                            name={match.creator.name}
+                            className="w-4 h-4 rounded-full text-[8px] text-white shrink-0"
+                            fallbackClassName="w-4 h-4 rounded-full bg-primary text-primary-foreground text-[8px] shrink-0"
+                          />
+                          <span className="truncate max-w-[80px]">
+                            {match.creator.id === currentUserId ? "شما" : match.creator.name}
+                          </span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
 
-                {/* Info pills */}
-                <div className="relative grid gap-2 mt-5">
-                  <div className="flex items-center gap-2 bg-background/70 dark:bg-white/10 rounded-2xl px-3.5 py-3 border border-border/60 dark:border-white/10 shadow-sm backdrop-blur-md">
-                    <CalendarIcon className="w-4 h-4 text-blue-500 shrink-0" />
-                    <span className="text-sm font-semibold text-foreground">{formatDateFull(match.scheduledAt)}</span>
+                {/* Info grid */}
+                <div className="relative mt-5 grid grid-cols-2 gap-2">
+
+                  {/* Date — full width */}
+                  <div className="col-span-2 flex items-center gap-2.5 bg-background/70 dark:bg-white/10 rounded-2xl px-3.5 py-3 border border-border/60 dark:border-white/10 shadow-sm backdrop-blur-md">
+                    <div className="w-8 h-8 rounded-xl bg-blue-500/15 flex items-center justify-center shrink-0">
+                      <CalendarIcon className="w-4 h-4 text-blue-500" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] text-muted-foreground font-medium">تاریخ بازی</p>
+                      <p className="text-sm font-bold text-foreground truncate">{formatDateFull(match.scheduledAt)}</p>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 bg-background/70 dark:bg-white/10 rounded-2xl px-3.5 py-3 border border-border/60 dark:border-white/10 shadow-sm backdrop-blur-md">
-                    <MapPinIcon className="w-4 h-4 text-violet-500 shrink-0" />
-                    <span className="text-sm font-semibold text-foreground">
-                      {match.courtName ? `${match.courtName} · ` : ""}{match.location}
-                    </span>
+
+                  {/* Location */}
+                  <div className={cn(
+                    "flex items-center gap-2.5 bg-background/70 dark:bg-white/10 rounded-2xl px-3.5 py-3 border border-border/60 dark:border-white/10 shadow-sm backdrop-blur-md",
+                    countdown ? "col-span-1" : "col-span-2"
+                  )}>
+                    <div className="w-8 h-8 rounded-xl bg-violet-500/15 flex items-center justify-center shrink-0">
+                      <MapPinIcon className="w-4 h-4 text-violet-500" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[10px] text-muted-foreground font-medium">محل بازی</p>
+                      <p className="text-sm font-bold text-foreground truncate">
+                        {match.courtName || match.location}
+                      </p>
+                      {match.courtName && match.location && (
+                        <p className="text-[10px] text-muted-foreground truncate">{match.location}</p>
+                      )}
+                    </div>
                   </div>
+
+                  {/* Countdown */}
                   {countdown && (
-                    <div className="flex items-center gap-2 bg-amber-500/12 rounded-2xl px-3.5 py-3 border border-amber-500/20 shadow-sm">
-                      <ClockIcon className="w-4 h-4 text-amber-500 shrink-0" />
-                      <span className="text-sm font-black text-amber-600 dark:text-amber-300">{countdown}</span>
+                    <div className="col-span-1 flex items-center gap-2.5 bg-amber-500/10 rounded-2xl px-3.5 py-3 border border-amber-500/20 shadow-sm">
+                      <div className="w-8 h-8 rounded-xl bg-amber-500/20 flex items-center justify-center shrink-0">
+                        <ClockIcon className="w-4 h-4 text-amber-500" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[10px] text-amber-600/70 dark:text-amber-400/70 font-medium">مانده تا بازی</p>
+                        <p className="text-sm font-black text-amber-600 dark:text-amber-300 truncate">{countdown}</p>
+                      </div>
                     </div>
                   )}
 
-                  {/* Compatibility pill */}
-                  {compatibility !== null && !isUserInMatch && (
-                    <div className="flex items-center gap-1.5 bg-violet-500/10 rounded-2xl px-3.5 py-2.5 border border-violet-500/20">
-                      <StarIcon className="w-3.5 h-3.5 text-violet-500 shrink-0" />
-                      <span className="text-xs font-bold text-violet-600 dark:text-violet-300">
-                        سازگاری با این مچ: {compatibility}٪
-                      </span>
-                    </div>
-                  )}
                 </div>
               </div>
 
@@ -357,14 +419,22 @@ export default function MatchDetailSheet() {
                   <ShareIcon className="w-3.5 h-3.5" />
                   دعوت
                 </button>
-                {isCreator && match.status !== "full" && match.status !== "completed" && (
+                {isCreator && !match.isCertified && match.status !== "full" && match.status !== "completed" && (
                   <button
-                    onClick={handleEmergencySub}
+                    onClick={handleEmergencyClick}
                     disabled={emergencyLoading}
                     className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-orange-500/30 bg-orange-500/8 text-xs font-bold text-orange-600 dark:text-orange-400 active:scale-95 transition-all disabled:opacity-60"
                   >
                     <ZapIcon className="w-3.5 h-3.5 shrink-0" />
                     {emergencyLoading ? "ارسال..." : "یار دقیقه‌نودی"}
+                  </button>
+                )}
+                {isCreator && match.status !== "completed" && (
+                  <button
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-red-500/30 bg-red-500/8 text-xs font-bold text-red-500 active:scale-95 transition-all"
+                  >
+                    <Trash2Icon className="w-3.5 h-3.5" />
                   </button>
                 )}
               </div>
@@ -411,6 +481,111 @@ export default function MatchDetailSheet() {
               onClose={() => setShowRating(false)}
             />
           )}
+
+          {/* Delete confirmation */}
+          <AnimatePresence>
+            {showEmergencyConfirm && (
+              <>
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => !emergencyLoading && setShowEmergencyConfirm(false)}
+                  className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60]"
+                />
+                <motion.div
+                  initial={{ y: "100%" }}
+                  animate={{ y: 0 }}
+                  exit={{ y: "100%" }}
+                  transition={{ type: "spring", damping: 30, stiffness: 300 }}
+                  className="fixed bottom-0 left-0 right-0 z-[70] bg-background rounded-t-3xl px-5 pt-6 pb-10"
+                >
+                  <div className="flex justify-center mb-4">
+                    <div className="w-12 h-12 rounded-2xl bg-orange-500/10 flex items-center justify-center">
+                      <ZapIcon className="w-6 h-6 text-orange-500" />
+                    </div>
+                  </div>
+                  <h3 className="text-center font-black text-lg mb-1">یار دقیقه‌نودی</h3>
+                  <p className="text-center text-sm text-muted-foreground mb-4 leading-6">
+                    با تایید شما، رکت‌زون برای پیدا کردن بازیکن جایگزین به کاربران واجد شرایط پیامک می‌فرستد.
+                  </p>
+                  <div className="rounded-2xl bg-muted/50 border border-border p-4 mb-5 space-y-3 text-right">
+                    <div>
+                      <p className="text-xs font-black text-foreground mb-1">چه کسانی پیام نمی‌گیرند؟</p>
+                      <p className="text-xs leading-6 text-muted-foreground">
+                        خود شما، بازیکن‌های داخل همین بازی، و کاربرهایی که در بازه‌ی دو ساعت قبل تا دو ساعت بعد از این بازی مسابقه‌ی دیگری دارند.
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-black text-foreground mb-1">پیام برای چه کسانی می‌رود؟</p>
+                      <p className="text-xs leading-6 text-muted-foreground">
+                        سیستم حداکثر به ۵۰ کاربر باقی‌مانده پیامک می‌فرستد تا برای پر کردن جای خالی وارد رکت‌زون شوند.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => setShowEmergencyConfirm(false)}
+                      disabled={emergencyLoading}
+                      className="py-3.5 rounded-2xl border-2 border-border bg-muted/50 text-sm font-bold text-foreground active:scale-[0.98] transition-all disabled:opacity-60"
+                    >
+                      انصراف
+                    </button>
+                    <button
+                      onClick={handleEmergencySub}
+                      disabled={emergencyLoading}
+                      className="py-3.5 rounded-2xl bg-orange-500 text-white text-sm font-bold shadow-lg shadow-orange-500/25 active:scale-[0.98] transition-all disabled:opacity-60"
+                    >
+                      {emergencyLoading ? "در حال ارسال..." : "تایید و ارسال"}
+                    </button>
+                  </div>
+                </motion.div>
+              </>
+            )}
+            {showDeleteConfirm && (
+              <>
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60]"
+                />
+                <motion.div
+                  initial={{ y: "100%" }}
+                  animate={{ y: 0 }}
+                  exit={{ y: "100%" }}
+                  transition={{ type: "spring", damping: 30, stiffness: 300 }}
+                  className="fixed bottom-0 left-0 right-0 z-[70] bg-background rounded-t-3xl px-5 pt-6 pb-10"
+                >
+                  <div className="flex justify-center mb-4">
+                    <div className="w-12 h-12 rounded-2xl bg-red-500/10 flex items-center justify-center">
+                      <Trash2Icon className="w-6 h-6 text-red-500" />
+                    </div>
+                  </div>
+                  <h3 className="text-center font-black text-lg mb-1">حذف بازی</h3>
+                  <p className="text-center text-sm text-muted-foreground mb-6">
+                    آیا مطمئنی؟ این بازی و همه شرکت‌کنندگانش حذف می‌شن.
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => setShowDeleteConfirm(false)}
+                      className="py-3.5 rounded-2xl border-2 border-border bg-muted/50 text-sm font-bold text-foreground active:scale-[0.98] transition-all"
+                    >
+                      انصراف
+                    </button>
+                    <button
+                      onClick={handleDelete}
+                      disabled={deleteLoading}
+                      className="py-3.5 rounded-2xl bg-red-500 text-white text-sm font-bold shadow-lg shadow-red-500/25 active:scale-[0.98] transition-all disabled:opacity-60"
+                    >
+                      {deleteLoading ? "در حال حذف..." : "بله، حذف شود"}
+                    </button>
+                  </div>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
         </>
       )}
     </AnimatePresence>

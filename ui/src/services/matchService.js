@@ -5,6 +5,7 @@ export const matchService = {
   getMatch: (id) => apiClient.get(`/matches/${id}`),
   joinMatch: (id, team) => apiClient.post(`/matches/${id}/join`, { team }),
   leaveMatch: (id) => apiClient.delete(`/matches/${id}/leave`),
+  deleteMatch: (id) => apiClient.delete(`/matches/${id}`),
   createMatch: (data) => apiClient.post("/matches", data),
   getInviteLink: (id) => apiClient.get(`/matches/${id}/invite`),
   emergencySub: (id) => apiClient.post(`/matches/${id}/emergency-sub`),

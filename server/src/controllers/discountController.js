@@ -271,6 +271,10 @@ export const sendSmsCampaignController = async (req, res) => {
       return res.status(400).json({ message: "متن پیام بسیار کوتاه است" });
     }
 
+    if (!discountCodeId && (/\{code\}|\{discount\}/.test(message))) {
+      return res.status(400).json({ message: "برای این متن باید کد تخفیف انتخاب کنید یا بخش کد تخفیف را از متن حذف کنید" });
+    }
+
     // Resolve discount code if provided
     let discountCode = null;
     if (discountCodeId) {

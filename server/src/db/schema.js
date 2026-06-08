@@ -17,6 +17,9 @@ export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
   phone: varchar("phone", { length: 20 }).unique(),
   name: varchar("name", { length: 255 }),
+  firstName: varchar("first_name", { length: 100 }),
+  lastName: varchar("last_name", { length: 100 }),
+  city: varchar("city", { length: 100 }),
   image: varchar("image", { length: 500 }),
   credits: integer("credits").notNull().default(30),
   subscriptionType: varchar("subscription_type", { length: 256 }),
@@ -222,6 +225,7 @@ export const clubs = pgTable("clubs", {
   sportTypes: jsonb("sport_types").default([]),   // ["padel","tennis"]
   amenities: jsonb("amenities").default([]),      // ["parking","shower"]
   images: jsonb("images").default([]),            // array of image URLs
+  province: varchar("province", { length: 100 }),
   openTime: varchar("open_time", { length: 5 }).notNull().default("07:00"),
   closeTime: varchar("close_time", { length: 5 }).notNull().default("23:00"),
   isActive: boolean("is_active").notNull().default(true),
@@ -264,7 +268,11 @@ export const bookings = pgTable("bookings", {
   startTime: varchar("start_time", { length: 5 }).notNull(), // HH:mm
   endTime: varchar("end_time", { length: 5 }).notNull(),     // HH:mm
   durationHours: integer("duration_hours").notNull(),
-  totalPrice: integer("total_price").notNull(),
+  totalPrice: integer("total_price").notNull(),       // final price after all discounts
+  basePrice: integer("base_price"),                   // original price before any discount (effective per-hour × duration)
+  slotDiscountPercent: smallint("slot_discount_percent").default(0), // slot/deal discount applied at booking time
+  discountCode: varchar("discount_code", { length: 50 }), // discount code used (null if none)
+  discountAmount: integer("discount_amount").default(0),  // toman amount discounted by the code
   paymentMethod: varchar("payment_method", { length: 20 }).notNull().default("none"),
   paymentStatus: varchar("payment_status", { length: 20 }).notNull().default("unpaid"),
   status: varchar("status", { length: 20 }).notNull().default("pending"), // pending | approved | rejected | cancelled

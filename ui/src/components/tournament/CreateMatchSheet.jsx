@@ -20,8 +20,11 @@ const SPORTS = [
 const defaultForm = {
   title: "",
   sportType: "padel",
+  venueMode: "platform", // "platform" = باشگاه‌های ما | "custom" = زمین غیر پلتفرم
   clubId: "",
   courtId: "",
+  customLocation: "",
+  customCourtName: "",
   scheduledAt: "",
   teamSize: 2,
   isCertified: false,
@@ -278,9 +281,14 @@ export default function CreateMatchSheet() {
   const availableCourts = selectedClub?.courts?.filter((c) => c.isActive !== false) ?? [];
   const selectedCourt = availableCourts.find((c) => c.id === form.courtId);
 
+  const isCustomVenue = form.venueMode === "custom";
+
   const canNext = () => {
     if (step === 0) return form.title.trim().length > 1;
-    if (step === 1) return !!form.clubId && !!form.courtId;
+    if (step === 1) {
+      if (isCustomVenue) return form.customLocation.trim().length > 1;
+      return !!form.clubId && !!form.courtId;
+    }
     if (step === 2) return !!form.scheduledAt;
     return false;
   };
@@ -291,7 +299,10 @@ export default function CreateMatchSheet() {
   };
 
   const handleSubmit = async () => {
-    if (!form.title || !form.clubId || !form.courtId || !form.scheduledAt) {
+    const location = isCustomVenue ? form.customLocation.trim() : (selectedClub?.name ?? form.clubId);
+    const courtName = isCustomVenue ? form.customCourtName.trim() : (selectedCourt?.name ?? "");
+
+    if (!form.title || !location || !form.scheduledAt) {
       toast.error("لطفاً تمام فیلدها را پر کنید");
       return;
     }
@@ -300,8 +311,8 @@ export default function CreateMatchSheet() {
       const payload = {
         title: form.title,
         sportType: form.sportType,
-        location: selectedClub?.name ?? form.clubId,
-        courtName: selectedCourt?.name ?? "",
+        location,
+        courtName,
         scheduledAt: form.scheduledAt,
         teamSize: form.teamSize,
         isCertified: form.isCertified,
@@ -477,6 +488,7 @@ function StepSport({ form, setForm }) {
 
 /* ─── Step 2: Club + Court ──────────────────────────────────────────────── */
 function StepClub({ form, setForm, clubs, clubsLoading, availableCourts }) {
+  const isCustom = form.venueMode === "custom";
   return (
     <motion.div
       initial={{ opacity: 0, x: 40 }}
@@ -485,6 +497,54 @@ function StepClub({ form, setForm, clubs, clubsLoading, availableCourts }) {
       transition={{ duration: 0.22 }}
       className="space-y-5 py-2"
     >
+      {/* Venue mode toggle: باشگاه‌های ما / زمین غیر پلتفرم */}
+      <div className="grid grid-cols-2 gap-2 rounded-2xl bg-muted/50 p-1">
+        <button
+          type="button"
+          onClick={() => setForm((f) => ({ ...f, venueMode: "platform" }))}
+          className={cn(
+            "py-2.5 rounded-xl text-xs font-bold transition-all",
+            !isCustom ? "bg-background text-primary shadow-sm" : "text-muted-foreground"
+          )}
+        >
+          باشگاه‌های ما
+        </button>
+        <button
+          type="button"
+          onClick={() => setForm((f) => ({ ...f, venueMode: "custom" }))}
+          className={cn(
+            "py-2.5 rounded-xl text-xs font-bold transition-all",
+            isCustom ? "bg-background text-primary shadow-sm" : "text-muted-foreground"
+          )}
+        >
+          زمین دیگر
+        </button>
+      </div>
+
+      {isCustom ? (
+        <>
+          <div className="space-y-2.5">
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">نام مجموعه / محل بازی</label>
+            <input
+              autoFocus
+              value={form.customLocation}
+              onChange={(e) => setForm((f) => ({ ...f, customLocation: e.target.value }))}
+              placeholder="مثلاً: مجموعه ورزشی انقلاب"
+              className="w-full bg-muted border-2 border-border rounded-2xl px-4 py-3.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors"
+            />
+          </div>
+          <div className="space-y-2.5">
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">نام زمین (اختیاری)</label>
+            <input
+              value={form.customCourtName}
+              onChange={(e) => setForm((f) => ({ ...f, customCourtName: e.target.value }))}
+              placeholder="مثلاً: زمین شماره ۲"
+              className="w-full bg-muted border-2 border-border rounded-2xl px-4 py-3.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition-colors"
+            />
+          </div>
+        </>
+      ) : (
+      <>
       <div className="space-y-2.5">
         <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">انتخاب باشگاه</label>
         {clubsLoading ? (
@@ -571,6 +631,8 @@ function StepClub({ form, setForm, clubs, clubsLoading, availableCourts }) {
           )}
         </div>
       )}
+      </>
+      )}
     </motion.div>
   );
 }
@@ -591,7 +653,9 @@ function StepTime({ form, setForm, selectedClub, selectedCourt }) {
         <div className="min-w-0">
           <p className="font-bold text-sm text-foreground truncate">{form.title}</p>
           <p className="text-xs text-muted-foreground mt-0.5 truncate">
-            {selectedClub?.name}{selectedCourt ? ` · ${selectedCourt.name}` : ""}
+            {form.venueMode === "custom"
+              ? `${form.customLocation}${form.customCourtName ? ` · ${form.customCourtName}` : ""}`
+              : `${selectedClub?.name ?? ""}${selectedCourt ? ` · ${selectedCourt.name}` : ""}`}
           </p>
         </div>
       </div>

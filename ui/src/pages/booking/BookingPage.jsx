@@ -251,6 +251,7 @@ export default function BookingPage() {
                 selectedSlot={selectedSlot}
                 onSelect={handleSelectSlot}
                 loading={availLoading}
+                selectedDate={selectedDate}
               />
             </div>
           </motion.div>

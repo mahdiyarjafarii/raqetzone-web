@@ -1,8 +1,9 @@
 import { eq, and, desc, count } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { bookings, courts, clubs, users, discountCodes, discountCodeUsages } from "../db/schema.js";
+import { bookings, courts, clubs, users, discountCodes, discountCodeUsages, slotOverrides } from "../db/schema.js";
 import { sendNotification } from "../utils/sendNotification.js";
 import { sendSMS } from "../utils/sms.js";
+import { formatBookingDateTimeFa } from "../utils/bookingTime.js";
 import { payBookingWithWallet } from "./walletController.js";
 
 const WELCOME_DISCOUNT_CODE = "WELCOME20";
@@ -154,17 +155,40 @@ export const createBookingController = async (req, res) => {
 
     const durationHours = (endMin - startMin) / 60;
     const storedDurationHours = Math.ceil(durationHours);
-    const basePrice = Math.round(court.pricePerHour * durationHours);
+
+    // Read the slot override (deal / custom price) for this exact slot so the
+    // booking is charged the same discounted price the user saw. Mirrors the
+    // computation in courtController.generateSlots to avoid rounding drift.
+    let slotOverride = null;
+    try {
+      [slotOverride] = await db
+        .select()
+        .from(slotOverrides)
+        .where(and(
+          eq(slotOverrides.courtId, courtId),
+          eq(slotOverrides.date, date),
+          eq(slotOverrides.startTime, startTime),
+        ))
+        .limit(1);
+    } catch { /* table may not exist yet */ }
+
+    const effectivePerHour = slotOverride?.price ?? court.pricePerHour;
+    const slotDiscountPercent = slotOverride?.discountPercent ?? 0;
+    const basePrice = Math.round(effectivePerHour * durationHours); // original price before any discount
+    const finalPerHour = slotDiscountPercent > 0
+      ? Math.round(effectivePerHour * (1 - slotDiscountPercent / 100))
+      : effectivePerHour;
+    const priceAfterSlot = Math.round(finalPerHour * durationHours); // after slot/deal discount
     console.log("[CreateBooking] calculated values:", {
       startMin,
       endMin,
       durationHours,
       storedDurationHours,
-      durationHoursType: typeof durationHours,
       pricePerHour: court.pricePerHour,
-      pricePerHourType: typeof court.pricePerHour,
+      effectivePerHour,
+      slotDiscountPercent,
       basePrice,
-      basePriceType: typeof basePrice,
+      priceAfterSlot,
       slotDuration: court.slotDuration,
     });
 
@@ -191,7 +215,7 @@ export const createBookingController = async (req, res) => {
         const now = new Date();
         const expired = discountCodeRow.expiresAt && now > new Date(discountCodeRow.expiresAt);
         const maxedOut = discountCodeRow.maxUses !== null && discountCodeRow.usedCount >= discountCodeRow.maxUses;
-        const belowMin = discountCodeRow.minBookingPrice && basePrice < discountCodeRow.minBookingPrice;
+        const belowMin = discountCodeRow.minBookingPrice && priceAfterSlot < discountCodeRow.minBookingPrice;
 
         if (!expired && !maxedOut && !belowMin) {
           const usageCount = normalizedDiscountCode === WELCOME_DISCOUNT_CODE
@@ -202,15 +226,16 @@ export const createBookingController = async (req, res) => {
                 .where(and(eq(discountCodeUsages.discountCodeId, discountCodeRow.id), eq(discountCodeUsages.userId, userId))))[0]?.cnt ?? 0;
 
           if (usageCount < discountCodeRow.perUserLimit) {
+            // Code discount stacks on top of the slot/deal discount
             discountAmount = discountCodeRow.discountType === "percent"
-              ? Math.round(basePrice * discountCodeRow.discountValue / 100)
-              : Math.min(discountCodeRow.discountValue, basePrice);
+              ? Math.round(priceAfterSlot * discountCodeRow.discountValue / 100)
+              : Math.min(discountCodeRow.discountValue, priceAfterSlot);
           }
         }
       }
     }
 
-    const totalPrice = Math.max(0, basePrice - discountAmount);
+    const totalPrice = Math.max(0, priceAfterSlot - discountAmount);
     const trackingCode = generateTrackingCode();
     console.log("[CreateBooking] insert values:", {
       userId,
@@ -240,6 +265,10 @@ export const createBookingController = async (req, res) => {
           endTime,
           durationHours: storedDurationHours,
           totalPrice,
+          basePrice,
+          slotDiscountPercent,
+          discountCode: discountAmount > 0 ? (discountCodeRow?.code ?? null) : null,
+          discountAmount,
           notes,
           trackingCode,
           paymentMethod: paymentMethod === "wallet" ? "wallet" : "none",
@@ -270,14 +299,15 @@ export const createBookingController = async (req, res) => {
     });
 
     const courtFullName = court.clubName ? `زمین ${court.name} باشگاه ${court.clubName}` : `زمین ${court.name}`;
+    const bookingDateTime = formatBookingDateTimeFa({ date, startTime, endTime });
 
     // Notify user of pending booking
     sendNotification(userId, {
       title: "درخواست رزرو ثبت شد ⏳",
-      message: `رزرو ${courtFullName} برای ${date} ساعت ${startTime} ثبت شد. منتظر تأیید مدیر باشید.`,
+      message: `رزرو ${courtFullName} برای ${bookingDateTime} ثبت شد. منتظر تأیید مدیر باشید.`,
       type: "BOOKING",
       metadata: { bookingId: booking.id, courtName: court.name, date, startTime, endTime, ctaHref: "/mybooking", ctaLabel: "مشاهده رزرو" },
-      smsText: `پلتفرم رکت‌زون: درخواست رزرو ${courtFullName} برای ${date} ساعت ${startTime} ثبت شد و در انتظار تأیید مدیر زمین است.`,
+      smsText: `پلتفرم رکت‌زون: درخواست رزرو ${courtFullName} برای ${bookingDateTime} ثبت شد و در انتظار تأیید مدیر زمین است.`,
     }).catch(() => {});
 
     // Notify court manager
@@ -286,7 +316,7 @@ export const createBookingController = async (req, res) => {
     if (managerPhone) {
       const [requester] = await db.select({ name: users.name, phone: users.phone }).from(users).where(eq(users.id, userId)).limit(1);
       const requesterInfo = requester?.name ? `${requester.name} (${requester.phone})` : requester?.phone ?? "کاربر";
-      const managerMsg = `پلتفرم رکت‌زون: درخواست رزرو جدید - ${courtFullName} - تاریخ ${date} ساعت ${startTime} تا ${endTime} - رزرو کننده: ${requesterInfo} - لطفا از پنل تایید یا رد کنید.`;
+      const managerMsg = `پلتفرم رکت‌زون: درخواست رزرو جدید - ${courtFullName} - ${bookingDateTime} - رزرو کننده: ${requesterInfo} - لطفا از پنل تایید یا رد کنید.`;
       console.log(`[SMS-Manager] → ${managerPhone} (${managerPhoneSource})`);
       sendSMS(managerPhone, managerMsg)
         .then(ok => console.log(`[SMS-Manager] result: ${ok}`))
@@ -450,17 +480,18 @@ export const updateBookingStatusController = async (req, res) => {
 
     // Notify the booking owner
     const isApproved = status === "approved";
-    const approvedMsg = `رزرو زمین برای ${booking.date} ساعت ${booking.startTime} تأیید شد. کد پیگیری: ${booking.trackingCode}`;
-    const rejectedMsg = `متأسفانه رزرو شما برای ${booking.date} ساعت ${booking.startTime} رد شد.${adminNote ? ` دلیل: ${adminNote}` : ""}`;
+    const bookingDateTime = formatBookingDateTimeFa(booking);
+    const approvedMsg = `رزرو زمین برای ${bookingDateTime} تأیید شد. کد پیگیری: ${booking.trackingCode}`;
+    const rejectedMsg = `متأسفانه رزرو شما برای ${bookingDateTime} رد شد.${adminNote ? ` دلیل: ${adminNote}` : ""}`;
 
     const frontendUrl = process.env.FRONTEND_URL ?? "https://raqetzone.ir";
     const trackingCode = booking.trackingCode;
 
     const approvedSms = trackingCode
-      ? `رکت‌زون: رزرو شما تایید شد. کد پیگیری: ${trackingCode}`
-      : `رکت‌زون: رزرو شما برای ${booking.date} ساعت ${booking.startTime} تایید شد.`;
+      ? `رکت‌زون: رزرو شما برای ${bookingDateTime} تایید شد. کد پیگیری: ${trackingCode}`
+      : `رکت‌زون: رزرو شما برای ${bookingDateTime} تایید شد.`;
 
-    const rejectedSms = `رکت‌زون: رزرو شما برای ${booking.date} ساعت ${booking.startTime} رد شد.${adminNote ? ` دلیل: ${adminNote}` : ""}`;
+    const rejectedSms = `رکت‌زون: رزرو شما برای ${bookingDateTime} رد شد.${adminNote ? ` دلیل: ${adminNote}` : ""}`;
 
     sendNotification(booking.userId, {
       title: isApproved ? "رزرو شما تأیید شد ✅" : "رزرو شما رد شد ❌",

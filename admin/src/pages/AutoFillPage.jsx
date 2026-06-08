@@ -26,6 +26,16 @@ function StatBox({ label, value, icon: Icon, tone = "primary" }) {
   );
 }
 
+function formatDateFa(dateStr) {
+  if (!dateStr) return "—";
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Date(year, month - 1, day, 12).toLocaleDateString("fa-IR-u-ca-persian", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
 function OpportunityRow({ item, checked, onToggle }) {
   return (
     <motion.label
@@ -41,7 +51,7 @@ function OpportunityRow({ item, checked, onToggle }) {
         <p className="text-sm font-bold text-foreground truncate">{item.courtName}</p>
         <p className="text-[11px] text-muted-foreground truncate">{item.clubName ?? "باشگاه"} · {item.sportType}</p>
       </div>
-      <div className="text-xs text-muted-foreground" dir="ltr">{item.date} · {item.startTime}-{item.endTime}</div>
+      <div className="text-xs text-muted-foreground">{formatDateFa(item.date)} · <span dir="ltr">{item.startTime}-{item.endTime}</span></div>
       <div className="text-xs">
         <span className="line-through text-muted-foreground ml-2">{fmt(item.price)}</span>
         <span className="font-black text-primary">{fmt(item.finalPrice)} ت</span>

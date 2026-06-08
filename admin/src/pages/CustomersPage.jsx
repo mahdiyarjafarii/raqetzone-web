@@ -55,6 +55,10 @@ const FILTER_OPTIONS = [
   { value: "tournament", label: "فقط شرکت‌کننده تورنومنت", desc: "کاربرانی که تورنومنت ثبت‌نام کردند" },
 ];
 
+function hasDiscountPlaceholder(text) {
+  return /\{code\}|\{discount\}/.test(text);
+}
+
 // ─── SMS Campaign Modal ───────────────────────────────────────────────────────
 
 function SmsCampaignModal({ open, onClose, clubs, customerCount }) {
@@ -82,13 +86,13 @@ function SmsCampaignModal({ open, onClose, clubs, customerCount }) {
 
   const preview = message
     .replace(/\{name\}/g, "علی عزیزی")
-    .replace(/\{code\}/g, selectedCode?.code ?? "RAQET20")
+    .replace(/\{code\}/g, selectedCode?.code ?? "بدون کد")
     .replace(/\{discount\}/g,
       selectedCode
         ? selectedCode.discountType === "percent"
           ? `${selectedCode.discountValue}٪`
           : `${selectedCode.discountValue.toLocaleString()} تومان`
-        : "۲۰٪"
+        : "بدون تخفیف"
     );
 
   const charCount = message.length;
@@ -115,6 +119,9 @@ function SmsCampaignModal({ open, onClose, clubs, customerCount }) {
   const handleSend = async () => {
     if (!clubId) return toast.error("باشگاه را انتخاب کنید");
     if (!message.trim()) return toast.error("متن پیام خالی است");
+    if (!discountCodeId && hasDiscountPlaceholder(message)) {
+      return toast.error("برای این متن باید کد تخفیف انتخاب کنید یا بخش کد تخفیف را از متن حذف کنید");
+    }
     setSending(true);
     const { ok, data } = await apiClient.post(`/club-panel/clubs/${clubId}/sms-campaign`, {
       discountCodeId: discountCodeId || undefined,
