@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useAtom } from "jotai";
+import { useAtom, useAtomValue } from "jotai";
 import toast from "react-hot-toast";
 import {
   XIcon, CalendarIcon, UsersIcon, CoinsIcon, StarIcon,
@@ -8,6 +8,7 @@ import {
   CheckCircleIcon, ChevronDownIcon, CheckIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { currentUserAtom } from "@/config/state";
 import UserAvatar from "@/components/ui/UserAvatar";
 import UserProfileSheet from "@/components/ui/UserProfileSheet";
 import { selectedTournamentAtom, tournamentDetailOpenAtom } from "../store/tournamentStore";
@@ -198,29 +199,144 @@ function ParticipantsList({ participants, max, currentUserId }) {
   );
 }
 
+function scoreSummary(sets) {
+  if (!Array.isArray(sets) || sets.length === 0) return "-";
+  return sets.map((set) => `${set.a}-${set.b}`).join(" | ");
+}
+
+function TournamentResultsBlock({ loading, matches, standings }) {
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <TrophyIcon className="w-4 h-4 text-violet-500" />
+        <span className="text-sm font-bold text-foreground">نتایج و جدول</span>
+      </div>
+
+      {loading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-10 rounded-xl bg-muted animate-pulse" />)}
+        </div>
+      ) : (
+        <>
+          <div className="rounded-2xl border border-border overflow-hidden">
+            <div className="px-3 py-2 bg-muted/60 border-b border-border text-xs font-bold text-foreground">جدول رده‌بندی</div>
+            {standings.length === 0 ? (
+              <div className="p-3 text-xs text-muted-foreground">هنوز نتیجه‌ای ثبت نشده است.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="bg-muted/35 text-muted-foreground border-b border-border">
+                      <th className="px-2 py-2 text-right">#</th>
+                      <th className="px-2 py-2 text-right">بازیکن</th>
+                      <th className="px-2 py-2 text-right">امتیاز</th>
+                      <th className="px-2 py-2 text-right">برد/باخت</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {standings.map((row) => (
+                      <tr key={row.userId} className="border-b border-border/60">
+                        <td className="px-2 py-2 font-bold">{row.rank}</td>
+                        <td className="px-2 py-2">{row.name ?? "کاربر"}</td>
+                        <td className="px-2 py-2 font-bold">{row.points}</td>
+                        <td className="px-2 py-2">{row.wins}/{row.losses}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            {matches.length === 0 ? (
+              <div className="text-xs text-muted-foreground">براکت هنوز ساخته نشده است.</div>
+            ) : (
+              matches.map((m) => (
+                <div key={m.id} className="rounded-xl border border-border p-2.5">
+                  <div className="flex items-center justify-between text-[11px]">
+                    <span className="font-bold text-foreground">راند {m.round} · بازی {m.matchNumber}</span>
+                    <span className={cn(
+                      "px-2 py-0.5 rounded-full border text-[10px] font-bold",
+                      m.status === "finished" ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/25" :
+                      m.status === "walkover" ? "bg-blue-500/10 text-blue-600 border-blue-500/25" :
+                      "bg-muted text-muted-foreground border-border"
+                    )}>
+                      {m.status === "finished" ? "پایان" : m.status === "walkover" ? "صعود خودکار" : "در انتظار"}
+                    </span>
+                  </div>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {m.playerA?.name ?? "—"} <span className="mx-1">vs</span> {m.playerB?.name ?? "—"}
+                  </div>
+                  {(m.status === "finished" || m.status === "walkover") && (
+                    <div className="mt-1 text-[11px] text-foreground" dir="ltr">{scoreSummary(m.scoreSets)}</div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── Main sheet ────────────────────────────────────────────────────────────────
 
 export default function TournamentDetailSheet() {
   const [tournament, setTournament] = useAtom(selectedTournamentAtom);
   const [open, setOpen] = useAtom(tournamentDetailOpenAtom);
+  const currentUser = useAtomValue(currentUserAtom);
   const [loading, setLoading] = useState(false);
   const [registered, setRegistered] = useState(false);
+  const [resultsLoading, setResultsLoading] = useState(false);
+  const [resultsMatches, setResultsMatches] = useState([]);
+  const [standings, setStandings] = useState([]);
 
-  const userId = (() => {
-    try { return JSON.parse(localStorage.getItem("myket-ai-user"))?.id ?? null; }
-    catch { return null; }
-  })();
+  const userId = currentUser?.id ?? null;
 
   useEffect(() => {
-    if (!tournament || !userId) return;
-    setRegistered(tournament.participants?.some(p => p.userId === userId) ?? false);
+    if (!tournament || !userId) {
+      setRegistered(false);
+      return;
+    }
+    setRegistered(tournament.participants?.some(p => String(p.userId) === String(userId)) ?? false);
   }, [tournament, userId]);
+
+  useEffect(() => {
+    if (!open || !tournament?.id) return;
+    setResultsLoading(true);
+    tournamentService.getResults(tournament.id)
+      .then((res) => {
+        if (res.ok) {
+          setResultsMatches(res.data.matches ?? []);
+          setStandings(res.data.standings ?? []);
+        }
+      })
+      .finally(() => setResultsLoading(false));
+  }, [open, tournament?.id]);
 
   if (!tournament || !open) return null;
 
   const phase = tournament.phase ?? "registration";
   const phaseCfg = PHASE_CONFIG[phase] ?? PHASE_CONFIG.registration;
+  const phaseHeaderBadge =
+    phase === "registration"
+      ? "text-emerald-100 bg-emerald-500/16 border-emerald-300/35"
+      : phase === "ongoing"
+      ? "text-blue-100 bg-blue-500/16 border-blue-300/35"
+      : "text-zinc-100 bg-zinc-400/16 border-zinc-200/35";
   const isFree = tournament.entryFee === 0;
+  const organizerClubName =
+    tournament.club?.name ??
+    tournament.club?.clubName ??
+    tournament.clubName ??
+    tournament.club?.title ??
+    tournament.organizerClub?.name ??
+    tournament.organizerClubName ??
+    tournament.organizer?.name ??
+    tournament.venue?.name ??
+    null;
   const canRegister = phase === "registration" && !registered &&
     (tournament.registeredCount < tournament.maxParticipants);
   const fillRatio = tournament.registeredCount / tournament.maxParticipants;
@@ -279,38 +395,46 @@ export default function TournamentDetailSheet() {
 
             {/* Hero header */}
             <div className="relative shrink-0 overflow-hidden rounded-t-[28px]">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(139,92,246,0.95),transparent_42%),linear-gradient(135deg,#24115f_0%,#4c1d95_45%,#312e81_100%)]" />
-              <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-background via-background/45 to-transparent" />
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.24),transparent_50%),linear-gradient(135deg,#0f172a_0%,#111827_55%,#1f2937_100%)]" />
+              <div className="absolute inset-0 bg-gradient-to-b from-white/6 via-transparent to-black/26" />
+              <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-background via-background/55 to-transparent" />
               <button
                 onClick={() => setOpen(false)}
-                className="absolute top-5 left-4 z-10 w-9 h-9 rounded-full bg-white/18 backdrop-blur-md border border-white/25 flex items-center justify-center shadow-sm"
+                className="absolute top-5 left-4 z-10 w-9 h-9 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center shadow-sm hover:bg-white/30 transition-colors"
               >
                 <XIcon className="w-[18px] h-[18px] text-white" />
               </button>
 
-              <div className="relative px-5 pt-11 pb-6">
-                <div className="flex items-start gap-3 mb-3">
-                  <div className="w-14 h-14 rounded-2xl bg-white/18 border border-white/25 flex items-center justify-center text-3xl shrink-0 shadow-lg shadow-black/10 backdrop-blur-md">
+              <div className="relative px-5 pt-11 pb-6 space-y-3.5">
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-white/10 px-2.5 py-1 text-[10px] font-bold text-white/90 backdrop-blur-md">
+                  <TrophyIcon className="w-3 h-3" />
+                  جزئیات تورنومنت
+                </div>
+
+                <div className="rounded-2xl border border-white/20 bg-black/18 p-3.5 backdrop-blur-md shadow-lg shadow-black/25">
+                  <div className="flex items-start gap-3">
+                    <div className="w-14 h-14 rounded-2xl bg-white/14 border border-white/20 flex items-center justify-center text-3xl shrink-0 shadow-lg shadow-black/20 backdrop-blur-md">
                     {SPORT_ICONS[tournament.sportType] ?? "🏅"}
-                  </div>
-                  <div className="flex-1 min-w-0 pt-1">
-                    <h2 className="font-black text-xl text-white leading-tight line-clamp-2 drop-shadow-sm">{tournament.title}</h2>
-                    {tournament.club && <p className="text-white/75 text-xs mt-1">🏢 {tournament.club.name}</p>}
+                    </div>
+                    <div className="flex-1 min-w-0 pt-0.5">
+                      <h2 className="font-black text-[22px] text-white leading-tight line-clamp-2 drop-shadow-sm">{tournament.title}</h2>
+                      {organizerClubName && <p className="text-white/95 text-xs mt-1.5 font-semibold">🏢 باشگاه برگزارکننده: {organizerClubName}</p>}
+                    </div>
                   </div>
                 </div>
 
                 {/* Badges */}
-                <div className="flex flex-wrap gap-2 mb-4">
-                  <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border backdrop-blur-md", phaseCfg.badge)}>
+                <div className="flex flex-wrap gap-2">
+                  <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border backdrop-blur-md", phaseHeaderBadge)}>
                     <span className={cn("w-1.5 h-1.5 rounded-full", phaseCfg.dot)} />
                     {phaseCfg.label}
                   </span>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-white/18 border border-white/25 text-white backdrop-blur-md">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-white/14 border border-white/22 text-white/95 backdrop-blur-md">
                     <CoinsIcon className="w-3 h-3" />
                     {isFree ? "رایگان" : `${tournament.entryFee.toLocaleString("fa-IR")} تومان`}
                   </span>
                   {tournament.minLevel > 1 && (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-400/20 border border-amber-300/40 text-amber-100 backdrop-blur-md">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-400/18 border border-amber-200/40 text-amber-50 backdrop-blur-md">
                       <StarIcon className="w-3 h-3" />سطح {tournament.minLevel}+
                     </span>
                   )}
@@ -320,8 +444,8 @@ export default function TournamentDetailSheet() {
                 <PhaseSteps phase={phase} />
 
                 {/* Capacity */}
-                <div className="mt-4">
-                  <div className="flex justify-between text-[11px] text-white/80 mb-1.5">
+                <div className="rounded-2xl border border-white/18 bg-black/16 p-3 backdrop-blur-sm">
+                  <div className="flex justify-between text-[11px] text-white mb-1.5 font-semibold">
                     <span className="flex items-center gap-1"><UsersIcon className="w-3 h-3" />{tournament.registeredCount} ثبت‌نام</span>
                     <span>{tournament.maxParticipants - tournament.registeredCount} جای خالی</span>
                   </div>
@@ -400,6 +524,15 @@ export default function TournamentDetailSheet() {
                     {new Date(tournament.registrationDeadline).toLocaleDateString("fa-IR",{month:"short",day:"numeric"})}
                   </InfoTile>
                 </div>
+
+                {/* Results + standings */}
+                {(phase === "ongoing" || phase === "completed") && (
+                  <TournamentResultsBlock
+                    loading={resultsLoading}
+                    matches={resultsMatches}
+                    standings={standings}
+                  />
+                )}
 
                 {/* Participants */}
                 <ParticipantsList

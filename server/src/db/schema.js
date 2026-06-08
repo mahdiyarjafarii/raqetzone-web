@@ -400,6 +400,24 @@ export const tournamentRegistrations = pgTable("tournament_registrations", {
   index("idx_tournament_reg_user_id").on(table.userId),
 ]);
 
+export const tournamentMatches = pgTable("tournament_matches", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tournamentId: uuid("tournament_id").notNull().references(() => tournaments.id, { onDelete: "cascade" }),
+  round: smallint("round").notNull(),
+  matchNumber: smallint("match_number").notNull(),
+  playerAUserId: uuid("player_a_user_id").references(() => users.id, { onDelete: "set null" }),
+  playerBUserId: uuid("player_b_user_id").references(() => users.id, { onDelete: "set null" }),
+  winnerUserId: uuid("winner_user_id").references(() => users.id, { onDelete: "set null" }),
+  status: varchar("status", { length: 20 }).notNull().default("scheduled"), // scheduled | finished | walkover
+  scoreSets: jsonb("score_sets").notNull().default(sql`'[]'::jsonb`), // [{ a: 6, b: 4 }, ...]
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_tournament_matches_tournament_id").on(table.tournamentId),
+  index("idx_tournament_matches_round").on(table.tournamentId, table.round),
+  uniqueIndex("uq_tournament_matches_round_match").on(table.tournamentId, table.round, table.matchNumber),
+]);
+
 // ─── Discount Codes ───────────────────────────────────────────────────────────
 
 export const discountCodes = pgTable("discount_codes", {

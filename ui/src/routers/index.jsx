@@ -9,6 +9,7 @@ import ChatPage from "@/pages/ai/ChatPage";
 import NewChatPage from "@/pages/ai/NewChatPage";
 
 const JoinMatchPage = lazy(() => import("@/pages/JoinMatchPage"));
+const TournamentInvitePage = lazy(() => import("@/pages/tournament/TournamentInvitePage"));
 const AiPage = lazy(() => import("@/pages/ai/AiPage"));
 const NotFoundPage = lazy(() => import("@/pages/404Page"));
 const ProfilePage = lazy(() => import("@/pages/user/ProfilePage"));
@@ -28,6 +29,10 @@ const router = createBrowserRouter([
   {
     path: "/join/:token",
     element: s(JoinMatchPage),
+  },
+  {
+    path: "/tournament/invite/:id",
+    element: s(TournamentInvitePage),
   },
   {
     path: "/",

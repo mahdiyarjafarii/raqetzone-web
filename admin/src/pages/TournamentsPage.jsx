@@ -5,7 +5,7 @@ import {
   CoinsIcon, StarIcon, XIcon, DownloadIcon,
   LockIcon, PlayIcon, FlagIcon, ChevronRightIcon,
   ChevronLeftIcon, CheckIcon, GiftIcon, ShieldCheckIcon,
-  ZapIcon, Trash2Icon, ClockIcon, PencilIcon,
+  ZapIcon, Trash2Icon, ClockIcon, PencilIcon, Share2Icon,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import apiClient from "@/lib/apiClient";
@@ -15,11 +15,272 @@ import Modal from "@/components/ui/Modal";
 import { cn } from "@/lib/utils";
 
 const ADMIN_BASE = import.meta.env.VITE_API_URL?.replace("/api", "") ?? "http://localhost:3000";
+const PUBLIC_APP_BASE = import.meta.env.VITE_PUBLIC_APP_URL ?? import.meta.env.VITE_WEBSITE_URL ?? "http://localhost:5173";
 
 function buildUserImageUrl(image) {
   if (!image) return null;
   if (image.startsWith("http")) return image;
   return `${ADMIN_BASE}/uploads/user/${image}`;
+}
+
+function ResultsModal({ tournament, onClose }) {
+  const [loading, setLoading] = useState(true);
+  const [savingId, setSavingId] = useState(null);
+  const [matches, setMatches] = useState([]);
+  const [standings, setStandings] = useState([]);
+  const [participants, setParticipants] = useState([]);
+  const [scoreDrafts, setScoreDrafts] = useState({});
+  const [manualDraft, setManualDraft] = useState({
+    round: "1",
+    playerAUserId: "",
+    playerBUserId: "",
+    score: "",
+  });
+
+  async function loadResults() {
+    setLoading(true);
+    const [resultsRes, participantsRes] = await Promise.all([
+      apiClient.get(`/tournaments/${tournament.id}/results`),
+      apiClient.get(`/tournaments/${tournament.id}/participants`),
+    ]);
+
+    if (resultsRes.ok) {
+      setMatches(resultsRes.data.matches ?? []);
+      setStandings(resultsRes.data.standings ?? []);
+    } else {
+      toast.error(resultsRes.data?.message ?? "خطا در دریافت نتایج");
+    }
+
+    if (participantsRes.ok) {
+      setParticipants(participantsRes.data.participants ?? []);
+    } else {
+      toast.error(participantsRes.data?.message ?? "خطا در دریافت شرکت‌کنندگان");
+    }
+
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    loadResults();
+  }, [tournament.id]);
+
+  async function submitResult(matchId) {
+    const raw = scoreDrafts[matchId] ?? "";
+    const sets = parseSetsInput(raw);
+    if (!sets) {
+      toast.error("فرمت نتیجه نامعتبر است. مثال: 6-4, 3-6, 10-8");
+      return;
+    }
+
+    setSavingId(matchId);
+    const { ok, data } = await apiClient.patch(`/tournaments/${tournament.id}/matches/${matchId}/result`, { sets });
+    setSavingId(null);
+    if (!ok) {
+      toast.error(data?.message ?? "خطا در ثبت نتیجه");
+      return;
+    }
+
+    toast.success("نتیجه ثبت شد");
+    setMatches(data.matches ?? []);
+    setStandings(data.standings ?? []);
+    setScoreDrafts((prev) => ({ ...prev, [matchId]: "" }));
+  }
+
+  async function submitManualResult() {
+    const sets = parseSetsInput(manualDraft.score);
+    if (!manualDraft.playerAUserId || !manualDraft.playerBUserId) {
+      toast.error("انتخاب هر دو بازیکن الزامی است");
+      return;
+    }
+    if (manualDraft.playerAUserId === manualDraft.playerBUserId) {
+      toast.error("بازیکنان باید متفاوت باشند");
+      return;
+    }
+    if (!sets) {
+      toast.error("فرمت نتیجه نامعتبر است. مثال: 6-4, 3-6, 10-8");
+      return;
+    }
+
+    setSavingId("manual");
+    const { ok, data } = await apiClient.patch(`/tournaments/${tournament.id}/matches/manual/result`, {
+      round: Number(manualDraft.round || 1),
+      playerAUserId: manualDraft.playerAUserId,
+      playerBUserId: manualDraft.playerBUserId,
+      sets,
+    });
+    setSavingId(null);
+
+    if (!ok) {
+      toast.error(data?.message ?? "خطا در ثبت نتیجه");
+      return;
+    }
+
+    toast.success("نتیجه ثبت شد");
+    setMatches(data.matches ?? []);
+    setStandings(data.standings ?? []);
+    setManualDraft((prev) => ({ ...prev, playerAUserId: "", playerBUserId: "", score: "" }));
+  }
+
+  return (
+    <Modal open onClose={onClose} title={`مدیریت نتایج — ${tournament.title}`} size="lg">
+      <div className="space-y-4">
+        <div className="rounded-xl border border-border bg-muted/40 p-3">
+          <p className="text-[11px] text-muted-foreground">فرمت ثبت نتیجه ست‌ها</p>
+          <p className="text-xs font-semibold text-foreground mt-1">مثال: <span dir="ltr">6-4, 3-6, 10-8</span></p>
+        </div>
+
+        {loading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-12 rounded-xl bg-muted animate-pulse" />
+            ))}
+          </div>
+        ) : (
+          <>
+            <div className="rounded-xl border border-border p-3 space-y-2.5 bg-muted/20">
+              <p className="text-xs font-bold text-foreground">ثبت دستی نتیجه بازی</p>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
+                <select
+                  value={manualDraft.round}
+                  onChange={(e) => setManualDraft((prev) => ({ ...prev, round: e.target.value }))}
+                  className="rounded-lg border border-input bg-background px-3 py-2 text-xs text-foreground"
+                >
+                  {Array.from({ length: 16 }, (_, i) => i + 1).map((roundNumber) => (
+                    <option key={roundNumber} value={String(roundNumber)}>راند {roundNumber}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={manualDraft.playerAUserId}
+                  onChange={(e) => setManualDraft((prev) => ({ ...prev, playerAUserId: e.target.value }))}
+                  className="rounded-lg border border-input bg-background px-3 py-2 text-xs text-foreground"
+                >
+                  <option value="">بازیکن A</option>
+                  {participants.map((p) => (
+                    <option key={p.userId} value={p.userId}>{p.name ?? "کاربر"}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={manualDraft.playerBUserId}
+                  onChange={(e) => setManualDraft((prev) => ({ ...prev, playerBUserId: e.target.value }))}
+                  className="rounded-lg border border-input bg-background px-3 py-2 text-xs text-foreground"
+                >
+                  <option value="">بازیکن B</option>
+                  {participants.map((p) => (
+                    <option key={p.userId} value={p.userId}>{p.name ?? "کاربر"}</option>
+                  ))}
+                </select>
+
+                <input
+                  value={manualDraft.score}
+                  onChange={(e) => setManualDraft((prev) => ({ ...prev, score: e.target.value }))}
+                  placeholder="6-4, 3-6, 10-8"
+                  className="rounded-lg border border-input bg-background px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground"
+                  dir="ltr"
+                />
+              </div>
+              <button
+                onClick={submitManualResult}
+                disabled={savingId === "manual"}
+                className="px-3 py-2 rounded-lg bg-violet-600 text-white text-xs font-bold hover:bg-violet-700 disabled:opacity-60"
+              >
+                {savingId === "manual" ? "..." : "ثبت نتیجه جدید"}
+              </button>
+            </div>
+
+            <div className="rounded-xl border border-border overflow-hidden">
+              <div className="px-3 py-2 bg-muted text-xs font-bold text-foreground">جدول رده‌بندی</div>
+              {standings.length === 0 ? (
+                <div className="p-4 text-xs text-muted-foreground">هنوز جدولی تشکیل نشده است.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr className="border-b border-border bg-muted/40 text-muted-foreground">
+                        <th className="px-2 py-2 text-right">#</th>
+                        <th className="px-2 py-2 text-right">بازیکن</th>
+                        <th className="px-2 py-2 text-right">امتیاز</th>
+                        <th className="px-2 py-2 text-right">برد/باخت</th>
+                        <th className="px-2 py-2 text-right">تفاضل ست</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {standings.map((row) => (
+                        <tr key={row.userId} className="border-b border-border/60">
+                          <td className="px-2 py-2 font-bold">{row.rank}</td>
+                          <td className="px-2 py-2">{row.name ?? "کاربر"}</td>
+                          <td className="px-2 py-2 font-bold">{row.points}</td>
+                          <td className="px-2 py-2">{row.wins}/{row.losses}</td>
+                          <td className="px-2 py-2">{row.setDiff}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="max-h-[42vh] overflow-y-auto space-y-2 pr-0.5">
+              {matches.length === 0 ? (
+                <div className="text-center py-8 text-sm text-muted-foreground">
+                  هنوز نتیجه‌ای ثبت نشده است.
+                </div>
+              ) : (
+                matches.map((m) => {
+                  const canSubmit = m.status === "scheduled" && m.playerAUserId && m.playerBUserId;
+                  return (
+                    <div key={m.id} className="rounded-xl border border-border p-3 space-y-2.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-foreground">راند {m.round} — بازی {m.matchNumber}</span>
+                        <span className={cn(
+                          "px-2 py-0.5 rounded-full text-[10px] font-bold border",
+                          m.status === "finished" ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/25" :
+                          m.status === "walkover" ? "bg-blue-500/10 text-blue-600 border-blue-500/25" :
+                          "bg-muted text-muted-foreground border-border"
+                        )}>
+                          {m.status === "finished" ? "پایان یافته" : m.status === "walkover" ? "صعود خودکار" : "برنامه‌ریزی شده"}
+                        </span>
+                      </div>
+
+                      <div className="text-xs text-muted-foreground">
+                        {m.playerA?.name ?? "—"} <span className="mx-1">vs</span> {m.playerB?.name ?? "—"}
+                      </div>
+
+                      {m.status !== "scheduled" && (
+                        <div className="text-xs text-foreground">
+                          نتیجه: <span dir="ltr">{formatSetsSummary(m.scoreSets)}</span>
+                        </div>
+                      )}
+
+                      {canSubmit && (
+                        <div className="flex gap-2">
+                          <input
+                            value={scoreDrafts[m.id] ?? ""}
+                            onChange={(e) => setScoreDrafts((prev) => ({ ...prev, [m.id]: e.target.value }))}
+                            placeholder="6-4, 3-6, 10-8"
+                            className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground"
+                            dir="ltr"
+                          />
+                          <button
+                            onClick={() => submitResult(m.id)}
+                            disabled={savingId === m.id}
+                            className="px-3 py-2 rounded-lg bg-violet-600 text-white text-xs font-bold hover:bg-violet-700 disabled:opacity-60"
+                          >
+                            {savingId === m.id ? "..." : "ثبت"}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </Modal>
+  );
 }
 
 function UserAvatar({ image, name, className, fallbackClassName }) {
@@ -78,6 +339,26 @@ const dateTimeFormatFa = new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
   month: "long",
   day: "numeric",
 });
+
+function formatSetsSummary(sets) {
+  if (!Array.isArray(sets) || sets.length === 0) return "-";
+  return sets.map((set) => `${set.a}-${set.b}`).join(" | ");
+}
+
+function parseSetsInput(raw) {
+  if (!raw?.trim()) return null;
+  const parts = raw.split(/[,|]/).map((part) => part.trim()).filter(Boolean);
+  if (!parts.length) return null;
+  const sets = [];
+  for (const part of parts) {
+    const [aRaw, bRaw] = part.split("-").map((x) => x?.trim());
+    const a = Number(aRaw);
+    const b = Number(bRaw);
+    if (!Number.isFinite(a) || !Number.isFinite(b) || a < 0 || b < 0 || a === b) return null;
+    sets.push({ a, b });
+  }
+  return sets.length ? sets : null;
+}
 
 function toLocalDateTimeValue(date) {
   const pad = (value) => String(value).padStart(2, "0");
@@ -615,22 +896,22 @@ function ParticipantsModal({ tournament, onClose }) {
             <div className="text-center py-10 text-muted-foreground text-sm">هنوز کسی ثبت‌نام نکرده</div>
           ) : (
             participants.map((p, i) => (
-              <div key={p.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-border bg-muted/30">
-                <span className="text-xs font-mono text-muted-foreground w-5 shrink-0">#{i+1}</span>
+              <div key={p.id} className="flex min-h-14 items-center gap-3 px-3 py-2 rounded-xl border border-border bg-muted/30">
+                <span className="text-xs font-mono text-muted-foreground w-5 shrink-0 leading-none">#{i+1}</span>
                 <UserAvatar
                   image={p.image}
                   name={p.name}
                   className="w-8 h-8 rounded-full text-white text-xs font-bold"
                   fallbackClassName="w-8 h-8 rounded-full bg-gradient-to-br from-violet-600 to-indigo-600 text-white text-xs font-bold"
                 />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-foreground truncate">{p.name ?? "ناشناس"}</p>
-                  <p className="text-xs text-muted-foreground" dir="ltr">{p.phone ?? "-"}</p>
+                <div className="flex-1 min-w-0 flex items-center gap-3">
+                  <p className="text-sm font-semibold text-foreground truncate leading-none">{p.name ?? "ناشناس"}</p>
+                  <p className="text-xs text-muted-foreground leading-none shrink-0" dir="ltr">{p.phone ?? "-"}</p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
-                  <span className="text-[11px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded">سطح {p.level}</span>
+                  <span className="inline-flex h-7 items-center text-[11px] text-muted-foreground bg-muted px-1.5 rounded">سطح {p.level}</span>
                   <span className={cn(
-                    "text-[11px] font-semibold px-2 py-0.5 rounded-full border",
+                    "inline-flex h-7 items-center text-[11px] font-semibold px-2 rounded-full border",
                     p.paymentStatus === "paid"
                       ? "text-emerald-600 bg-emerald-500/10 border-emerald-500/25"
                       : "text-amber-600 bg-amber-500/10 border-amber-500/25"
@@ -688,7 +969,7 @@ function DeleteModal({ tournament, onClose, onDeleted }) {
 
 // ─── Tournament Card ───────────────────────────────────────────────────────────
 
-function TournamentAdminCard({ tournament, onStatusChange, onViewParticipants, onEdit, onDelete }) {
+function TournamentAdminCard({ tournament, onStatusChange, onViewParticipants, onManageResults, onEdit, onDelete }) {
   const [actionLoading, setActionLoading] = useState(null);
   const phase = tournament.phase ?? "registration";
   const phaseCfg = PHASE_CONFIG[phase] ?? PHASE_CONFIG.registration;
@@ -701,6 +982,16 @@ function TournamentAdminCard({ tournament, onStatusChange, onViewParticipants, o
     setActionLoading(null);
     if (ok) { toast.success(`تورنومنت ${label} شد`); onStatusChange(); }
     else toast.error(data?.message ?? "خطا");
+  }
+
+  async function copyInviteLink() {
+    const url = `${PUBLIC_APP_BASE.replace(/\/$/, "")}/tournament/invite/${tournament.id}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("لینک دعوت کپی شد");
+    } catch {
+      toast.error("خطا در کپی لینک");
+    }
   }
 
   return (
@@ -773,14 +1064,31 @@ function TournamentAdminCard({ tournament, onStatusChange, onViewParticipants, o
         </div>
 
         {/* Actions */}
-        <div className="flex gap-2 pt-1">
+        <div className={cn("grid gap-2 pt-1", phase === "registration" ? "grid-cols-2" : "grid-cols-3")}>
           <button
             onClick={onViewParticipants}
-            className="flex-1 py-1.5 rounded-xl border border-border text-xs text-muted-foreground hover:bg-muted transition-colors"
+            className="py-1.5 rounded-xl border border-border text-xs text-muted-foreground hover:bg-muted transition-colors"
           >
             👥 شرکت‌کنندگان
           </button>
+          {phase !== "registration" && (
+            <button
+              onClick={onManageResults}
+              className="py-1.5 rounded-xl border border-blue-500/25 bg-blue-500/10 text-xs font-semibold text-blue-600 hover:bg-blue-500/15 transition-colors"
+            >
+              🏁 نتایج
+            </button>
+          )}
+          <button
+            onClick={copyInviteLink}
+            className="flex items-center justify-center gap-1.5 py-1.5 rounded-xl border border-emerald-500/25 bg-emerald-500/10 text-xs font-semibold text-emerald-600 hover:bg-emerald-500/15 transition-colors"
+          >
+            <Share2Icon className="w-3.5 h-3.5" />
+            لینک دعوت
+          </button>
+        </div>
 
+        <div className="flex gap-2">
           {phase === "registration" && (
             <button
               onClick={() => changeStatus("ongoing", "شروع شد")}
@@ -827,6 +1135,7 @@ export default function TournamentsPage() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [participantsModal, setParticipantsModal] = useState(null);
+  const [resultsModal, setResultsModal] = useState(null);
   const [deleteModal, setDeleteModal] = useState(null);
   const [phaseFilter, setPhaseFilter] = useState(null);
 
@@ -859,6 +1168,9 @@ export default function TournamentsPage() {
     if (wizardStep === 1) {
       if (!form.registrationDeadline || !form.startDate || !form.endDate) {
         toast.error("همه تاریخ‌ها الزامی هستند"); return false;
+      }
+      if (new Date(form.registrationDeadline) < new Date()) {
+        toast.error("مهلت ثبت‌نام نباید قبل از زمان فعلی باشد"); return false;
       }
       if (new Date(form.registrationDeadline) >= new Date(form.startDate)) {
         toast.error("مهلت ثبت‌نام باید قبل از شروع باشد"); return false;
@@ -948,6 +1260,7 @@ export default function TournamentsPage() {
               tournament={t}
               onStatusChange={fetchTournaments}
               onViewParticipants={() => setParticipantsModal(t)}
+              onManageResults={() => setResultsModal(t)}
               onEdit={() => openEdit(t)}
               onDelete={() => setDeleteModal(t)}
             />
@@ -969,6 +1282,14 @@ export default function TournamentsPage() {
           tournament={deleteModal}
           onClose={() => setDeleteModal(null)}
           onDeleted={fetchTournaments}
+        />
+      )}
+
+      {/* Results modal */}
+      {resultsModal && (
+        <ResultsModal
+          tournament={resultsModal}
+          onClose={() => setResultsModal(null)}
         />
       )}
 

@@ -488,6 +488,10 @@ export default function CreateTournamentSheet({ onCreated }) {
       if (!form.registrationDeadline) { toast.error("مهلت ثبت‌نام الزامی است"); return false; }
       if (!form.startDate) { toast.error("تاریخ شروع الزامی است"); return false; }
       if (!form.endDate) { toast.error("تاریخ پایان الزامی است"); return false; }
+      if (new Date(form.registrationDeadline) < new Date()) {
+        toast.error("مهلت ثبت‌نام نباید قبل از زمان فعلی باشد");
+        return false;
+      }
       if (new Date(form.registrationDeadline) >= new Date(form.startDate)) {
         toast.error("مهلت ثبت‌نام باید قبل از شروع مسابقه باشد");
         return false;

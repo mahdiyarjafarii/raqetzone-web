@@ -35,6 +35,14 @@ const WEEKLY_HOURS = [
   { value: "6",  label: "بیشتر از ۵ ساعت در هفته", emoji: "�" },
 ];
 
+const PROVINCES = [
+  "آذربایجان شرقی", "آذربایجان غربی", "اردبیل", "اصفهان", "البرز", "ایلام", "بوشهر",
+  "تهران", "چهارمحال و بختیاری", "خراسان جنوبی", "خراسان رضوی", "خراسان شمالی",
+  "خوزستان", "زنجان", "سمنان", "سیستان و بلوچستان", "فارس", "قزوین", "قم",
+  "کردستان", "کرمان", "کرمانشاه", "کهگیلویه و بویراحمد", "گلستان", "گیلان", "لرستان",
+  "مازندران", "مرکزی", "هرمزگان", "همدان", "یزد",
+];
+
 // 0=welcome, 1=profile, 2=photo, 3=sport, 4=level, 5=duration
 const TOTAL_STEPS = 6;
 const MAX_ONBOARDING_IMAGE_SIZE_MB = 5;
@@ -110,7 +118,7 @@ function StepWelcome() {
   );
 }
 
-function StepProfileInfo({ firstName, lastName, city, onFirstNameChange, onLastNameChange, onCityChange }) {
+function StepProfileInfo({ firstName, lastName, city, onFirstNameChange, onLastNameChange, onOpenProvincePicker }) {
   return (
     <div className="space-y-6 text-center">
       <div>
@@ -137,18 +145,57 @@ function StepProfileInfo({ firstName, lastName, city, onFirstNameChange, onLastN
           maxLength={60}
         />
         <div className="relative">
-          <MapPinIcon className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary" />
-          <input
-            type="text"
-            value={city}
-            onChange={e => onCityChange(e.target.value)}
-            placeholder="شهر، مثل تهران"
-            className="w-full bg-muted border-0 rounded-2xl px-4 py-4 pr-11 text-center text-lg font-bold text-foreground placeholder:text-muted-foreground placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
-            maxLength={60}
-          />
+          <MapPinIcon className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-primary pointer-events-none" />
+          <button
+            type="button"
+            onClick={onOpenProvincePicker}
+            className="w-full bg-muted border-0 rounded-2xl px-4 py-4 pr-11 text-center text-lg font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 transition-all"
+          >
+            {city || "انتخاب استان"}
+          </button>
         </div>
       </div>
     </div>
+  );
+}
+
+function ProvincePickerSheet({ open, onClose, query, onQueryChange, provinces, onSelect }) {
+  return (
+    <BottomSheet
+      open={open}
+      onDismiss={onClose}
+      snapPoints={({ maxHeight }) => [Math.min(maxHeight * 0.78, 560)]}
+      defaultSnap={({ snapPoints }) => snapPoints[0]}
+    >
+      <div className="px-5 pt-2 pb-8 space-y-3" dir="rtl">
+        <h3 className="text-base font-black text-foreground text-center">انتخاب استان</h3>
+        <input
+          autoFocus
+          type="text"
+          value={query}
+          onChange={(e) => onQueryChange(e.target.value)}
+          placeholder="جستجو در استان‌ها..."
+          className="w-full bg-muted border-0 rounded-2xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+        />
+
+        <div className="max-h-[48vh] overflow-y-auto space-y-1.5">
+          {provinces.length === 0 ? (
+            <p className="text-center text-xs text-muted-foreground py-6">استانی پیدا نشد</p>
+          ) : (
+            provinces.map((province) => (
+              <button
+                key={province}
+                type="button"
+                onClick={() => onSelect(province)}
+                className="w-full rounded-xl bg-muted/60 px-3 py-3 text-sm font-semibold text-foreground hover:bg-muted transition-colors text-right"
+              >
+                {province}
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+    </BottomSheet>
   );
 }
 
@@ -161,7 +208,7 @@ function StepPhoto({ preview, onSelect, uploading }) {
         <div className="text-5xl mb-4">🤳</div>
         <h2 className="text-xl font-black text-foreground">عکس پروفایلت رو بزار</h2>
         <p className="text-muted-foreground text-sm mt-2">
-          برای ادامه انتخاب عکس الزامیه 📸
+          اختیاریه، ولی پروفایلت رو جذاب‌تر می‌کنه 📸
         </p>
       </div>
 
@@ -356,6 +403,8 @@ export default function OnboardingSheet() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [city, setCity] = useState("");
+  const [provincePickerOpen, setProvincePickerOpen] = useState(false);
+  const [provinceQuery, setProvinceQuery] = useState("");
   const [photoPreview, setPhotoPreview] = useState(null);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [sports, setSports] = useState(["padel"]);
@@ -364,10 +413,13 @@ export default function OnboardingSheet() {
   const [saving, setSaving] = useState(false);
 
   const isLastStep = step === TOTAL_STEPS - 1;
+  const filteredProvinces = PROVINCES.filter((province) =>
+    province.includes(provinceQuery.trim())
+  );
 
   const canNext = () => {
     if (step === 1) return firstName.trim().length >= 2 && lastName.trim().length >= 2 && city.trim().length >= 2;
-    if (step === 2) return !!photoPreview && !photoUploading;
+    if (step === 2) return !photoUploading;
     if (step === 3) return sports.length > 0;
     return true;
   };
@@ -464,20 +516,21 @@ export default function OnboardingSheet() {
 
   const btnLabel = () => {
     if (step === 0) return "شروع کن 🚀";
-    if (step === 2) return photoUploading ? "در حال آپلود..." : photoPreview ? "ادامه" : "عکس پروفایل الزامی است";
+    if (step === 2) return photoUploading ? "در حال آپلود..." : "ادامه";
     if (isLastStep) return saving ? "در حال ذخیره..." : "بزن بریم! 🎉";
     return "بعدی";
   };
 
   return (
-    <BottomSheet
-      open={open}
-      onDismiss={() => {}}
-      blocking
-      snapPoints={({ maxHeight }) => [Math.min(maxHeight * 0.88, 640)]}
-      defaultSnap={({ snapPoints }) => snapPoints[0]}
-    >
-      <div className="px-5 pt-2 pb-10">
+    <>
+      <BottomSheet
+        open={open}
+        onDismiss={() => {}}
+        blocking
+        snapPoints={({ maxHeight }) => [Math.min(maxHeight * 0.88, 640)]}
+        defaultSnap={({ snapPoints }) => snapPoints[0]}
+      >
+        <div className="px-5 pt-2 pb-10">
         <ProgressDots current={step} total={TOTAL_STEPS} />
 
         <AnimatePresence mode="wait">
@@ -496,7 +549,7 @@ export default function OnboardingSheet() {
                 city={city}
                 onFirstNameChange={setFirstName}
                 onLastNameChange={setLastName}
-                onCityChange={setCity}
+                onOpenProvincePicker={() => setProvincePickerOpen(true)}
               />
             )}
             {step === 2 && (
@@ -536,7 +589,24 @@ export default function OnboardingSheet() {
             </button>
           )}
         </div>
-      </div>
-    </BottomSheet>
+        </div>
+      </BottomSheet>
+
+      <ProvincePickerSheet
+        open={provincePickerOpen}
+        onClose={() => {
+          setProvincePickerOpen(false);
+          setProvinceQuery("");
+        }}
+        query={provinceQuery}
+        onQueryChange={setProvinceQuery}
+        provinces={filteredProvinces}
+        onSelect={(province) => {
+          setCity(province);
+          setProvincePickerOpen(false);
+          setProvinceQuery("");
+        }}
+      />
+    </>
   );
 }

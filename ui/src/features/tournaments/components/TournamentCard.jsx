@@ -57,8 +57,10 @@ export default function TournamentCard({ tournament, onClick, index = 0 }) {
   const isFree = tournament.entryFee === 0;
   const clubName =
     tournament.club?.name ??
+    tournament.club?.clubName ??
     tournament.clubName ??
     tournament.club?.title ??
+    tournament.organizerClub?.name ??
     tournament.organizerClubName ??
     tournament.organizer?.name ??
     tournament.venue?.name ??

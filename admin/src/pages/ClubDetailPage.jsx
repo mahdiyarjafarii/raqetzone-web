@@ -214,7 +214,7 @@ function CourtForm({ form, setForm, onSubmit, loading, submitLabel, isEdit = fal
             </div>
           )}
           <div className="flex gap-2 pt-1">
-            <Button type="button" variant="outline" onClick={prev} className="flex-1">← قبلی</Button>
+            <Button type="button" variant="outline" onClick={prev} className="flex-1">قبلی →</Button>
             <Button type="button" disabled={!form.pricePerHour} onClick={next} className="flex-1">بعدی ←</Button>
           </div>
         </motion.div>
@@ -250,7 +250,7 @@ function CourtForm({ form, setForm, onSubmit, loading, submitLabel, isEdit = fal
             <p>⏱️ اسلات {form.slotDuration} دقیقه‌ای</p>
           </div>
           <div className="flex gap-2 pt-1">
-            <Button type="button" variant="outline" onClick={prev} className="flex-1">← قبلی</Button>
+            <Button type="button" variant="outline" onClick={prev} className="flex-1">قبلی →</Button>
             <Button type="button" onClick={onSubmit} disabled={loading} className="flex-1">
               {loading ? "در حال ثبت..." : submitLabel}
             </Button>
