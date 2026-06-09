@@ -3,6 +3,7 @@ import { db } from "../db/index.js";
 import { clubs, courts, bookings, users, slotOverrides, tournaments, tournamentRegistrations, deals } from "../db/schema.js";
 import { sendNotification } from "../utils/sendNotification.js";
 import { formatBookingDateTimeFa } from "../utils/bookingTime.js";
+import { validateIranianPhone } from "../utils/validation.js";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -296,6 +297,10 @@ export const createClubCourtController = async (req, res) => {
 
     const { name, location, address, surfaceType, sportType, pricePerHour, openTime, closeTime, slotDuration, description, managerPhone } = req.body;
     if (!name || !pricePerHour) return res.status(400).json({ message: "نام و قیمت الزامی است" });
+    const normalizedManagerPhone = typeof managerPhone === "string" ? managerPhone.trim() : "";
+    if (normalizedManagerPhone && !validateIranianPhone(normalizedManagerPhone)) {
+      return res.status(400).json({ message: "فرمت شماره مدیر زمین نامعتبر است" });
+    }
     const parsedSlotDuration = parseInt(slotDuration ?? "60", 10);
     if (![60, 90].includes(parsedSlotDuration)) {
       return res.status(400).json({ message: "مدت اسلات فقط می‌تواند ۶۰ یا ۹۰ دقیقه باشد" });
@@ -318,7 +323,7 @@ export const createClubCourtController = async (req, res) => {
         closeTime: closeTime || club?.closeTime || "23:00",
         slotDuration: parsedSlotDuration,
         description: description || null,
-        managerPhone: managerPhone || club?.phone || null,
+        managerPhone: normalizedManagerPhone || club?.phone || null,
       })
       .returning();
 
@@ -346,6 +351,12 @@ export const updateClubCourtController = async (req, res) => {
             return res.status(400).json({ message: "مدت اسلات فقط می‌تواند ۶۰ یا ۹۰ دقیقه باشد" });
           }
           updates[f] = parsedSlotDuration;
+        } else if (f === "managerPhone") {
+          const normalizedManagerPhone = typeof req.body[f] === "string" ? req.body[f].trim() : "";
+          if (normalizedManagerPhone && !validateIranianPhone(normalizedManagerPhone)) {
+            return res.status(400).json({ message: "فرمت شماره مدیر زمین نامعتبر است" });
+          }
+          updates[f] = normalizedManagerPhone || null;
         } else {
           updates[f] = f === "pricePerHour" ? parseInt(req.body[f], 10) : req.body[f];
         }

@@ -50,6 +50,13 @@ function validateCourtTimes(courtForm, club) {
   return null;
 }
 
+function validateManagerPhone(managerPhone) {
+  const normalized = (managerPhone ?? "").trim();
+  if (!normalized) return null;
+  if (!/^09\d{9}$/.test(normalized)) return "شماره مدیر زمین باید با 09 شروع شود و 11 رقم باشد";
+  return null;
+}
+
 function isTennisSport(sportType) {
   return sportType === "tennis";
 }
@@ -303,6 +310,8 @@ export default function ClubDetailPage() {
     e.preventDefault();
     const timeError = validateCourtTimes(form, club);
     if (timeError) return toast.error(timeError);
+    const managerPhoneError = validateManagerPhone(form.managerPhone);
+    if (managerPhoneError) return toast.error(managerPhoneError);
     setSaving(true);
     const { ok, data } = await apiClient.post(`/club-panel/clubs/${clubId}/courts`, normalizeCourtPayload(form));
     setSaving(false);
@@ -315,6 +324,8 @@ export default function ClubDetailPage() {
     e.preventDefault();
     const timeError = validateCourtTimes(form, club);
     if (timeError) return toast.error(timeError);
+    const managerPhoneError = validateManagerPhone(form.managerPhone);
+    if (managerPhoneError) return toast.error(managerPhoneError);
     setSaving(true);
     const { ok, data } = await apiClient.patch(`/club-panel/courts/${editTarget.id}`, normalizeCourtPayload(form));
     setSaving(false);
