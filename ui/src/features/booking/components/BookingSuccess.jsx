@@ -2,11 +2,11 @@ import React from "react";
 import { motion } from "framer-motion";
 import { CheckCircle2Icon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { formatPersianDateInTehran } from "@/lib/timezone";
 import BookingStatusBadge from "./BookingStatusBadge";
 
 function formatDateFa(dateStr) {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString("fa-IR", { weekday: "long", month: "long", day: "numeric" });
+  return formatPersianDateInTehran(dateStr, { weekday: "long", month: "long", day: "numeric" });
 }
 
 function formatPrice(p) {

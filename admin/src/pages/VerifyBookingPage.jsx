@@ -8,7 +8,9 @@ import {
 import toast from "react-hot-toast";
 import apiClient from "@/lib/apiClient";
 import PageHeader from "@/components/PageHeader";
-import { cn } from "@/lib/utils";
+import { cn, getUserFullName } from "@/lib/utils";
+
+const TEHRAN_TIME_ZONE = "Asia/Tehran";
 
 const SPORT_LABELS = {
   padel: "پدل", tennis: "تنیس", squash: "اسکواش",
@@ -66,6 +68,12 @@ export default function VerifyBookingPage() {
   };
 
   const statusCfg = result ? (STATUS_MAP[result.booking.status] ?? STATUS_MAP.cancelled) : null;
+  const bookingUser = result?.booking
+    ? {
+        firstName: result.booking.userFirstName,
+        lastName: result.booking.userLastName,
+      }
+    : null;
 
   return (
     <div dir="rtl">
@@ -183,11 +191,11 @@ export default function VerifyBookingPage() {
                 </div>
 
                 <div className="px-4 divide-y divide-border">
-                  <InfoRow icon={UserIcon}     label="نام مشتری"   value={result.booking.userName  || "—"} />
+                  <InfoRow icon={UserIcon}     label="نام مشتری"   value={getUserFullName(bookingUser)} />
                   <InfoRow icon={PhoneIcon}    label="شماره موبایل" value={result.booking.userPhone || "—"} mono />
                   <InfoRow icon={MapPinIcon}   label="زمین"         value={`${result.booking.courtName} — ${SPORT_LABELS[result.booking.sportType] ?? result.booking.sportType}`} />
                   <InfoRow icon={MapPinIcon}   label="باشگاه"       value={result.booking.clubName} />
-                  <InfoRow icon={CalendarIcon} label="تاریخ"        value={new Date(result.booking.date).toLocaleDateString("fa-IR", { year:"numeric", month:"long", day:"numeric" })} />
+                  <InfoRow icon={CalendarIcon} label="تاریخ"        value={new Date(result.booking.date).toLocaleDateString("fa-IR", { timeZone: TEHRAN_TIME_ZONE, year:"numeric", month:"long", day:"numeric" })} />
                   <InfoRow icon={ClockIcon}    label="ساعت"         value={`${result.booking.startTime} تا ${result.booking.endTime}`} mono />
                   {(() => {
                     const b = result.booking;

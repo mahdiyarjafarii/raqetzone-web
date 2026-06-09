@@ -5,7 +5,7 @@ import toast from "react-hot-toast";
 import apiClient from "@/lib/apiClient";
 import PageHeader from "@/components/PageHeader";
 import Badge from "@/components/ui/Badge";
-import { fmtDate } from "@/lib/utils";
+import { fmtDate, getUserFullName } from "@/lib/utils";
 
 const PLAN_LABEL = { basic:"پلاس", premium:"پریمیوم", pro:"حرفه‌ای" };
 
@@ -24,7 +24,10 @@ export default function UsersPage() {
   }, []);
 
   const filtered = search
-    ? users.filter(u => u.name?.includes(search) || u.phone?.includes(search))
+    ? users.filter((u) => {
+        const fullName = getUserFullName(u);
+        return fullName.includes(search) || u.phone?.includes(search);
+      })
     : users;
 
   return (
@@ -53,7 +56,7 @@ export default function UsersPage() {
               )) : filtered.map((u,i)=>(
                 <motion.tr key={u.id} initial={{opacity:0}} animate={{opacity:1}} transition={{delay:i*0.02}}
                   className="border-b border-border last:border-0 hover:bg-muted/20 transition-colors">
-                  <td className="px-4 py-3 font-medium text-foreground">{u.name ?? "—"}</td>
+                  <td className="px-4 py-3 font-medium text-foreground">{getUserFullName(u)}</td>
                   <td className="px-4 py-3 text-muted-foreground font-mono text-xs" dir="ltr">{u.phone}</td>
                   <td className="px-4 py-3">
                     {u.subscriptionType

@@ -137,6 +137,8 @@ export const verifyOTPController = async (req, res) => {
         id: user.id,
         phone: user.phone,
         name: user.name,
+        firstName: user.firstName,
+        lastName: user.lastName,
         email: user.email,
         image: user.image,
         isAdmin: user.isAdmin ?? false,

@@ -1,4 +1,4 @@
-import { eq, and, desc, count } from "drizzle-orm";
+import { eq, and, desc, count, inArray } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { bookings, courts, clubs, users, discountCodes, discountCodeUsages, slotOverrides } from "../db/schema.js";
 import { sendNotification } from "../utils/sendNotification.js";
@@ -7,6 +7,14 @@ import { formatBookingDateTimeFa } from "../utils/bookingTime.js";
 import { payBookingWithWallet } from "./walletController.js";
 
 const WELCOME_DISCOUNT_CODE = "WELCOME20";
+const PLATFORM_PUBLIC_DISCOUNT_CODES = new Set([WELCOME_DISCOUNT_CODE]);
+const TEHRAN_OFFSET = "+03:30";
+const BOOKING_TIME_PASSED_NOTE = "تایم زمین گذشته";
+
+function isPlatformPublicDiscountCode(code) {
+  if (!code) return false;
+  return PLATFORM_PUBLIC_DISCOUNT_CODES.has(String(code).toUpperCase().trim());
+}
 
 function generateTrackingCode() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -18,6 +26,57 @@ function generateTrackingCode() {
 function timeToMinutes(t) {
   const [h, m] = t.split(":").map(Number);
   return h * 60 + m;
+}
+
+function parseBookingEndDateTime(date, endTime) {
+  if (!date || !endTime) return null;
+  const parsed = new Date(`${date}T${endTime}:00${TEHRAN_OFFSET}`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function isPendingBookingExpiredByTime(booking, now = new Date()) {
+  if (!booking || booking.status !== "pending") return false;
+  const endDateTime = parseBookingEndDateTime(booking.date, booking.endTime);
+  return Boolean(endDateTime && endDateTime <= now);
+}
+
+async function notifyBookingExpiredByTime(booking) {
+  if (!booking?.userId) return;
+  const bookingDateTime = formatBookingDateTimeFa(booking);
+  await sendNotification(booking.userId, {
+    title: "رزرو شما منقضی شد ⌛️",
+    message: `درخواست رزرو شما برای ${bookingDateTime} به‌صورت خودکار رد شد چون تایم زمین گذشته است.`,
+    type: "BOOKING",
+    metadata: {
+      bookingId: booking.id,
+      date: booking.date,
+      startTime: booking.startTime,
+      ctaHref: "/mybooking",
+      ctaLabel: "مشاهده رزروها",
+    },
+  }).catch(() => {});
+}
+
+async function expirePendingBookings(bookingsList) {
+  const now = new Date();
+  const expiredBookings = bookingsList
+    .filter((booking) => isPendingBookingExpiredByTime(booking, now));
+  const expiredIds = expiredBookings.map((booking) => booking.id);
+
+  if (expiredIds.length === 0) return [];
+
+  await db
+    .update(bookings)
+    .set({
+      status: "rejected",
+      adminNote: BOOKING_TIME_PASSED_NOTE,
+      updatedAt: now,
+    })
+    .where(inArray(bookings.id, expiredIds));
+
+  await Promise.allSettled(expiredBookings.map((booking) => notifyBookingExpiredByTime(booking)));
+
+  return expiredIds;
 }
 
 async function getUserPhone(userId) {
@@ -197,18 +256,19 @@ export const createBookingController = async (req, res) => {
     let discountAmount = 0;
     if (discountCode) {
       const normalizedDiscountCode = discountCode.toUpperCase().trim();
+      const isPlatformCode = isPlatformPublicDiscountCode(normalizedDiscountCode);
       if (normalizedDiscountCode === WELCOME_DISCOUNT_CODE) {
         discountCodeRow = await findOrCreateWelcomeDiscount(court.clubId);
       } else {
         [discountCodeRow] = await db
           .select()
           .from(discountCodes)
-          .where(and(
-            eq(discountCodes.code, normalizedDiscountCode),
-            eq(discountCodes.clubId, court.clubId),
-            eq(discountCodes.isActive, true),
-          ))
+          .where(eq(discountCodes.code, normalizedDiscountCode))
           .limit(1);
+      }
+
+      if (discountCodeRow && !isPlatformCode && discountCodeRow.clubId !== court.clubId) {
+        discountCodeRow = null;
       }
 
       if (discountCodeRow?.isActive) {
@@ -218,7 +278,7 @@ export const createBookingController = async (req, res) => {
         const belowMin = discountCodeRow.minBookingPrice && priceAfterSlot < discountCodeRow.minBookingPrice;
 
         if (!expired && !maxedOut && !belowMin) {
-          const usageCount = normalizedDiscountCode === WELCOME_DISCOUNT_CODE
+          const usageCount = isPlatformCode
             ? await getDiscountUsageCountByPhone(discountCodeRow.id, await getUserPhone(userId))
             : (await db
                 .select({ cnt: count() })
@@ -343,6 +403,20 @@ export const getMyBookingsController = async (req, res) => {
   try {
     const userId = req.user.id;
 
+    const pendingRows = await db
+      .select({
+        id: bookings.id,
+        userId: bookings.userId,
+        date: bookings.date,
+        startTime: bookings.startTime,
+        endTime: bookings.endTime,
+        status: bookings.status,
+      })
+      .from(bookings)
+      .where(and(eq(bookings.userId, userId), eq(bookings.status, "pending")));
+
+    await expirePendingBookings(pendingRows);
+
     const rows = await db
       .select({
         id: bookings.id,
@@ -413,6 +487,22 @@ export const getAdminBookingsController = async (req, res) => {
   try {
     const { status } = req.query;
 
+    if (!status || status === "pending") {
+      const pendingRows = await db
+        .select({
+          id: bookings.id,
+          userId: bookings.userId,
+          date: bookings.date,
+          startTime: bookings.startTime,
+          endTime: bookings.endTime,
+          status: bookings.status,
+        })
+        .from(bookings)
+        .where(eq(bookings.status, "pending"));
+
+      await expirePendingBookings(pendingRows);
+    }
+
     const conditions = [];
     if (status) conditions.push(eq(bookings.status, status));
 
@@ -470,6 +560,21 @@ export const updateBookingStatusController = async (req, res) => {
     if (!booking) return res.status(404).json({ message: "رزرو یافت نشد" });
     if (booking.status !== "pending") {
       return res.status(400).json({ message: "فقط رزروهای در انتظار قابل بررسی هستند" });
+    }
+
+    if (isPendingBookingExpiredByTime(booking)) {
+      await db
+        .update(bookings)
+        .set({
+          status: "rejected",
+          adminNote: BOOKING_TIME_PASSED_NOTE,
+          updatedAt: new Date(),
+        })
+        .where(eq(bookings.id, id));
+
+      await notifyBookingExpiredByTime(booking);
+
+      return res.status(400).json({ message: BOOKING_TIME_PASSED_NOTE });
     }
 
     const [updated] = await db
@@ -557,6 +662,20 @@ export const getBookingByTrackingCodeController = async (req, res) => {
       .limit(1);
 
     if (!row) return res.status(404).json({ message: "رزروی با این کد یافت نشد" });
+
+    if (isPendingBookingExpiredByTime(row)) {
+      await db
+        .update(bookings)
+        .set({
+          status: "rejected",
+          adminNote: BOOKING_TIME_PASSED_NOTE,
+          updatedAt: new Date(),
+        })
+        .where(eq(bookings.id, row.id));
+
+      row.status = "rejected";
+      row.adminNote = BOOKING_TIME_PASSED_NOTE;
+    }
 
     return res.status(200).json({ booking: row });
   } catch (error) {

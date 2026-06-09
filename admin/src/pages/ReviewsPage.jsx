@@ -5,9 +5,10 @@ import toast from "react-hot-toast";
 import apiClient from "@/lib/apiClient";
 import PageHeader from "@/components/PageHeader";
 import Badge from "@/components/ui/Badge";
-import { cn } from "@/lib/utils";
+import { cn, getUserFullName } from "@/lib/utils";
 
 const BASE = import.meta.env.VITE_API_URL?.replace("/api", "") ?? "http://localhost:3000";
+const TEHRAN_TIME_ZONE = "Asia/Tehran";
 
 function Stars({ value }) {
   return (
@@ -22,7 +23,7 @@ function Stars({ value }) {
 }
 
 function formatDate(d) {
-  try { return new Date(d).toLocaleDateString("fa-IR", { year:"numeric", month:"long", day:"numeric" }); }
+  try { return new Date(d).toLocaleDateString("fa-IR", { timeZone: TEHRAN_TIME_ZONE, year:"numeric", month:"long", day:"numeric" }); }
   catch { return ""; }
 }
 
@@ -177,7 +178,9 @@ export default function ReviewsPage() {
             <p>هنوز نظری ثبت نشده</p>
           </div>
         ) : (
-          reviews.map((r, i) => (
+          reviews.map((r, i) => {
+            const fullName = getUserFullName(r.user);
+            return (
             <motion.div key={r.id} initial={{opacity:0, y:8}} animate={{opacity:1, y:0}} transition={{delay:i*0.04}}
               className="bg-card border border-border rounded-2xl p-4">
               <div className="flex items-start justify-between gap-3 mb-2">
@@ -185,11 +188,11 @@ export default function ReviewsPage() {
                   <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden">
                     {r.user?.image
                       ? <img src={r.user.image.startsWith("http") ? r.user.image : `${BASE}/uploads/user/${r.user.image}`} alt="" className="w-full h-full object-cover" />
-                      : <span className="text-sm font-bold text-primary">{r.user?.name?.[0]?.toUpperCase() ?? "?"}</span>
+                      : <span className="text-sm font-bold text-primary">{fullName?.[0]?.toUpperCase() ?? ""}</span>
                     }
                   </div>
                   <div>
-                    <p className="font-bold text-sm text-foreground">{r.user?.name ?? "کاربر"}</p>
+                    <p className="font-bold text-sm text-foreground">{fullName}</p>
                     <p className="text-[10px] text-muted-foreground">{formatDate(r.createdAt)}</p>
                   </div>
                 </div>
@@ -203,7 +206,8 @@ export default function ReviewsPage() {
               {r.comment && <p className="text-sm text-foreground leading-relaxed mb-2">{r.comment}</p>}
               <ReplyForm review={r} onSave={() => fetchReviews(selectedClub.id)} />
             </motion.div>
-          ))
+            );
+          })
         )}
       </div>
     </div>

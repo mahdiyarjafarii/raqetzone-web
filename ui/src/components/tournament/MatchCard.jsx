@@ -4,6 +4,7 @@ import { MapPinIcon, CalendarIcon, UsersIcon, ChevronRightIcon, ClockIcon, UserI
 import { cn } from "@/lib/utils";
 import UserAvatar from "@/components/ui/UserAvatar";
 import UserProfileSheet from "@/components/ui/UserProfileSheet";
+import { addDaysToDateKey, formatDateKeyInTehran, getTodayDateKeyInTehran } from "@/lib/timezone";
 
 function useCountdown(targetDate) {
   const [label, setLabel] = useState("");
@@ -50,17 +51,17 @@ const SPORT_ACCENT = {
 
 function formatDate(dateStr) {
   const date = new Date(dateStr);
-  const now = new Date();
-  const tomorrow = new Date();
-  tomorrow.setDate(now.getDate() + 1);
-
-  const isToday = date.toDateString() === now.toDateString();
-  const isTomorrow = date.toDateString() === tomorrow.toDateString();
-  const timeStr = date.toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" });
+  const nowTehranKey = getTodayDateKeyInTehran();
+  const tomorrowKey = addDaysToDateKey(nowTehranKey, 1);
+  const matchDateKey = formatDateKeyInTehran(date);
+  const isToday = matchDateKey === nowTehranKey;
+  const isTomorrow = matchDateKey === tomorrowKey;
+  const timeStr = date.toLocaleTimeString("fa-IR", { timeZone: "Asia/Tehran", hour: "2-digit", minute: "2-digit" });
 
   if (isToday) return `امروز ساعت ${timeStr}`;
   if (isTomorrow) return `فردا ساعت ${timeStr}`;
   return date.toLocaleDateString("fa-IR", {
+    timeZone: "Asia/Tehran",
     weekday: "short",
     month: "short",
     day: "numeric",

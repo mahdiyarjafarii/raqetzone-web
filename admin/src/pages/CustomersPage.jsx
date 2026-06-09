@@ -11,8 +11,9 @@ import apiClient from "@/lib/apiClient";
 import PageHeader from "@/components/PageHeader";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
-import { fmt, cn } from "@/lib/utils";
+import { fmt, cn, getUserFullName } from "@/lib/utils";
 
+const TEHRAN_TIME_ZONE = "Asia/Tehran";
 const API_BASE = import.meta.env.VITE_API_URL?.replace("/api", "") ?? "http://localhost:3000";
 
 function buildUserImageUrl(image) {
@@ -244,7 +245,7 @@ function SmsCampaignModal({ open, onClose, clubs, customerCount }) {
                 {discountCodes.map(c => (
                   <option key={c.id} value={c.id}>
                     {c.code} — {c.discountType === "percent" ? `${c.discountValue}٪` : `${fmt(c.discountValue)} ت`}
-                    {c.expiresAt ? ` (تا ${new Date(c.expiresAt).toLocaleDateString("fa-IR")})` : ""}
+                    {c.expiresAt ? ` (تا ${new Date(c.expiresAt).toLocaleDateString("fa-IR", { timeZone: TEHRAN_TIME_ZONE })})` : ""}
                   </option>
                 ))}
               </select>
@@ -354,7 +355,8 @@ function SmsCampaignModal({ open, onClose, clubs, customerCount }) {
 
 function Avatar({ customer }) {
   const src = buildUserImageUrl(customer.image);
-  const initials = (customer.name ?? customer.phone ?? "?")[0].toUpperCase();
+  const fullName = getUserFullName(customer);
+  const initials = (fullName || customer.phone || "?")[0]?.toUpperCase() ?? "?";
   return (
     <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0 overflow-hidden">
       {src ? (
@@ -406,8 +408,9 @@ export default function CustomersPage() {
   const filtered = customers.filter(c => {
     const q = search.trim().toLowerCase();
     if (!q) return true;
+    const fullName = getUserFullName(c);
     return (
-      (c.name ?? "").toLowerCase().includes(q) ||
+      fullName.toLowerCase().includes(q) ||
       (c.phone ?? "").includes(q)
     );
   });
@@ -524,7 +527,9 @@ export default function CustomersPage() {
             </div>
 
             <div className="divide-y divide-border">
-              {filtered.map((c, i) => (
+              {filtered.map((c, i) => {
+                const fullName = getUserFullName(c);
+                return (
                 <motion.div
                   key={c.id}
                   initial={{ opacity: 0 }}
@@ -536,7 +541,7 @@ export default function CustomersPage() {
                     <Avatar customer={c} />
                     <div className="min-w-0">
                       <p className="text-sm font-semibold text-foreground truncate">
-                        {c.name ?? "بدون نام"}
+                        {fullName}
                       </p>
                       {c.phone && (
                         <p className="text-xs text-muted-foreground flex items-center gap-1" dir="ltr">
@@ -564,7 +569,7 @@ export default function CustomersPage() {
                     <span className="text-xs text-muted-foreground sm:hidden">آخرین مراجعه: </span>
                     <p className="text-xs text-muted-foreground">
                       {c.lastVisit
-                        ? new Date(c.lastVisit).toLocaleDateString("fa-IR")
+                        ? new Date(c.lastVisit).toLocaleDateString("fa-IR", { timeZone: TEHRAN_TIME_ZONE })
                         : "—"}
                     </p>
                   </div>
@@ -584,7 +589,8 @@ export default function CustomersPage() {
                     )}
                   </div>
                 </motion.div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

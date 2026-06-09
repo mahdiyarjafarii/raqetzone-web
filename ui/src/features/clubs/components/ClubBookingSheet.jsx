@@ -7,6 +7,12 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRightIcon, CalendarIcon, ClockIcon, BanknoteIcon, CheckCircle2Icon, ClipboardListIcon, TicketIcon, XCircleIcon, CheckCircleIcon, LoaderIcon, SparklesIcon, WalletIcon, CreditCardIcon } from "lucide-react";
 import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
+import {
+  addDaysToDateKey,
+  formatPersianDateInTehran,
+  getCurrentMinutesInTehran,
+  getTodayDateKeyInTehran,
+} from "@/lib/timezone";
 import { Button } from "@/components/ui/button";
 import { bookingService } from "@/features/booking/services/bookingService";
 import { walletService } from "@/features/wallet/walletService";
@@ -26,26 +32,14 @@ function formatPrice(p) {
   return new Intl.NumberFormat("fa-IR").format(p);
 }
 
-function toLocalDateValue(date) {
-  const pad = (value) => String(value).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
-
-function parseLocalDate(dateStr) {
-  const [year, month, day] = dateStr.split("-").map(Number);
-  return new Date(year, month - 1, day, 12, 0, 0, 0);
-}
-
 function formatDateFa(dateStr) {
-  return parseLocalDate(dateStr).toLocaleDateString("fa-IR-u-ca-persian", {
+  return formatPersianDateInTehran(dateStr, {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
   });
 }
 
 function addDays(dateStr, n) {
-  const d = parseLocalDate(dateStr);
-  d.setDate(d.getDate() + n);
-  return toLocalDateValue(d);
+  return addDaysToDateKey(dateStr, n);
 }
 
 function getSlotDurationHours(slot) {
@@ -54,13 +48,11 @@ function getSlotDurationHours(slot) {
   return ((eh * 60 + em) - (sh * 60 + sm)) / 60;
 }
 
-const WEEKDAY_FA = ["یک", "دو", "سه", "چهار", "پنج", "جمعه", "شنبه"];
 function formatDayShort(dateStr) {
-  const d = parseLocalDate(dateStr);
   return {
-    dayNum: d.toLocaleDateString("fa-IR-u-ca-persian", { day: "numeric" }),
-    dayName: WEEKDAY_FA[d.getDay()],
-    monthName: d.toLocaleDateString("fa-IR-u-ca-persian", { month: "short" }),
+    dayNum: formatPersianDateInTehran(dateStr, { day: "numeric" }),
+    dayName: formatPersianDateInTehran(dateStr, { weekday: "short" }),
+    monthName: formatPersianDateInTehran(dateStr, { month: "short" }),
   };
 }
 
@@ -109,7 +101,7 @@ function CourtSelector({ courts, onSelect }) {
 // ── Combined Date + Slots Step ────────────────────────────────────────────────
 
 function DateSlotsStep({ court, selectedDate, onDateChange, slots, slotsLoading, selectedSlot, onSelectSlot }) {
-  const today = toLocalDateValue(new Date());
+  const today = getTodayDateKeyInTehran();
   const dates = Array.from({ length: 10 }, (_, i) => addDays(today, i));
 
   return (
@@ -228,7 +220,7 @@ function DateSlotsStep({ court, selectedDate, onDateChange, slots, slotsLoading,
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {slots.filter(slot => {
               if (selectedDate !== today) return true;
-              const nowMins = new Date().getHours() * 60 + new Date().getMinutes();
+              const nowMins = getCurrentMinutesInTehran();
               const [sh, sm] = slot.start.split(":").map(Number);
               return (sh * 60 + sm) > nowMins;
             }).map((slot, i) => {
@@ -650,7 +642,7 @@ const STEP_TITLES = {
 
 export default function ClubBookingSheet({ open, onClose, club, initialCourt = null, initialDate = null }) {
   const navigate = useNavigate();
-  const today = toLocalDateValue(new Date());
+  const today = getTodayDateKeyInTehran();
 
   const courts = club?.courts ?? [];
 

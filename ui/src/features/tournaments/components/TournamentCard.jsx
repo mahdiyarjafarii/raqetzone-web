@@ -28,6 +28,7 @@ const PHASE_CONFIG = {
 function formatDate(dateStr) {
   const date = new Date(dateStr);
   return date.toLocaleDateString("fa-IR", {
+    timeZone: "Asia/Tehran",
     month: "short",
     day: "numeric",
     hour: "2-digit",

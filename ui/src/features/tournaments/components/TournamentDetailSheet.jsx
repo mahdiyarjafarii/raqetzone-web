@@ -477,7 +477,7 @@ export default function TournamentDetailSheet() {
                     <div>
                       <p className="text-blue-500 font-bold text-sm">مسابقه در حال برگزاری است</p>
                       <p className="text-blue-400/70 text-xs">
-                        پایان: {new Date(tournament.endDate).toLocaleDateString("fa-IR",{month:"long",day:"numeric"})}
+                        پایان: {new Date(tournament.endDate).toLocaleDateString("fa-IR", { timeZone: "Asia/Tehran", month:"long", day:"numeric" })}
                       </p>
                     </div>
                   </div>
@@ -512,16 +512,16 @@ export default function TournamentDetailSheet() {
                 {/* Info grid */}
                 <div className="grid grid-cols-2 gap-2.5">
                   <InfoTile icon={<CalendarIcon className="w-4 h-4 text-violet-500" />} label="شروع">
-                    {new Date(tournament.startDate).toLocaleDateString("fa-IR",{month:"long",day:"numeric"})}
+                    {new Date(tournament.startDate).toLocaleDateString("fa-IR", { timeZone: "Asia/Tehran", month:"long", day:"numeric" })}
                   </InfoTile>
                   <InfoTile icon={<CalendarIcon className="w-4 h-4 text-indigo-400" />} label="پایان">
-                    {new Date(tournament.endDate).toLocaleDateString("fa-IR",{month:"long",day:"numeric"})}
+                    {new Date(tournament.endDate).toLocaleDateString("fa-IR", { timeZone: "Asia/Tehran", month:"long", day:"numeric" })}
                   </InfoTile>
                   <InfoTile icon={<TrophyIcon className="w-4 h-4 text-emerald-500" />} label="ورزش">
                     {tournament.sportType}
                   </InfoTile>
                   <InfoTile icon={<ShieldCheckIcon className="w-4 h-4 text-blue-400" />} label="مهلت ثبت‌نام">
-                    {new Date(tournament.registrationDeadline).toLocaleDateString("fa-IR",{month:"short",day:"numeric"})}
+                    {new Date(tournament.registrationDeadline).toLocaleDateString("fa-IR", { timeZone: "Asia/Tehran", month:"short", day:"numeric" })}
                   </InfoTile>
                 </div>
 

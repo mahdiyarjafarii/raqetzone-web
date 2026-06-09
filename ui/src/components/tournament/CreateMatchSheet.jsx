@@ -7,6 +7,11 @@ import { ChevronRightIcon, CheckIcon, BuildingIcon, MapPinIcon, ShieldCheckIcon,
 import { createMatchOpenAtom, matchesAtom } from "@/store/matchStore";
 import { matchService } from "@/services/matchService";
 import { cn } from "@/lib/utils";
+import {
+  addDaysToDateKey,
+  formatPersianDateInTehran,
+  getTodayDateKeyInTehran,
+} from "@/lib/timezone";
 import apiClient from "@/lib/apiClient";
 
 const SPORTS = [
@@ -32,18 +37,6 @@ const defaultForm = {
 
 const STEPS = ["ورزش و نام", "باشگاه و زمین", "زمان و تیم"];
 
-const dateTimeFormatFa = new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
-  weekday: "short",
-  year: "numeric",
-  month: "long",
-  day: "numeric",
-});
-
-function toLocalDateTimeValue(date) {
-  const pad = (value) => String(value).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
 function getDatePart(value) {
   return value?.split("T")[0] ?? "";
 }
@@ -53,14 +46,17 @@ function getTimePart(value) {
 }
 
 function buildDateOptions(daysAhead = 730) {
-  const today = new Date();
-  today.setHours(12, 0, 0, 0);
+  const today = getTodayDateKeyInTehran();
   return Array.from({ length: daysAhead }, (_, index) => {
-    const date = new Date(today);
-    date.setDate(today.getDate() + index);
+    const dateKey = addDaysToDateKey(today, index);
     return {
-      value: toLocalDateTimeValue(date).split("T")[0],
-      label: dateTimeFormatFa.format(date),
+      value: dateKey,
+      label: formatPersianDateInTehran(dateKey, {
+        weekday: "short",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      }),
     };
   });
 }

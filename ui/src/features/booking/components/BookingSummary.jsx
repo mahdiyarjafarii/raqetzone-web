@@ -3,13 +3,13 @@ import { motion } from "framer-motion";
 import { MapPinIcon, CalendarIcon, ClockIcon, BanknoteIcon, FileTextIcon, WalletIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { formatPersianDateInTehran } from "@/lib/timezone";
 import { walletService } from "@/features/wallet/walletService";
 
 const SPORT_ICONS = { padel: "🏓", tennis: "🎾", squash: "🟡", badminton: "🏸" };
 
 function formatDateFa(dateStr) {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString("fa-IR", {
+  return formatPersianDateInTehran(dateStr, {
     weekday: "long",
     year: "numeric",
     month: "long",

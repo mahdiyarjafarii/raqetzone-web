@@ -1,7 +1,62 @@
-import { eq, and, gte, lte, desc, asc, sql, count } from "drizzle-orm";
+import { eq, and, gte, lte, desc, asc, sql, count, inArray } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { bookings, courts, users, matches, matchParticipants, notifications, deals } from "../db/schema.js";
 import { formatBookingDateTimeFa } from "../utils/bookingTime.js";
+import { sendNotification } from "../utils/sendNotification.js";
+
+const TEHRAN_OFFSET = "+03:30";
+const BOOKING_TIME_PASSED_NOTE = "تایم زمین گذشته";
+
+function parseBookingEndDateTime(date, endTime) {
+  if (!date || !endTime) return null;
+  const parsed = new Date(`${date}T${endTime}:00${TEHRAN_OFFSET}`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function isPendingBookingExpiredByTime(booking, now = new Date()) {
+  if (!booking || booking.status !== "pending") return false;
+  const endDateTime = parseBookingEndDateTime(booking.date, booking.endTime);
+  return Boolean(endDateTime && endDateTime <= now);
+}
+
+async function notifyBookingExpiredByTime(booking) {
+  if (!booking?.userId) return;
+  const bookingDateTime = formatBookingDateTimeFa(booking);
+  await sendNotification(booking.userId, {
+    title: "رزرو شما منقضی شد ⌛️",
+    message: `درخواست رزرو شما برای ${bookingDateTime} به‌صورت خودکار رد شد چون تایم زمین گذشته است.`,
+    type: "BOOKING",
+    metadata: {
+      bookingId: booking.id,
+      date: booking.date,
+      startTime: booking.startTime,
+      ctaHref: "/mybooking",
+      ctaLabel: "مشاهده رزروها",
+    },
+  }).catch(() => {});
+}
+
+async function expirePendingBookings(bookingsList) {
+  const now = new Date();
+  const expiredBookings = bookingsList
+    .filter((booking) => isPendingBookingExpiredByTime(booking, now));
+  const expiredIds = expiredBookings.map((booking) => booking.id);
+
+  if (expiredIds.length === 0) return [];
+
+  await db
+    .update(bookings)
+    .set({
+      status: "rejected",
+      adminNote: BOOKING_TIME_PASSED_NOTE,
+      updatedAt: now,
+    })
+    .where(inArray(bookings.id, expiredIds));
+
+  await Promise.allSettled(expiredBookings.map((booking) => notifyBookingExpiredByTime(booking)));
+
+  return expiredIds;
+}
 
 function subtractDays(n) {
   const d = new Date();
@@ -101,13 +156,35 @@ export const getAdminBookingsController = async (req, res) => {
   try {
     const { status, limit = "50", offset = "0" } = req.query;
 
+    if (!status || status === "pending") {
+      const pendingRows = await db
+        .select({
+          id: bookings.id,
+          userId: bookings.userId,
+          date: bookings.date,
+          startTime: bookings.startTime,
+          endTime: bookings.endTime,
+          status: bookings.status,
+        })
+        .from(bookings)
+        .where(eq(bookings.status, "pending"));
+
+      await expirePendingBookings(pendingRows);
+    }
+
     const rows = await db
       .select({
         id: bookings.id, date: bookings.date, startTime: bookings.startTime,
         endTime: bookings.endTime, totalPrice: bookings.totalPrice,
         status: bookings.status, notes: bookings.notes, adminNote: bookings.adminNote,
         createdAt: bookings.createdAt,
-        user: { id: users.id, name: users.name, phone: users.phone },
+        user: {
+          id: users.id,
+          name: users.name,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          phone: users.phone,
+        },
         court: { id: courts.id, name: courts.name, location: courts.location, sportType: courts.sportType },
       })
       .from(bookings)
@@ -206,6 +283,21 @@ export const approveBookingController = async (req, res) => {
     if (!booking) return res.status(404).json({ message: "رزرو یافت نشد" });
     if (booking.status !== "pending") return res.status(400).json({ message: "فقط رزروهای در انتظار قابل بررسی هستند" });
 
+    if (isPendingBookingExpiredByTime(booking)) {
+      await db
+        .update(bookings)
+        .set({
+          status: "rejected",
+          adminNote: BOOKING_TIME_PASSED_NOTE,
+          updatedAt: new Date(),
+        })
+        .where(eq(bookings.id, id));
+
+      await notifyBookingExpiredByTime(booking);
+
+      return res.status(400).json({ message: BOOKING_TIME_PASSED_NOTE });
+    }
+
     const [updated] = await db.update(bookings).set({ status: "approved", adminNote: adminNote ?? null, updatedAt: new Date() }).where(eq(bookings.id, id)).returning();
 
     const { sendNotification } = await import("../utils/sendNotification.js");
@@ -268,7 +360,16 @@ export const getAdminMatchesController = async (req, res) => {
 export const getAdminUsersController = async (req, res) => {
   try {
     const rows = await db
-      .select({ id: users.id, name: users.name, phone: users.phone, createdAt: users.createdAt, subscriptionType: users.subscriptionType, isAdmin: users.isAdmin })
+      .select({
+        id: users.id,
+        name: users.name,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        phone: users.phone,
+        createdAt: users.createdAt,
+        subscriptionType: users.subscriptionType,
+        isAdmin: users.isAdmin,
+      })
       .from(users)
       .orderBy(desc(users.createdAt))
       .limit(100);

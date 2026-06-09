@@ -4,6 +4,12 @@ import { discountCodes, discountCodeUsages, clubs, courts, bookings, users, tour
 import { sendSMS } from "../utils/sms.js";
 
 const WELCOME_DISCOUNT_CODE = "WELCOME20";
+const PLATFORM_PUBLIC_DISCOUNT_CODES = new Set([WELCOME_DISCOUNT_CODE]);
+
+function isPlatformPublicDiscountCode(code) {
+  if (!code) return false;
+  return PLATFORM_PUBLIC_DISCOUNT_CODES.has(String(code).toUpperCase().trim());
+}
 
 async function assertClubOwnership(req, clubId) {
   if (req.user.isAdmin) return true;
@@ -93,7 +99,7 @@ export const getDiscountCodesController = async (req, res) => {
       .where(eq(discountCodes.clubId, clubId))
       .orderBy(desc(discountCodes.createdAt));
 
-    return res.json(codes);
+    return res.json(codes.filter((codeRow) => !isPlatformPublicDiscountCode(codeRow.code)));
   } catch (err) {
     console.error(err);
     return res.status(500).json({ message: "خطای سرور" });
@@ -173,6 +179,9 @@ export const updateDiscountCodeController = async (req, res) => {
       .limit(1);
 
     if (!existing) return res.status(404).json({ message: "کد تخفیف یافت نشد" });
+    if (isPlatformPublicDiscountCode(existing.code)) {
+      return res.status(403).json({ message: "ویرایش کد تخفیف پلتفرمی از پنل باشگاه مجاز نیست" });
+    }
 
     const {
       discountType, discountValue, maxUses, perUserLimit,
@@ -209,9 +218,23 @@ export const deleteDiscountCodeController = async (req, res) => {
       return res.status(403).json({ message: "دسترسی ندارید" });
     }
 
+    const [existing] = await db
+      .select({ id: discountCodes.id, code: discountCodes.code })
+      .from(discountCodes)
+      .where(and(eq(discountCodes.id, codeId), eq(discountCodes.clubId, clubId)))
+      .limit(1);
+
+    if (!existing) {
+      return res.status(404).json({ message: "کد تخفیف یافت نشد" });
+    }
+
+    if (isPlatformPublicDiscountCode(existing.code)) {
+      return res.status(403).json({ message: "حذف کد تخفیف پلتفرمی از پنل باشگاه مجاز نیست" });
+    }
+
     await db
       .delete(discountCodes)
-      .where(and(eq(discountCodes.id, codeId), eq(discountCodes.clubId, clubId)));
+      .where(eq(discountCodes.id, codeId));
 
     return res.json({ message: "کد تخفیف حذف شد" });
   } catch (err) {
@@ -228,12 +251,15 @@ export const getDiscountCodeUsagesController = async (req, res) => {
     }
 
     const [codeRow] = await db
-      .select({ id: discountCodes.id })
+      .select({ id: discountCodes.id, code: discountCodes.code })
       .from(discountCodes)
       .where(and(eq(discountCodes.id, codeId), eq(discountCodes.clubId, clubId)))
       .limit(1);
 
     if (!codeRow) return res.status(404).json({ message: "کد تخفیف یافت نشد" });
+    if (isPlatformPublicDiscountCode(codeRow.code)) {
+      return res.status(403).json({ message: "نمایش مصرف کد تخفیف پلتفرمی از پنل باشگاه مجاز نیست" });
+    }
 
     const usages = await db
       .select({
@@ -241,6 +267,8 @@ export const getDiscountCodeUsagesController = async (req, res) => {
         discountAmount: discountCodeUsages.discountAmount,
         usedAt: discountCodeUsages.usedAt,
         userName: users.name,
+        firstName: users.firstName,
+        lastName: users.lastName,
         userPhone: users.phone,
         bookingId: discountCodeUsages.bookingId,
       })
@@ -451,8 +479,9 @@ export const validateDiscountCodeController = async (req, res) => {
     const userId = req.user.id;
     const { code, clubId, bookingPrice } = req.body;
     const normalizedCode = code?.toUpperCase().trim();
+    const isPlatformCode = isPlatformPublicDiscountCode(normalizedCode);
 
-    if (!normalizedCode || (!clubId && normalizedCode !== WELCOME_DISCOUNT_CODE)) {
+    if (!normalizedCode || (!clubId && !isPlatformCode)) {
       return res.status(400).json({ message: "اطلاعات ناقص است" });
     }
 
@@ -461,11 +490,11 @@ export const validateDiscountCodeController = async (req, res) => {
       : await db
           .select()
           .from(discountCodes)
-          .where(and(eq(discountCodes.code, normalizedCode), eq(discountCodes.clubId, clubId)))
+          .where(eq(discountCodes.code, normalizedCode))
           .limit(1);
     const discountCode = normalizedCode === WELCOME_DISCOUNT_CODE
       ? await findOrCreateWelcomeDiscount(clubId)
-      : regularDiscountCode;
+      : (regularDiscountCode && (isPlatformCode || regularDiscountCode.clubId === clubId) ? regularDiscountCode : null);
 
     if (!discountCode) {
       return res.status(404).json({ message: "کد تخفیف معتبر نیست" });
@@ -489,7 +518,7 @@ export const validateDiscountCodeController = async (req, res) => {
       });
     }
 
-    const usageCount = normalizedCode === WELCOME_DISCOUNT_CODE
+    const usageCount = isPlatformCode
       ? await getDiscountUsageCountByPhone(discountCode.id, await getUserPhone(userId))
       : (await db
           .select({ cnt: count() })

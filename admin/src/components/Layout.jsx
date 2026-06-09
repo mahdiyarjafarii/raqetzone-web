@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import Sidebar from "./Sidebar";
 import { adminTokenAtom } from "@/store/authStore";
 
+const TEHRAN_TIME_ZONE = "Asia/Tehran";
+
 const PAGE_TITLES = {
   "/":            "داشبورد",
   "/bookings":    "رزروها",
@@ -36,7 +38,7 @@ export default function Layout() {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-muted-foreground bg-muted px-2.5 py-1 rounded-full">
-              {new Date().toLocaleDateString("fa-IR", { weekday:"short", month:"long", day:"numeric" })}
+              {new Date().toLocaleDateString("fa-IR", { timeZone: TEHRAN_TIME_ZONE, weekday:"short", month:"long", day:"numeric" })}
             </span>
           </div>
         </header>

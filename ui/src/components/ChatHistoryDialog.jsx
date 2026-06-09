@@ -171,7 +171,7 @@ function ChatHistoryDialog({ open, onOpenChange }) {
     } else if (days < 7) {
       return `${days} روز پیش`;
     } else {
-      return date.toLocaleDateString("fa-IR");
+      return date.toLocaleDateString("fa-IR", { timeZone: "Asia/Tehran" });
     }
   };
 

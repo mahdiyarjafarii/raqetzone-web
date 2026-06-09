@@ -1,13 +1,14 @@
 import React from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { getCurrentMinutesInTehran, getTodayDateKeyInTehran } from "@/lib/timezone";
 
 function isPastSlot(dateStr, startTime) {
-  const today = new Date().toISOString().split("T")[0];
+  const today = getTodayDateKeyInTehran();
   if (dateStr !== today) return false;
   const [h, m] = startTime.split(":").map(Number);
-  const now = new Date();
-  return h * 60 + m <= now.getHours() * 60 + now.getMinutes();
+  const nowMinutes = getCurrentMinutesInTehran();
+  return h * 60 + m <= nowMinutes;
 }
 
 export default function TimeSlotGrid({ slots, selectedSlot, onSelect, loading, selectedDate }) {

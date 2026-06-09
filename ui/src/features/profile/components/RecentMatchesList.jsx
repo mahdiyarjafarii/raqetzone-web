@@ -8,6 +8,7 @@ const SPORT_ICONS = { padel: "🏓", tennis: "🎾", squash: "🟡", badminton: 
 
 function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString("fa-IR", {
+    timeZone: "Asia/Tehran",
     month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
   });
 }

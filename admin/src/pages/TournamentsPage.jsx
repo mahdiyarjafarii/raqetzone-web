@@ -12,7 +12,7 @@ import apiClient from "@/lib/apiClient";
 import PageHeader from "@/components/PageHeader";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
-import { cn } from "@/lib/utils";
+import { cn, getUserFullName } from "@/lib/utils";
 
 const ADMIN_BASE = import.meta.env.VITE_API_URL?.replace("/api", "") ?? "http://localhost:3000";
 const PUBLIC_APP_BASE = import.meta.env.VITE_PUBLIC_APP_URL ?? import.meta.env.VITE_WEBSITE_URL ?? "http://localhost:5173";
@@ -157,7 +157,7 @@ function ResultsModal({ tournament, onClose }) {
                 >
                   <option value="">بازیکن A</option>
                   {participants.map((p) => (
-                    <option key={p.userId} value={p.userId}>{p.name ?? "کاربر"}</option>
+                    <option key={p.userId} value={p.userId}>{getUserFullName(p)}</option>
                   ))}
                 </select>
 
@@ -168,7 +168,7 @@ function ResultsModal({ tournament, onClose }) {
                 >
                   <option value="">بازیکن B</option>
                   {participants.map((p) => (
-                    <option key={p.userId} value={p.userId}>{p.name ?? "کاربر"}</option>
+                    <option key={p.userId} value={p.userId}>{getUserFullName(p)}</option>
                   ))}
                 </select>
 
@@ -209,7 +209,7 @@ function ResultsModal({ tournament, onClose }) {
                       {standings.map((row) => (
                         <tr key={row.userId} className="border-b border-border/60">
                           <td className="px-2 py-2 font-bold">{row.rank}</td>
-                          <td className="px-2 py-2">{row.name ?? "کاربر"}</td>
+                          <td className="px-2 py-2">{getUserFullName(row)}</td>
                           <td className="px-2 py-2 font-bold">{row.points}</td>
                           <td className="px-2 py-2">{row.wins}/{row.losses}</td>
                           <td className="px-2 py-2">{row.setDiff}</td>
@@ -244,7 +244,7 @@ function ResultsModal({ tournament, onClose }) {
                       </div>
 
                       <div className="text-xs text-muted-foreground">
-                        {m.playerA?.name ?? "—"} <span className="mx-1">vs</span> {m.playerB?.name ?? "—"}
+                        {getUserFullName(m.playerA)} <span className="mx-1">vs</span> {getUserFullName(m.playerB)}
                       </div>
 
                       {m.status !== "scheduled" && (
@@ -297,7 +297,7 @@ function UserAvatar({ image, name, className, fallbackClassName }) {
   }
   return (
     <div className={`flex items-center justify-center font-bold shrink-0 ${fallbackClassName ?? className}`}>
-      {name?.[0]?.toUpperCase() ?? "?"}
+      {name?.[0]?.toUpperCase() ?? ""}
     </div>
   );
 }
@@ -333,12 +333,40 @@ const emptyForm = {
 const inputClass =
   "rounded-xl border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-violet-500 transition-colors w-full resize-none";
 
+const TEHRAN_TIME_ZONE = "Asia/Tehran";
+
 const dateTimeFormatFa = new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
   weekday: "short",
   year: "numeric",
   month: "long",
   day: "numeric",
 });
+
+function formatDateKeyInTehran(date) {
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone: TEHRAN_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+  return `${year}-${month}-${day}`;
+}
+
+function parseDateKey(dateStr) {
+  const [year, month, day] = (dateStr ?? "").split("-").map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0));
+}
+
+function addDaysToDateKey(dateStr, days) {
+  const date = parseDateKey(dateStr);
+  if (!date) return dateStr;
+  date.setUTCDate(date.getUTCDate() + days);
+  return formatDateKeyInTehran(date);
+}
 
 function formatSetsSummary(sets) {
   if (!Array.isArray(sets) || sets.length === 0) return "-";
@@ -360,9 +388,28 @@ function parseSetsInput(raw) {
   return sets.length ? sets : null;
 }
 
-function toLocalDateTimeValue(date) {
-  const pad = (value) => String(value).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+function formatDateTimeValueInTehran(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone: TEHRAN_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+  const hour = parts.find((part) => part.type === "hour")?.value;
+  const minute = parts.find((part) => part.type === "minute")?.value;
+  return `${year}-${month}-${day}T${hour}:${minute}`;
+}
+
+function getNowDateTimeValueInTehran() {
+  return formatDateTimeValueInTehran(new Date());
 }
 
 function getDatePart(value) {
@@ -375,7 +422,7 @@ function getTimePart(value) {
 
 function toFormDateTime(value) {
   if (!value) return "";
-  return toLocalDateTimeValue(new Date(value));
+  return formatDateTimeValueInTehran(value);
 }
 
 function tournamentToForm(tournament) {
@@ -397,13 +444,12 @@ function tournamentToForm(tournament) {
 }
 
 function buildDateOptions(daysAhead = 730) {
-  const today = new Date();
-  today.setHours(12, 0, 0, 0);
+  const today = formatDateKeyInTehran(new Date());
   return Array.from({ length: daysAhead }, (_, index) => {
-    const date = new Date(today);
-    date.setDate(today.getDate() + index);
+    const dateKey = addDaysToDateKey(today, index);
+    const date = parseDateKey(dateKey);
     return {
-      value: toLocalDateTimeValue(date).split("T")[0],
+      value: dateKey,
       label: dateTimeFormatFa.format(date),
     };
   });
@@ -649,9 +695,9 @@ function WStep1({ form, setForm }) {
 // ─── Wizard Step 2 ────────────────────────────────────────────────────────────
 
 function WStep2({ form, setForm }) {
-  const deadline = form.registrationDeadline ? new Date(form.registrationDeadline) : null;
-  const start    = form.startDate            ? new Date(form.startDate)            : null;
-  const end      = form.endDate              ? new Date(form.endDate)              : null;
+  const deadline = form.registrationDeadline || "";
+  const start    = form.startDate || "";
+  const end      = form.endDate || "";
   const allSet   = !!(deadline && start && end);
   const valid    = allSet && deadline < start && start < end;
 
@@ -695,7 +741,7 @@ function WStep2({ form, setForm }) {
                   <div className={`w-2 h-2 rounded-full bg-${color}-500`} />
                   <span className={`font-bold text-${color}-600`}>{label}</span>
                   <span className="text-muted-foreground tabular-nums">
-                    {date?.toLocaleDateString("fa-IR",{month:"short",day:"numeric"})}
+                    {date?.toLocaleDateString("fa-IR", { timeZone: TEHRAN_TIME_ZONE, month:"short", day:"numeric" })}
                   </span>
                 </div>
                 {i < 2 && <div className="flex-1 h-0.5 bg-border rounded mb-5" />}
@@ -822,15 +868,19 @@ function ParticipantsModal({ tournament, onClose }) {
   }, [tournament.id]);
 
   function exportPDF() {
-    const dateStr = new Date().toLocaleDateString("fa-IR");
+    const dateStr = new Date().toLocaleDateString("fa-IR", { timeZone: TEHRAN_TIME_ZONE });
+    const formatPhone = (phone) => {
+      const value = phone == null ? "" : String(phone).trim();
+      return value || "-";
+    };
     const rows = participants.map((p, i) => `
       <tr>
         <td>${i + 1}</td>
-        <td>${p.name ?? "ناشناس"}</td>
-        <td dir="ltr">${p.phone ?? "-"}</td>
+        <td>${getUserFullName(p)}</td>
+        <td class="phone-col">${formatPhone(p.phone)}</td>
         <td>${p.level ?? "-"}</td>
         <td style="color:${p.paymentStatus==="paid"?"#16a34a":"#d97706"}">${p.paymentStatus === "paid" ? "✓ پرداخت شده" : "⏳ در انتظار"}</td>
-        <td>${new Date(p.registeredAt).toLocaleDateString("fa-IR")}</td>
+        <td>${new Date(p.registeredAt).toLocaleDateString("fa-IR", { timeZone: TEHRAN_TIME_ZONE })}</td>
       </tr>`).join("");
 
     const html = `<!DOCTYPE html>
@@ -850,6 +900,7 @@ function ParticipantsModal({ tournament, onClose }) {
     th { background: #7c3aed; color: #fff; padding: 10px 12px; text-align: right; font-weight: 700; }
     td { padding: 9px 12px; border-bottom: 1px solid #e5e7eb; }
     tr:nth-child(even) td { background: #f9f7ff; }
+    .phone-col { direction: ltr; text-align: right; unicode-bidi: plaintext; font-variant-numeric: tabular-nums; }
     .footer { margin-top: 20px; font-size: 11px; color: #999; text-align: center; }
   </style>
 </head>
@@ -862,7 +913,7 @@ function ParticipantsModal({ tournament, onClose }) {
     <span class="badge">${tournament.sportType}</span>
   </div>
   <table>
-    <thead><tr><th>#</th><th>نام</th><th>تلفن</th><th>سطح</th><th>وضعیت</th><th>تاریخ ثبت‌نام</th></tr></thead>
+    <thead><tr><th>#</th><th>نام</th><th class="phone-col">شماره تماس</th><th>سطح</th><th>وضعیت</th><th>تاریخ ثبت‌نام</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>
   <div class="footer">رکت‌زون — گزارش شرکت‌کنندگان تورنومنت</div>
@@ -900,13 +951,16 @@ function ParticipantsModal({ tournament, onClose }) {
                 <span className="text-xs font-mono text-muted-foreground w-5 shrink-0 leading-none">#{i+1}</span>
                 <UserAvatar
                   image={p.image}
-                  name={p.name}
+                  name={getUserFullName(p)}
                   className="w-8 h-8 rounded-full text-white text-xs font-bold"
                   fallbackClassName="w-8 h-8 rounded-full bg-gradient-to-br from-violet-600 to-indigo-600 text-white text-xs font-bold"
                 />
-                <div className="flex-1 min-w-0 flex items-center gap-3">
-                  <p className="text-sm font-semibold text-foreground truncate leading-none">{p.name ?? "ناشناس"}</p>
-                  <p className="text-xs text-muted-foreground leading-none shrink-0" dir="ltr">{p.phone ?? "-"}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-foreground truncate leading-none">{getUserFullName(p)}</p>
+                </div>
+                <div className="w-[170px] shrink-0 rounded-lg border border-border/70 bg-muted px-2 py-1">
+                  <p className="text-[10px] text-muted-foreground leading-none mb-1">شماره تلفن</p>
+                  <p className="text-sm text-foreground leading-none tabular-nums" dir="ltr">{p.phone ?? "-"}</p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <span className="inline-flex h-7 items-center text-[11px] text-muted-foreground bg-muted px-1.5 rounded">سطح {p.level}</span>
@@ -1045,7 +1099,7 @@ function TournamentAdminCard({ tournament, onStatusChange, onViewParticipants, o
           )}
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] bg-muted border border-border text-muted-foreground">
             <CalendarIcon className="w-3 h-3" />
-            {new Date(tournament.startDate).toLocaleDateString("fa-IR",{month:"short",day:"numeric"})}
+            {new Date(tournament.startDate).toLocaleDateString("fa-IR", { timeZone: TEHRAN_TIME_ZONE, month:"short", day:"numeric" })}
           </span>
         </div>
 
@@ -1141,8 +1195,33 @@ export default function TournamentsPage() {
 
   const fetchTournaments = async () => {
     setLoading(true);
-    const { ok, data } = await apiClient.get("/tournaments");
-    if (ok) setTournaments(data.tournaments);
+    const clubsRes = await apiClient.get("/club-panel/clubs");
+    if (!clubsRes.ok) {
+      setTournaments([]);
+      setLoading(false);
+      toast.error(clubsRes.data?.message ?? "خطا در دریافت باشگاه‌ها");
+      return;
+    }
+
+    const clubIds = (clubsRes.data?.clubs ?? []).map((club) => club.id).filter(Boolean);
+    if (clubIds.length === 0) {
+      setTournaments([]);
+      setLoading(false);
+      return;
+    }
+
+    const tournamentResponses = await Promise.all(clubIds.map((clubId) => apiClient.get(`/clubs/${clubId}/tournaments`)));
+    const hasError = tournamentResponses.some((res) => !res.ok);
+
+    if (hasError) {
+      setTournaments([]);
+      toast.error("خطا در بارگذاری تورنومنت‌ها");
+      setLoading(false);
+      return;
+    }
+
+    const merged = tournamentResponses.flatMap((res) => res.data?.tournaments ?? []);
+    setTournaments(merged);
     setLoading(false);
   };
   useEffect(() => { fetchTournaments(); }, []);
@@ -1169,13 +1248,14 @@ export default function TournamentsPage() {
       if (!form.registrationDeadline || !form.startDate || !form.endDate) {
         toast.error("همه تاریخ‌ها الزامی هستند"); return false;
       }
-      if (new Date(form.registrationDeadline) < new Date()) {
+      const nowTehran = getNowDateTimeValueInTehran();
+      if (form.registrationDeadline < nowTehran) {
         toast.error("مهلت ثبت‌نام نباید قبل از زمان فعلی باشد"); return false;
       }
-      if (new Date(form.registrationDeadline) >= new Date(form.startDate)) {
+      if (form.registrationDeadline >= form.startDate) {
         toast.error("مهلت ثبت‌نام باید قبل از شروع باشد"); return false;
       }
-      if (new Date(form.startDate) >= new Date(form.endDate)) {
+      if (form.startDate >= form.endDate) {
         toast.error("تاریخ شروع باید قبل از پایان باشد"); return false;
       }
     }

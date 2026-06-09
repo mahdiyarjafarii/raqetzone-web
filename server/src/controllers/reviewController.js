@@ -16,7 +16,13 @@ export const getClubReviewsController = async (req, res) => {
         ownerReply: clubReviews.ownerReply,
         ownerRepliedAt: clubReviews.ownerRepliedAt,
         createdAt: clubReviews.createdAt,
-        user: { id: users.id, name: users.name, image: users.image },
+        user: {
+          id: users.id,
+          name: users.name,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          image: users.image,
+        },
       })
       .from(clubReviews)
       .innerJoin(users, eq(clubReviews.userId, users.id))

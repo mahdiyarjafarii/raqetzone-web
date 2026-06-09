@@ -10,7 +10,7 @@ const BASE = import.meta.env.VITE_API_URL?.replace("/api", "") ?? "http://localh
 
 function formatDate(d) {
   try {
-    return new Date(d).toLocaleDateString("fa-IR", { year: "numeric", month: "long", day: "numeric" });
+    return new Date(d).toLocaleDateString("fa-IR", { timeZone: "Asia/Tehran", year: "numeric", month: "long", day: "numeric" });
   } catch { return ""; }
 }
 

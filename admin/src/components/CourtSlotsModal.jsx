@@ -6,16 +6,45 @@ import Modal from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
 import Input from "@/components/ui/Input";
 import apiClient from "@/lib/apiClient";
-import { cn, fmt } from "@/lib/utils";
+import { cn, fmt, getUserFullName } from "@/lib/utils";
+
+const TEHRAN_TIME_ZONE = "Asia/Tehran";
+
+function formatDateKeyInTehran(date) {
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone: TEHRAN_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+  return `${year}-${month}-${day}`;
+}
+
+function parseDateKey(dateStr) {
+  const [year, month, day] = (dateStr ?? "").split("-").map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0));
+}
 
 function addDays(dateStr, n) {
-  const d = new Date(dateStr);
-  d.setDate(d.getDate() + n);
-  return d.toISOString().split("T")[0];
+  const d = parseDateKey(dateStr);
+  if (!d) return dateStr;
+  d.setUTCDate(d.getUTCDate() + n);
+  return formatDateKeyInTehran(d);
 }
 
 function formatDateFa(dateStr) {
-  return new Date(dateStr).toLocaleDateString("fa-IR", { weekday: "short", month: "short", day: "numeric" });
+  const date = parseDateKey(dateStr);
+  if (!date) return dateStr;
+  return date.toLocaleDateString("fa-IR-u-ca-persian", {
+    timeZone: TEHRAN_TIME_ZONE,
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 function generateSlots(openTime, closeTime, slotDuration) {
@@ -41,7 +70,7 @@ function getSlotDurationHours(slot) {
   return ((eh * 60 + em) - (sh * 60 + sm)) / 60;
 }
 
-const today = new Date().toISOString().split("T")[0];
+const today = formatDateKeyInTehran(new Date());
 const DAYS = Array.from({ length: 7 }, (_, i) => addDays(today, i));
 
 const STATUS_CONFIG = {
@@ -68,6 +97,10 @@ function SlotEditPanel({ slot, override, booking, courtPrice, slotDurationHours,
   const effectiveHourlyPrice = price !== "" ? Number(price) : courtPrice;
   const effectivePrice = Math.round(effectiveHourlyPrice * slotDurationHours);
   const finalPrice = discount > 0 ? Math.round(effectivePrice * (1 - discount / 100)) : effectivePrice;
+  const bookingUserName = getUserFullName({
+    firstName: booking?.userFirstName,
+    lastName: booking?.userLastName,
+  });
 
   const handleSave = async () => {
     setSaving(true);
@@ -103,7 +136,7 @@ function SlotEditPanel({ slot, override, booking, courtPrice, slotDurationHours,
               <UserCheckIcon className="w-3.5 h-3.5" />
               رزرو شده توسط:
             </p>
-            <p className="text-sm font-bold text-foreground">{booking.userName || "—"}</p>
+            <p className="text-sm font-bold text-foreground">{bookingUserName}</p>
             <p className="text-xs text-muted-foreground" dir="ltr">{booking.userPhone}</p>
             {booking.trackingCode && (
               <p className="text-[10px] text-muted-foreground">کد رهگیری: <span className="font-mono font-semibold">{booking.trackingCode}</span></p>
@@ -306,6 +339,10 @@ export default function CourtSlotsModal({ open, onClose, court }) {
               const finalPrice = discount > 0 ? Math.round(displayPrice * (1 - discount / 100)) : displayPrice;
               const isActive = activeSlot?.start === slot.start;
               const isBookedSlot = status === "booked" && booking;
+              const bookingUserName = getUserFullName({
+                firstName: booking?.userFirstName,
+                lastName: booking?.userLastName,
+              });
 
               return (
                 <motion.button
@@ -323,7 +360,7 @@ export default function CourtSlotsModal({ open, onClose, court }) {
                   <span className="font-bold">{slot.start}</span>
                   {isBookedSlot ? (
                     <span className="text-[9px] font-semibold truncate max-w-full px-1 mt-0.5 leading-tight text-center opacity-80">
-                      {booking.userName || booking.userPhone}
+                      {bookingUserName}
                     </span>
                   ) : discount > 0 ? (
                     <>

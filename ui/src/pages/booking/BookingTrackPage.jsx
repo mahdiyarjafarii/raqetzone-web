@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import apiClient from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
+import { formatPersianDateInTehran } from "@/lib/timezone";
 
 const STATUS = {
   pending:   { label: "در انتظار تأیید", icon: <LoaderIcon   className="w-5 h-5 animate-spin" />, color: "text-amber-500",  bg: "bg-amber-500/10  border-amber-500/25"  },
@@ -36,7 +37,7 @@ function CopyButton({ text }) {
 }
 
 function formatDate(dateStr) {
-  return new Date(dateStr).toLocaleDateString("fa-IR", {
+  return formatPersianDateInTehran(dateStr, {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
   });
 }

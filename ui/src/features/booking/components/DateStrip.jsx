@@ -1,28 +1,20 @@
 import React, { useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
+import { addDaysToDateKey, formatPersianDateInTehran, getTodayDateKeyInTehran } from "@/lib/timezone";
 
 function addDays(dateStr, n) {
-  const d = new Date(dateStr);
-  d.setDate(d.getDate() + n);
-  return d.toISOString().split("T")[0];
+  return addDaysToDateKey(dateStr, n);
 }
 
-const WEEKDAY_FA = ["یک", "دو", "سه", "چهار", "پنج", "جمعه", "شنبه"];
-const MONTH_FA = [
-  "فروردین","اردیبهشت","خرداد","تیر","مرداد","شهریور",
-  "مهر","آبان","آذر","دی","بهمن","اسفند",
-];
-
 function formatDayFa(dateStr) {
-  const d = new Date(dateStr);
-  const dayNum = d.getDate().toLocaleString("fa-IR");
-  const dayName = WEEKDAY_FA[d.getDay()];
+  const dayNum = formatPersianDateInTehran(dateStr, { day: "numeric" });
+  const dayName = formatPersianDateInTehran(dateStr, { weekday: "short" });
   return { dayNum, dayName };
 }
 
 export default function DateStrip({ selectedDate, onSelect, daysAhead = 14 }) {
-  const today = new Date().toISOString().split("T")[0];
+  const today = getTodayDateKeyInTehran();
   const dates = Array.from({ length: daysAhead }, (_, i) => addDays(today, i));
   const scrollRef = useRef(null);
   const selectedRef = useRef(null);

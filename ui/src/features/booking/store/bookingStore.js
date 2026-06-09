@@ -1,4 +1,5 @@
 import { atom } from "jotai";
+import { getTodayDateKeyInTehran } from "@/lib/timezone";
 
 // ─── Step flow: "courts" | "slots" | "summary" | "mybookings"
 export const bookingStepAtom = atom("courts");
@@ -8,8 +9,7 @@ export const selectedCourtAtom = atom(null);
 
 // Selected date string YYYY-MM-DD
 export const selectedDateAtom = atom(() => {
-  const d = new Date();
-  return d.toISOString().split("T")[0];
+  return getTodayDateKeyInTehran();
 });
 
 // Selected slot { start, end }

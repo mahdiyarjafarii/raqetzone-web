@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { MapPinIcon, ClockIcon, UsersIcon } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { addDaysToDateKey, formatDateKeyInTehran, getTodayDateKeyInTehran } from "@/lib/timezone";
 
 const SPORT_ICONS = { padel: "🏓", tennis: "🎾", squash: "🟡", badminton: "🏸" };
 const SPORT_COLOR = {
@@ -14,12 +15,13 @@ const SPORT_COLOR = {
 
 function formatMatchTime(dateStr) {
   const d = new Date(dateStr);
-  const now = new Date();
-  const tomorrow = new Date(); tomorrow.setDate(now.getDate() + 1);
-  const time = d.toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" });
-  if (d.toDateString() === now.toDateString()) return `امروز ${time}`;
-  if (d.toDateString() === tomorrow.toDateString()) return `فردا ${time}`;
-  return d.toLocaleDateString("fa-IR", { weekday: "short", hour: "2-digit", minute: "2-digit" });
+  const todayKey = getTodayDateKeyInTehran();
+  const tomorrowKey = addDaysToDateKey(todayKey, 1);
+  const dateKey = formatDateKeyInTehran(d);
+  const time = d.toLocaleTimeString("fa-IR", { timeZone: "Asia/Tehran", hour: "2-digit", minute: "2-digit" });
+  if (dateKey === todayKey) return `امروز ${time}`;
+  if (dateKey === tomorrowKey) return `فردا ${time}`;
+  return d.toLocaleDateString("fa-IR", { timeZone: "Asia/Tehran", weekday: "short", hour: "2-digit", minute: "2-digit" });
 }
 
 export default function HomeMatchCard({ match, index = 0 }) {

@@ -13,6 +13,8 @@ async function enrichTournament(tournament) {
       paymentStatus: tournamentRegistrations.paymentStatus,
       registeredAt: tournamentRegistrations.registeredAt,
       name: users.name,
+      firstName: users.firstName,
+      lastName: users.lastName,
       image: users.image,
     })
     .from(tournamentRegistrations)
@@ -106,7 +108,13 @@ async function loadTournamentMatchesWithUsers(tournamentId) {
   const userIds = [...new Set(rows.flatMap((m) => [m.playerAUserId, m.playerBUserId, m.winnerUserId].filter(Boolean)))];
   const userRows = userIds.length
     ? await db
-        .select({ id: users.id, name: users.name, image: users.image })
+        .select({
+          id: users.id,
+          name: users.name,
+          firstName: users.firstName,
+          lastName: users.lastName,
+          image: users.image,
+        })
         .from(users)
         .where(inArray(users.id, userIds))
     : [];
@@ -234,6 +242,8 @@ async function buildTournamentStandings(tournamentId) {
     .select({
       userId: tournamentRegistrations.userId,
       name: users.name,
+      firstName: users.firstName,
+      lastName: users.lastName,
       image: users.image,
     })
     .from(tournamentRegistrations)
@@ -244,6 +254,8 @@ async function buildTournamentStandings(tournamentId) {
     participants.map((p) => [String(p.userId), {
       userId: p.userId,
       name: p.name,
+      firstName: p.firstName,
+      lastName: p.lastName,
       image: p.image,
       played: 0,
       wins: 0,
@@ -668,6 +680,8 @@ export const getTournamentParticipantsController = async (req, res) => {
         paymentStatus: tournamentRegistrations.paymentStatus,
         registeredAt: tournamentRegistrations.registeredAt,
         name: users.name,
+        firstName: users.firstName,
+        lastName: users.lastName,
         image: users.image,
         phone: users.phone,
         level: users.level,
@@ -831,6 +845,18 @@ export const setTournamentMatchResultController = async (req, res) => {
 export const getClubTournamentsController = async (req, res) => {
   try {
     const { clubId } = req.params;
+
+    if (!req.user?.isAdmin) {
+      const [ownedClub] = await db
+        .select({ id: clubs.id })
+        .from(clubs)
+        .where(and(eq(clubs.id, clubId), eq(clubs.ownerId, req.user.id)))
+        .limit(1);
+
+      if (!ownedClub) {
+        return res.status(403).json({ message: "اجازه دسترسی به تورنومنت‌های این باشگاه را ندارید" });
+      }
+    }
 
     const rows = await db
       .select()

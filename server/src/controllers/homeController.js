@@ -1,4 +1,4 @@
-import { eq, and, asc, gte, lte, desc, ne } from "drizzle-orm";
+import { eq, and, asc, gte, lte, desc, ne, inArray } from "drizzle-orm";
 import { db } from "../db/index.js";
 import {
   matches,
@@ -9,6 +9,22 @@ import {
   promotions,
   deals,
 } from "../db/schema.js";
+
+const TEHRAN_OFFSET = "+03:30";
+
+function parseDealSlotDateTime(slotDate, slotTime) {
+  if (!slotDate || !slotTime) return null;
+  const parsed = new Date(`${slotDate}T${slotTime}:00${TEHRAN_OFFSET}`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function isDealExpiredByTime(deal, now = new Date()) {
+  const validUntil = deal.validUntil ? new Date(deal.validUntil) : null;
+  const isValidUntilExpired = validUntil && !Number.isNaN(validUntil.getTime()) && validUntil <= now;
+  const slotEndDateTime = parseDealSlotDateTime(deal.slotDate, deal.slotEnd);
+  const isSlotPassed = slotEndDateTime && slotEndDateTime <= now;
+  return Boolean(isValidUntilExpired || isSlotPassed);
+}
 
 async function enrichMatches(rows) {
   return Promise.all(
@@ -65,8 +81,29 @@ export const getHomeController = async (req, res) => {
       .orderBy(asc(promotions.sortOrder))
       .limit(6);
 
+    const activeDealRows = await db
+      .select({
+        id: deals.id,
+        slotDate: deals.slotDate,
+        slotEnd: deals.slotEnd,
+        validUntil: deals.validUntil,
+      })
+      .from(deals)
+      .where(eq(deals.isActive, true));
+
+    const expiredActiveDealIds = activeDealRows
+      .filter((deal) => isDealExpiredByTime(deal, now))
+      .map((deal) => deal.id);
+
+    if (expiredActiveDealIds.length > 0) {
+      await db
+        .update(deals)
+        .set({ isActive: false })
+        .where(and(eq(deals.isActive, true), inArray(deals.id, expiredActiveDealIds)));
+    }
+
     // ── Active deals (not expired)
-    const activeDeals = await db
+    const dealRows = await db
       .select({
         id: deals.id,
         slotDate: deals.slotDate,
@@ -93,7 +130,11 @@ export const getHomeController = async (req, res) => {
         )
       )
       .orderBy(asc(deals.validUntil))
-      .limit(6);
+      .limit(24);
+
+    const activeDeals = dealRows
+      .filter((deal) => !isDealExpiredByTime(deal, now))
+      .slice(0, 6);
 
     // ── User's pending bookings count
     const userBookings = await db

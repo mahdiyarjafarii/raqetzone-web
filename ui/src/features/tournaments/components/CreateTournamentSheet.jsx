@@ -8,6 +8,11 @@ import {
   CalendarIcon, CheckIcon, TrophyIcon, ZapIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import {
+  addDaysToDateKey,
+  formatPersianDateInTehran,
+  getTodayDateKeyInTehran,
+} from "@/lib/timezone";
 import { createTournamentOpenAtom, tournamentsAtom } from "../store/tournamentStore";
 import { tournamentService } from "../services/tournamentService";
 
@@ -43,18 +48,6 @@ const defaultForm = {
 const inputClass =
   "w-full bg-muted border border-border rounded-xl px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-violet-500 transition-colors";
 
-const dateTimeFormatFa = new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
-  weekday: "short",
-  year: "numeric",
-  month: "long",
-  day: "numeric",
-});
-
-function toLocalDateTimeValue(date) {
-  const pad = (value) => String(value).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
 function getDatePart(value) {
   return value?.split("T")[0] ?? "";
 }
@@ -64,16 +57,38 @@ function getTimePart(value) {
 }
 
 function buildDateOptions(daysAhead = 730) {
-  const today = new Date();
-  today.setHours(12, 0, 0, 0);
+  const today = getTodayDateKeyInTehran();
   return Array.from({ length: daysAhead }, (_, index) => {
-    const date = new Date(today);
-    date.setDate(today.getDate() + index);
+    const dateKey = addDaysToDateKey(today, index);
     return {
-      value: toLocalDateTimeValue(date).split("T")[0],
-      label: dateTimeFormatFa.format(date),
+      value: dateKey,
+      label: formatPersianDateInTehran(dateKey, {
+        weekday: "short",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      }),
     };
   });
+}
+
+function getNowDateTimeValueInTehran() {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone: "Asia/Tehran",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(now);
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+  const hour = parts.find((part) => part.type === "hour")?.value;
+  const minute = parts.find((part) => part.type === "minute")?.value;
+  return `${year}-${month}-${day}T${hour}:${minute}`;
 }
 
 const persianDateOptions = buildDateOptions();
@@ -220,11 +235,11 @@ function Step1({ form, setForm }) {
 // ─── Step 2: Schedule ───────────────────────────────────────────────────────
 
 function Step2({ form, setForm }) {
-  const deadline = form.registrationDeadline ? new Date(form.registrationDeadline) : null;
-  const start = form.startDate ? new Date(form.startDate) : null;
-  const end = form.endDate ? new Date(form.endDate) : null;
+  const deadline = form.registrationDeadline || "";
+  const start = form.startDate || "";
+  const end = form.endDate || "";
 
-  const allSet = deadline && start && end;
+  const allSet = !!(deadline && start && end);
   const validOrder = allSet && deadline < start && start < end;
 
   return (
@@ -303,7 +318,7 @@ function TimelineNode({ color, label, date }) {
       <div className={cn("w-2 h-2 rounded-full", `bg-${color}-500`)} />
       <span className={cn("font-bold text-[9px]", `text-${color}-600`)}>{label}</span>
       <span className="text-[9px] text-muted-foreground tabular-nums">
-        {date?.toLocaleDateString("fa-IR", { month: "short", day: "numeric" })}
+        {date ? formatPersianDateInTehran(date.slice(0, 10), { month: "short", day: "numeric" }) : ""}
       </span>
     </div>
   );
@@ -488,15 +503,16 @@ export default function CreateTournamentSheet({ onCreated }) {
       if (!form.registrationDeadline) { toast.error("مهلت ثبت‌نام الزامی است"); return false; }
       if (!form.startDate) { toast.error("تاریخ شروع الزامی است"); return false; }
       if (!form.endDate) { toast.error("تاریخ پایان الزامی است"); return false; }
-      if (new Date(form.registrationDeadline) < new Date()) {
+      const nowTehran = getNowDateTimeValueInTehran();
+      if (form.registrationDeadline < nowTehran) {
         toast.error("مهلت ثبت‌نام نباید قبل از زمان فعلی باشد");
         return false;
       }
-      if (new Date(form.registrationDeadline) >= new Date(form.startDate)) {
+      if (form.registrationDeadline >= form.startDate) {
         toast.error("مهلت ثبت‌نام باید قبل از شروع مسابقه باشد");
         return false;
       }
-      if (new Date(form.startDate) >= new Date(form.endDate)) {
+      if (form.startDate >= form.endDate) {
         toast.error("تاریخ شروع باید قبل از پایان باشد");
         return false;
       }

@@ -8,12 +8,12 @@ import { myBookingsAtom, myBookingsLoadingAtom } from "../store/bookingStore";
 import { bookingService } from "../services/bookingService";
 import BookingStatusBadge from "./BookingStatusBadge";
 import { cn } from "@/lib/utils";
+import { formatPersianDateInTehran } from "@/lib/timezone";
 
 const SPORT_ICONS = { padel: "🏓", tennis: "🎾", squash: "🟡", badminton: "🏸" };
 
 function formatDateFa(dateStr) {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString("fa-IR", { weekday: "short", month: "short", day: "numeric" });
+  return formatPersianDateInTehran(dateStr, { weekday: "short", month: "short", day: "numeric" });
 }
 
 function formatPrice(p) {

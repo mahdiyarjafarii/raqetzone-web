@@ -16,11 +16,12 @@ import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
 import { bookingService } from "@/features/booking/services/bookingService";
 import BookingStatusBadge from "@/features/booking/components/BookingStatusBadge";
+import { formatPersianDateInTehran } from "@/lib/timezone";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 function formatDateFa(dateStr) {
-  return new Date(dateStr).toLocaleDateString("fa-IR", {
+  return formatPersianDateInTehran(dateStr, {
     weekday: "long",
     year: "numeric",
     month: "long",
@@ -192,7 +193,7 @@ function BookingCard({ booking, index, onCancel }) {
           {/* ── Footer: date created + cancel ── */}
           <div className="flex items-center justify-between pt-3 mt-2 border-t border-border">
             <span className="text-[10px] text-muted-foreground">
-              ثبت: {new Date(booking.createdAt).toLocaleDateString("fa-IR")}
+              ثبت: {new Date(booking.createdAt).toLocaleDateString("fa-IR", { timeZone: "Asia/Tehran" })}
             </span>
             {isPending && (
               <button

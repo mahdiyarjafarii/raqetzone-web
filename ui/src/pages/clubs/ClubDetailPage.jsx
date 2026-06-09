@@ -178,7 +178,7 @@ export default function ClubDetailPage() {
         </div>
 
         {reviewStats.total > 0 && (
-          <div className="absolute bottom-3 right-3 z-20 flex items-center gap-1.5 bg-black/60 backdrop-blur-sm rounded-full px-3 py-1.5">
+          <div className="absolute bottom-3 right-3 z-1 flex items-center gap-1.5 bg-black/60 backdrop-blur-sm rounded-full px-3 py-1.5">
             <StarIcon className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
             <span className="text-white font-black text-sm">{reviewStats.average}</span>
             <span className="text-white/60 text-xs">({reviewStats.total})</span>

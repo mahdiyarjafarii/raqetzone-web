@@ -15,6 +15,8 @@ import apiClient from "@/lib/apiClient";
 import PageHeader from "@/components/PageHeader";
 import { fmt, cn } from "@/lib/utils";
 
+const TEHRAN_TIME_ZONE = "Asia/Tehran";
+
 const PIE_COLORS = ["#10B981", "#F59E0B", "#EF4444"];
 const STATUS_MAP = {
   approved:  { label: "تأیید شده",  color: "text-emerald-600", bg: "bg-emerald-500/10", icon: CheckCircle2Icon },
@@ -257,7 +259,9 @@ export default function DashboardPage() {
     <div dir="rtl">
       <PageHeader
         title="داشبورد"
-        description={lastUpdated ? `آخرین بروزرسانی: ${lastUpdated.toLocaleTimeString("fa-IR", { hour: "2-digit", minute: "2-digit" })}` : `امروز ${new Date().toLocaleDateString("fa-IR", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}`}
+        description={lastUpdated
+          ? `آخرین بروزرسانی: ${lastUpdated.toLocaleTimeString("fa-IR", { timeZone: TEHRAN_TIME_ZONE, hour: "2-digit", minute: "2-digit" })}`
+          : `امروز ${new Date().toLocaleDateString("fa-IR", { timeZone: TEHRAN_TIME_ZONE, weekday: "long", year: "numeric", month: "long", day: "numeric" })}`}
         actions={
           <button
             type="button"

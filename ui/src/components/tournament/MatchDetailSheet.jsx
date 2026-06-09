@@ -46,6 +46,7 @@ function useCountdown(targetDate) {
 function formatDateFull(dateStr) {
   const date = new Date(dateStr);
   return date.toLocaleDateString("fa-IR", {
+    timeZone: "Asia/Tehran",
     weekday: "long",
     month: "long",
     day: "numeric",

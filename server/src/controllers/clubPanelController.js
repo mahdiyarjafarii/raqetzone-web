@@ -71,6 +71,74 @@ function recommendedDiscount(date, startTime) {
   return hour >= 12 && hour <= 17 ? 20 : 10;
 }
 
+const TEHRAN_OFFSET = "+03:30";
+const BOOKING_TIME_PASSED_NOTE = "تایم زمین گذشته";
+
+function parseDealSlotDateTime(slotDate, slotTime) {
+  if (!slotDate || !slotTime) return null;
+  const parsed = new Date(`${slotDate}T${slotTime}:00${TEHRAN_OFFSET}`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function isDealExpiredByTime(deal, now = new Date()) {
+  const validUntil = deal.validUntil ? new Date(deal.validUntil) : null;
+  const isValidUntilExpired = validUntil && !Number.isNaN(validUntil.getTime()) && validUntil <= now;
+  const slotEndDateTime = parseDealSlotDateTime(deal.slotDate, deal.slotEnd);
+  const isSlotPassed = slotEndDateTime && slotEndDateTime <= now;
+  return Boolean(isValidUntilExpired || isSlotPassed);
+}
+
+function parseBookingEndDateTime(date, endTime) {
+  if (!date || !endTime) return null;
+  const parsed = new Date(`${date}T${endTime}:00${TEHRAN_OFFSET}`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function isPendingBookingExpiredByTime(booking, now = new Date()) {
+  if (!booking || booking.status !== "pending") return false;
+  const endDateTime = parseBookingEndDateTime(booking.date, booking.endTime);
+  return Boolean(endDateTime && endDateTime <= now);
+}
+
+async function notifyBookingExpiredByTime(booking) {
+  if (!booking?.userId) return;
+  const bookingDateTime = formatBookingDateTimeFa(booking);
+  await sendNotification(booking.userId, {
+    title: "رزرو شما منقضی شد ⌛️",
+    message: `درخواست رزرو شما برای ${bookingDateTime} به‌صورت خودکار رد شد چون تایم زمین گذشته است.`,
+    type: "BOOKING",
+    metadata: {
+      bookingId: booking.id,
+      date: booking.date,
+      startTime: booking.startTime,
+      ctaHref: "/mybooking",
+      ctaLabel: "مشاهده رزروها",
+    },
+  }).catch(() => {});
+}
+
+async function expirePendingBookings(bookingsList) {
+  const now = new Date();
+  const expiredBookings = bookingsList
+    .filter((booking) => isPendingBookingExpiredByTime(booking, now));
+  const expiredIds = expiredBookings.map((booking) => booking.id);
+
+  if (expiredIds.length === 0) return [];
+
+  await db
+    .update(bookings)
+    .set({
+      status: "rejected",
+      adminNote: BOOKING_TIME_PASSED_NOTE,
+      updatedAt: now,
+    })
+    .where(inArray(bookings.id, expiredIds));
+
+  await Promise.allSettled(expiredBookings.map((booking) => notifyBookingExpiredByTime(booking)));
+
+  return expiredIds;
+}
+
 async function getOwnerCourtScope(req, clubId) {
   const ownerId = ownerFilter(req);
   let clubRows = [];
@@ -325,6 +393,22 @@ export const getClubBookingsController = async (req, res) => {
       if (courtIds.length === 0) return res.json({ bookings: [] });
     }
 
+    if ((!status || status === "pending") && courtIds.length > 0) {
+      const pendingRows = await db
+        .select({
+          id: bookings.id,
+          userId: bookings.userId,
+          date: bookings.date,
+          startTime: bookings.startTime,
+          endTime: bookings.endTime,
+          status: bookings.status,
+        })
+        .from(bookings)
+        .where(and(inArray(bookings.courtId, courtIds), eq(bookings.status, "pending")));
+
+      await expirePendingBookings(pendingRows);
+    }
+
     const conditions = [];
     if (ownerId && courtIds.length > 0) conditions.push(inArray(bookings.courtId, courtIds));
     if (status) conditions.push(eq(bookings.status, status));
@@ -348,6 +432,8 @@ export const getClubBookingsController = async (req, res) => {
         user: {
           id: users.id,
           name: users.name,
+          firstName: users.firstName,
+          lastName: users.lastName,
           phone: users.phone,
           image: users.image,
         },
@@ -380,6 +466,21 @@ export const approveClubBookingController = async (req, res) => {
     const [booking] = await db.select().from(bookings).where(eq(bookings.id, id)).limit(1);
     if (!booking) return res.status(404).json({ message: "رزرو یافت نشد" });
     if (booking.status !== "pending") return res.status(400).json({ message: "فقط رزروهای در انتظار قابل تأیید است" });
+
+    if (isPendingBookingExpiredByTime(booking)) {
+      await db
+        .update(bookings)
+        .set({
+          status: "rejected",
+          adminNote: BOOKING_TIME_PASSED_NOTE,
+          updatedAt: new Date(),
+        })
+        .where(eq(bookings.id, id));
+
+      await notifyBookingExpiredByTime(booking);
+
+      return res.status(400).json({ message: BOOKING_TIME_PASSED_NOTE });
+    }
 
     if (!(await assertCourtOwnership(req, booking.courtId))) {
       return res.status(403).json({ message: "دسترسی غیر مجاز" });
@@ -628,7 +729,19 @@ export const getSlotOverridesController = async (req, res) => {
     if (from) bookingConditions.push(gte(bookings.date, from));
     if (to)   bookingConditions.push(lte(bookings.date, to));
     const bookingRows = await db
-      .select({ id: bookings.id, date: bookings.date, startTime: bookings.startTime, endTime: bookings.endTime, status: bookings.status, totalPrice: bookings.totalPrice, trackingCode: bookings.trackingCode, userName: users.name, userPhone: users.phone })
+      .select({
+        id: bookings.id,
+        date: bookings.date,
+        startTime: bookings.startTime,
+        endTime: bookings.endTime,
+        status: bookings.status,
+        totalPrice: bookings.totalPrice,
+        trackingCode: bookings.trackingCode,
+        userName: users.name,
+        userFirstName: users.firstName,
+        userLastName: users.lastName,
+        userPhone: users.phone,
+      })
       .from(bookings)
       .innerJoin(users, eq(bookings.userId, users.id))
       .where(and(...bookingConditions));
@@ -843,13 +956,23 @@ export const getClubCustomersController = async (req, res) => {
     if (allUserIds.length === 0) return res.json({ customers: [] });
 
     const userRows = await db
-      .select({ id: users.id, name: users.name, phone: users.phone, image: users.image, createdAt: users.createdAt })
+      .select({
+        id: users.id,
+        name: users.name,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        phone: users.phone,
+        image: users.image,
+        createdAt: users.createdAt,
+      })
       .from(users)
       .where(inArray(users.id, allUserIds));
 
     const customers = userRows.map(u => ({
       id:            u.id,
       name:          u.name,
+      firstName:     u.firstName,
+      lastName:      u.lastName,
       phone:         u.phone,
       image:         u.image,
       memberSince:   u.createdAt,
@@ -892,6 +1015,8 @@ export const verifyBookingController = async (req, res) => {
         notes:        bookings.notes,
         createdAt:    bookings.createdAt,
         userName:     users.name,
+        userFirstName: users.firstName,
+        userLastName: users.lastName,
         userPhone:    users.phone,
         courtId:      courts.id,
         courtName:    courts.name,
@@ -926,11 +1051,33 @@ export const verifyBookingController = async (req, res) => {
 export const getClubDealsController = async (req, res) => {
   try {
     const { active } = req.query;
+    const now = new Date();
     const scope = await getOwnerCourtScope(req);
     if (!scope) return res.status(403).json({ message: "دسترسی ندارید" });
 
     const courtIds = scope.courtRows.map((court) => court.id);
     if (courtIds.length === 0) return res.status(200).json({ deals: [] });
+
+    const activeDealRows = await db
+      .select({
+        id: deals.id,
+        slotDate: deals.slotDate,
+        slotEnd: deals.slotEnd,
+        validUntil: deals.validUntil,
+      })
+      .from(deals)
+      .where(and(inArray(deals.courtId, courtIds), eq(deals.isActive, true)));
+
+    const expiredActiveDealIds = activeDealRows
+      .filter((deal) => isDealExpiredByTime(deal, now))
+      .map((deal) => deal.id);
+
+    if (expiredActiveDealIds.length > 0) {
+      await db
+        .update(deals)
+        .set({ isActive: false })
+        .where(inArray(deals.id, expiredActiveDealIds));
+    }
 
     const rows = await db
       .select({
@@ -955,14 +1102,16 @@ export const getClubDealsController = async (req, res) => {
       .where(
         and(
           inArray(deals.courtId, courtIds),
-          active === "true" ? and(eq(deals.isActive, true), gte(deals.validUntil, new Date())) :
+          active === "true" ? eq(deals.isActive, true) :
           active === "false" ? eq(deals.isActive, false) :
           undefined
         )
       )
       .orderBy(asc(deals.validUntil));
 
-    return res.status(200).json({ deals: rows });
+    const visibleDeals = rows.filter((deal) => !isDealExpiredByTime(deal, now));
+
+    return res.status(200).json({ deals: visibleDeals });
   } catch (error) {
     console.error("getClubDeals error:", error);
     return res.status(500).json({ message: "خطای سرور" });

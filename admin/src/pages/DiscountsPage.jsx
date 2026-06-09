@@ -13,7 +13,35 @@ import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
 import PersianTimePicker from "@/components/PersianTimePicker";
-import { fmt, cn } from "@/lib/utils";
+import { fmt, cn, getUserFullName } from "@/lib/utils";
+
+const TEHRAN_TIME_ZONE = "Asia/Tehran";
+
+function formatDateKeyInTehran(date) {
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone: TEHRAN_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+  return `${year}-${month}-${day}`;
+}
+
+function parseDateKey(dateStr) {
+  const [year, month, day] = (dateStr ?? "").split("-").map(Number);
+  if (!year || !month || !day) return null;
+  return new Date(Date.UTC(year, month - 1, day, 12, 0, 0, 0));
+}
+
+function addDaysToDateKey(dateStr, days) {
+  const date = parseDateKey(dateStr);
+  if (!date) return dateStr;
+  date.setUTCDate(date.getUTCDate() + days);
+  return formatDateKeyInTehran(date);
+}
 
 // ─── Countdown hook ───────────────────────────────────────────────────────────
 function useCountdown(target) {
@@ -40,10 +68,6 @@ const dateTimeFormatFa = new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
   day: "numeric",
 });
 
-function toLocalDateTimeValue(date) {
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
 function getDatePart(value) {
   return value?.split("T")[0] ?? "";
 }
@@ -53,13 +77,12 @@ function getTimePart(value) {
 }
 
 function buildDateOptions(daysAhead = 730) {
-  const today = new Date();
-  today.setHours(12, 0, 0, 0);
+  const today = formatDateKeyInTehran(new Date());
   return Array.from({ length: daysAhead }, (_, index) => {
-    const date = new Date(today);
-    date.setDate(today.getDate() + index);
+    const dateKey = addDaysToDateKey(today, index);
+    const date = parseDateKey(dateKey);
     return {
-      value: toLocalDateTimeValue(date).split("T")[0],
+      value: dateKey,
       label: dateTimeFormatFa.format(date),
     };
   });
@@ -69,8 +92,10 @@ const persianDateOptions = buildDateOptions();
 
 function formatDateFa(dateStr) {
   if (!dateStr) return "—";
-  const [year, month, day] = dateStr.split("-").map(Number);
-  return new Date(year, month - 1, day, 12).toLocaleDateString("fa-IR-u-ca-persian", {
+  const date = parseDateKey(dateStr);
+  if (!date) return dateStr;
+  return date.toLocaleDateString("fa-IR-u-ca-persian", {
+    timeZone: TEHRAN_TIME_ZONE,
     weekday: "short",
     month: "short",
     day: "numeric",
@@ -417,7 +442,7 @@ function VoucherCard({ code, onToggle, onDelete, onViewUsages, index }) {
       <div className="flex items-center justify-between">
         <div className="text-[10px] text-muted-foreground">
           {code.expiresAt
-            ? `انقضا: ${new Date(code.expiresAt).toLocaleDateString("fa-IR")}`
+            ? `انقضا: ${new Date(code.expiresAt).toLocaleDateString("fa-IR", { timeZone: TEHRAN_TIME_ZONE })}`
             : "بدون انقضا"}
         </div>
         <div className="flex items-center gap-1">
@@ -614,20 +639,23 @@ function UsagesModal({ code, clubId, onClose }) {
         </div>
       ) : (
         <div className="space-y-2 max-h-80 overflow-y-auto">
-          {usages.map((u) => (
-            <div key={u.id} className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-muted/50">
-              <div>
-                <p className="text-sm font-semibold text-foreground">{u.userName ?? "کاربر"}</p>
-                <p className="text-[10px] text-muted-foreground" dir="ltr">{u.userPhone}</p>
+          {usages.map((u) => {
+            const fullName = getUserFullName(u);
+            return (
+              <div key={u.id} className="flex items-center justify-between px-3 py-2.5 rounded-xl bg-muted/50">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">{fullName}</p>
+                  <p className="text-[10px] text-muted-foreground" dir="ltr">{u.userPhone}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-bold text-primary">{fmt(u.discountAmount)} تومان</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {new Date(u.usedAt).toLocaleDateString("fa-IR", { timeZone: TEHRAN_TIME_ZONE })}
+                  </p>
+                </div>
               </div>
-              <div className="text-right">
-                <p className="text-sm font-bold text-primary">{fmt(u.discountAmount)} تومان</p>
-                <p className="text-[10px] text-muted-foreground">
-                  {new Date(u.usedAt).toLocaleDateString("fa-IR")}
-                </p>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </Modal>

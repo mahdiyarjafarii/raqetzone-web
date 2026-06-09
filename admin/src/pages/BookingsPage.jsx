@@ -8,8 +8,7 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
-import { fmt, fmtDate } from "@/lib/utils";
-import { cn } from "@/lib/utils";
+import { cn, fmt, fmtDate, getUserFullName } from "@/lib/utils";
 
 const ADMIN_BASE = import.meta.env.VITE_API_URL?.replace("/api", "") ?? "http://localhost:3000";
 
@@ -42,7 +41,7 @@ function UserAvatar({ image, name }) {
         className="w-full h-full bg-gradient-to-br from-violet-600 to-indigo-500 text-white text-xs font-bold items-center justify-center"
         style={{ display: src ? "none" : "flex" }}
       >
-        {name?.[0]?.toUpperCase() ?? "?"}
+        {name?.[0]?.toUpperCase() ?? ""}
       </div>
     </div>
   );
@@ -94,11 +93,10 @@ export default function BookingsPage() {
   };
 
   const filtered = search
-    ? bookings.filter(b =>
-        b.user?.name?.includes(search) ||
-        b.user?.phone?.includes(search) ||
-        b.court?.name?.includes(search)
-      )
+    ? bookings.filter((b) => {
+        const fullName = getUserFullName(b.user);
+        return fullName.includes(search) || b.user?.phone?.includes(search) || b.court?.name?.includes(search);
+      })
     : bookings;
 
   return (
@@ -160,6 +158,7 @@ export default function BookingsPage() {
                   <tr><td colSpan={7} className="text-center py-12 text-muted-foreground text-sm">رزروی یافت نشد</td></tr>
                 ) : (
                   filtered.map((b, i) => {
+                    const fullName = getUserFullName(b.user);
                     const sb = STATUS_BADGE[b.status] ?? STATUS_BADGE.pending;
                     return (
                       <motion.tr
@@ -171,9 +170,9 @@ export default function BookingsPage() {
                       >
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2.5">
-                            <UserAvatar image={b.user?.image} name={b.user?.name} />
+                            <UserAvatar image={b.user?.image} name={fullName} />
                             <div>
-                              <div className="font-medium text-foreground">{b.user?.name ?? "—"}</div>
+                              <div className="font-medium text-foreground">{fullName}</div>
                               <div className="text-xs text-muted-foreground" dir="ltr">{b.user?.phone}</div>
                             </div>
                           </div>
