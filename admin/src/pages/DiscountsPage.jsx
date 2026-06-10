@@ -16,6 +16,7 @@ import PersianTimePicker from "@/components/PersianTimePicker";
 import { fmt, cn, getUserFullName } from "@/lib/utils";
 
 const TEHRAN_TIME_ZONE = "Asia/Tehran";
+const TEHRAN_OFFSET = "+03:30";
 
 function formatDateKeyInTehran(date) {
   const parts = new Intl.DateTimeFormat("en", {
@@ -86,6 +87,13 @@ function buildDateOptions(daysAhead = 730) {
       label: dateTimeFormatFa.format(date),
     };
   });
+}
+
+function isFutureSlotInTehran(slotDate, slotStart) {
+  if (!slotDate || !slotStart) return false;
+  const slotDateTime = new Date(`${slotDate}T${slotStart}:00${TEHRAN_OFFSET}`);
+  if (Number.isNaN(slotDateTime.getTime())) return false;
+  return slotDateTime.getTime() > Date.now();
 }
 
 const persianDateOptions = buildDateOptions();
@@ -303,7 +311,11 @@ function CreateDealForm({ courts, onCreated, onClose }) {
       .then(({ ok, data }) => {
         if (cancelled) return;
         const nextSlots = ok
-          ? (data?.slots ?? []).filter((slot) => !(slot.isBooked || slot.isPending || slot.isBlocked || slot.isManualBooked))
+          ? (data?.slots ?? []).filter((slot) => {
+              const isUnavailable = slot.isBooked || slot.isPending || slot.isBlocked || slot.isManualBooked;
+              if (isUnavailable) return false;
+              return isFutureSlotInTehran(form.slotDate, slot.start);
+            })
           : [];
         setAvailableSlots(nextSlots);
         setForm((prev) => {

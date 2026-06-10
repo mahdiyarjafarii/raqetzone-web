@@ -61,7 +61,9 @@ function toDateStr(date) {
 }
 
 function minutes(time) {
+  if (!time || typeof time !== "string") return NaN;
   const [h, m] = time.split(":").map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return NaN;
   return h * 60 + m;
 }
 
@@ -80,6 +82,9 @@ function buildCourtSlots(court) {
   const open = minutes(court.openTime);
   const close = minutes(court.closeTime);
   const duration = Number(court.slotDuration ?? 60);
+  if (!Number.isFinite(open) || !Number.isFinite(close) || !Number.isFinite(duration) || duration <= 0) {
+    return slots;
+  }
   for (let t = open; t + duration <= close; t += duration) {
     slots.push({ startTime: timeStr(t), endTime: timeStr(t + duration) });
   }
@@ -1202,13 +1207,27 @@ export const createClubDealController = async (req, res) => {
     }
 
     const [court] = await db
-      .select({ id: courts.id, name: courts.name, location: courts.location, sportType: courts.sportType, pricePerHour: courts.pricePerHour })
+      .select({
+        id: courts.id,
+        name: courts.name,
+        location: courts.location,
+        sportType: courts.sportType,
+        pricePerHour: courts.pricePerHour,
+        openTime: courts.openTime,
+        closeTime: courts.closeTime,
+        slotDuration: courts.slotDuration,
+      })
       .from(courts)
       .where(eq(courts.id, courtId))
       .limit(1);
     if (!court) return res.status(404).json({ message: "زمین یافت نشد" });
 
-    const slotDefinition = buildCourtSlots(court).find(
+    const courtSlots = buildCourtSlots(court);
+    if (courtSlots.length === 0) {
+      return res.status(400).json({ message: "تنظیمات ساعت کاری یا مدت سانس زمین نامعتبر است" });
+    }
+
+    const slotDefinition = courtSlots.find(
       (slot) => slot.startTime === slotStart && slot.endTime === slotEnd
     );
     if (!slotDefinition) {
