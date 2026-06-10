@@ -1,6 +1,6 @@
-import React from "react";
-import { NavLink, useNavigate } from "react-router-dom";
-import { useAtom, useAtomValue } from "jotai";
+import React, { useCallback, useEffect, useRef } from "react";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import {
   LayoutDashboardIcon, CalendarCheckIcon,
   Building2Icon, UserCircle2Icon,
@@ -10,6 +10,12 @@ import {
 } from "lucide-react";
 import { cn, getUserFullName } from "@/lib/utils";
 import { adminUserAtom, adminTokenAtom } from "@/store/authStore";
+import apiClient from "@/lib/apiClient";
+import {
+  getLastSeenBookingAt,
+  setLastSeenBookingAt,
+  unseenBookingsCountAtom,
+} from "@/store/bookingStore";
 
 const CLUB_OWNER_NAV = [
   { to: "/",            icon: LayoutDashboardIcon, label: "داشبورد"      },
@@ -28,7 +34,9 @@ const ADMIN_EXTRA_NAV = [
   { to: "/users",     icon: UsersIcon,     label: "کاربران"    },
 ];
 
-function NavItem({ to, icon: Icon, label }) {
+const BOOKING_POLL_INTERVAL_MS = 60_000;
+
+function NavItem({ to, icon: Icon, label, badgeCount = 0 }) {
   return (
     <NavLink
       to={to}
@@ -45,7 +53,15 @@ function NavItem({ to, icon: Icon, label }) {
       {({ isActive }) => (
         <>
           <Icon className={cn("w-4 h-4 shrink-0", isActive ? "text-primary-foreground" : "")} />
-          <span>{label}</span>
+          <span className="flex-1">{label}</span>
+          {badgeCount > 0 && (
+            <span className={cn(
+              "min-w-5 h-5 px-1 rounded-full text-[10px] font-bold flex items-center justify-center",
+              isActive ? "bg-primary-foreground/20 text-primary-foreground" : "bg-red-500 text-white"
+            )}>
+              {badgeCount > 99 ? "99+" : badgeCount}
+            </span>
+          )}
         </>
       )}
     </NavLink>
@@ -56,9 +72,56 @@ export default function Sidebar() {
   const [, setUser]  = useAtom(adminUserAtom);
   const [, setToken] = useAtom(adminTokenAtom);
   const user         = useAtomValue(adminUserAtom);
+  const unseenBookingsCount = useAtomValue(unseenBookingsCountAtom);
+  const setUnseenBookingsCount = useSetAtom(unseenBookingsCountAtom);
   const navigate     = useNavigate();
+  const location = useLocation();
+  const pollRef = useRef(null);
 
   const isAdmin = user?.isAdmin;
+
+  const refreshUnseenBookingsCount = useCallback(async () => {
+    const { ok, data } = await apiClient.get("/club-panel/bookings");
+    if (!ok) return;
+
+    const rows = Array.isArray(data?.bookings) ? data.bookings : [];
+    const latestCreatedAt = rows[0]?.createdAt;
+
+    if (location.pathname.startsWith("/bookings")) {
+      setUnseenBookingsCount(0);
+      if (latestCreatedAt) setLastSeenBookingAt(latestCreatedAt);
+      return;
+    }
+
+    const lastSeenBookingAt = getLastSeenBookingAt();
+    if (!lastSeenBookingAt) {
+      if (latestCreatedAt) setLastSeenBookingAt(latestCreatedAt);
+      setUnseenBookingsCount(0);
+      return;
+    }
+
+    const lastSeenMs = Date.parse(lastSeenBookingAt);
+    if (Number.isNaN(lastSeenMs)) return;
+
+    const unseenCount = rows.filter((booking) => {
+      const createdAtMs = Date.parse(booking?.createdAt);
+      return !Number.isNaN(createdAtMs) && createdAtMs > lastSeenMs;
+    }).length;
+
+    setUnseenBookingsCount(Math.max(0, unseenCount));
+  }, [location.pathname, setUnseenBookingsCount]);
+
+  useEffect(() => {
+    const syncNow = async () => {
+      await refreshUnseenBookingsCount();
+    };
+    syncNow();
+
+    pollRef.current = setInterval(syncNow, BOOKING_POLL_INTERVAL_MS);
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [refreshUnseenBookingsCount]);
 
   const handleLogout = () => {
     localStorage.removeItem("raqetzone-admin-token");
@@ -87,7 +150,13 @@ export default function Sidebar() {
         <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-2 mt-1">
           مدیریت باشگاه
         </p>
-        {CLUB_OWNER_NAV.map((item) => <NavItem key={item.to} {...item} />)}
+        {CLUB_OWNER_NAV.map((item) => (
+          <NavItem
+            key={item.to}
+            {...item}
+            badgeCount={item.to === "/bookings" ? unseenBookingsCount : 0}
+          />
+        ))}
 
         {isAdmin && (
           <>

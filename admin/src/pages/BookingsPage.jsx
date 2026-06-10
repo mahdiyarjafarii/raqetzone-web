@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useSetAtom } from "jotai";
 import { motion } from "framer-motion";
 import { CheckCircleIcon, XCircleIcon, SearchIcon } from "lucide-react";
 import toast from "react-hot-toast";
@@ -9,8 +10,13 @@ import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import Input from "@/components/ui/Input";
 import { cn, fmt, fmtDate, getUserFullName } from "@/lib/utils";
+import {
+  setLastSeenBookingAt,
+  unseenBookingsCountAtom,
+} from "@/store/bookingStore";
 
 const ADMIN_BASE = import.meta.env.VITE_API_URL?.replace("/api", "") ?? "http://localhost:3000";
+const BOOKING_POLL_INTERVAL_MS = 60_000;
 
 function buildUserImageUrl(image) {
   if (!image) return null;
@@ -69,16 +75,35 @@ export default function BookingsPage() {
   const [actionModal, setActionModal] = useState(null); // { id, action: 'approve'|'reject' }
   const [adminNote, setAdminNote] = useState("");
   const [acting, setActing]       = useState(false);
+  const pollRef = useRef(null);
+  const setUnseenBookingsCount = useSetAtom(unseenBookingsCountAtom);
 
-  const fetch = async (s = filter) => {
-    setLoading(true);
+  const fetch = useCallback(async (s = filter, { showLoading = true } = {}) => {
+    if (showLoading) setLoading(true);
     const { ok, data } = await apiClient.get("/club-panel/bookings", s ? { status: s } : {});
-    if (ok) setBookings(data.bookings);
-    else toast.error("خطا در بارگذاری رزروها");
-    setLoading(false);
-  };
+    if (ok) {
+      const rows = Array.isArray(data?.bookings) ? data.bookings : [];
+      setBookings(rows);
+      setUnseenBookingsCount(0);
+      if (rows.length > 0) {
+        setLastSeenBookingAt(rows[0]?.createdAt);
+      }
+    } else if (showLoading) {
+      toast.error("خطا در بارگذاری رزروها");
+    }
+    if (showLoading) setLoading(false);
+  }, [filter, setUnseenBookingsCount]);
 
-  useEffect(() => { fetch(); }, [filter]);
+  useEffect(() => { fetch(); }, [fetch]);
+
+  useEffect(() => {
+    pollRef.current = setInterval(() => {
+      fetch(filter, { showLoading: false });
+    }, BOOKING_POLL_INTERVAL_MS);
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [fetch, filter]);
 
   const handleAction = async () => {
     if (!actionModal) return;
@@ -89,7 +114,7 @@ export default function BookingsPage() {
     if (!ok) return toast.error(data?.message ?? "خطا");
     toast.success(actionModal.action === "approve" ? "رزرو تأیید شد ✅" : "رزرو رد شد");
     setActionModal(null); setAdminNote("");
-    fetch();
+    fetch(filter);
   };
 
   const filtered = search

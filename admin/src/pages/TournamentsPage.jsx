@@ -342,6 +342,11 @@ const dateTimeFormatFa = new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
   day: "numeric",
 });
 
+const shortDateFormatFa = new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
+  month: "short",
+  day: "numeric",
+});
+
 function formatDateKeyInTehran(date) {
   const parts = new Intl.DateTimeFormat("en", {
     timeZone: TEHRAN_TIME_ZONE,
@@ -418,6 +423,13 @@ function getDatePart(value) {
 
 function getTimePart(value) {
   return value?.split("T")[1]?.slice(0, 5) ?? "12:00";
+}
+
+function formatShortDateLabel(value) {
+  const dateKey = getDatePart(value);
+  const date = parseDateKey(dateKey);
+  if (!date) return "-";
+  return shortDateFormatFa.format(date);
 }
 
 function toFormDateTime(value) {
@@ -741,7 +753,7 @@ function WStep2({ form, setForm }) {
                   <div className={`w-2 h-2 rounded-full bg-${color}-500`} />
                   <span className={`font-bold text-${color}-600`}>{label}</span>
                   <span className="text-muted-foreground tabular-nums">
-                    {date?.toLocaleDateString("fa-IR", { timeZone: TEHRAN_TIME_ZONE, month:"short", day:"numeric" })}
+                    {formatShortDateLabel(date)}
                   </span>
                 </div>
                 {i < 2 && <div className="flex-1 h-0.5 bg-border rounded mb-5" />}
