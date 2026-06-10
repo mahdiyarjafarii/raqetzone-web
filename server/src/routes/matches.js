@@ -6,6 +6,7 @@ import {
   getMatchByIdController,
   joinMatchController,
   leaveMatchController,
+  finalizeMatchController,
   createMatchController,
   deleteMatchController,
   certifyMatchController,
@@ -24,6 +25,7 @@ router.post("/matches", authMiddleware, createMatchController);
 router.delete("/matches/:id", authMiddleware, deleteMatchController);
 router.post("/matches/:id/join", authMiddleware, joinMatchController);
 router.delete("/matches/:id/leave", authMiddleware, leaveMatchController);
+router.patch("/matches/:id/finalize", authMiddleware, finalizeMatchController);
 
 router.post("/matches/:id/emergency-sub", authMiddleware, emergencySubController);
 router.post("/matches/:id/rate", authMiddleware, rateMatchController);

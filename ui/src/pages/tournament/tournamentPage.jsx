@@ -38,7 +38,7 @@ function MatchmakingSection() {
   const fetchMatches = async () => {
     setLoading(true);
     try {
-      const res = await matchService.getMatches({ status: "open" });
+      const res = await matchService.getMatches();
       if (res.ok) setMatches(res.data.matches);
       else toast.error("خطا در بارگذاری مسابقه‌ها");
     } finally {

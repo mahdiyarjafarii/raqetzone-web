@@ -46,7 +46,7 @@ async function enrichMatch(match) {
   const teamA = participants.filter((p) => p.team === "A");
   const teamB = participants.filter((p) => p.team === "B");
 
-  return { ...match, creator, teamA, teamB };
+  return { ...withMatchState(match), creator, teamA, teamB };
 }
 
 function timeToMinutes(value) {
@@ -88,11 +88,34 @@ function parseScheduledAt(value) {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+function hasMatchStarted(match, now = new Date()) {
+  if (!match?.scheduledAt) return false;
+  const scheduledAt = new Date(match.scheduledAt);
+  if (Number.isNaN(scheduledAt.getTime())) return false;
+  return scheduledAt <= now;
+}
+
+function isMatchAwaitingResult(match, now = new Date()) {
+  if (!match) return false;
+  if (!("status" in match)) return false;
+  if (match.status !== "open" && match.status !== "full") return false;
+  return hasMatchStarted(match, now);
+}
+
+function withMatchState(match, now = new Date()) {
+  const awaitingResult = isMatchAwaitingResult(match, now);
+  return {
+    ...match,
+    awaitingResult,
+    isJoinClosed: awaitingResult || match.status !== "open",
+  };
+}
+
 // ─── Controllers ─────────────────────────────────────────────────────────────
 
 export const getMatchesController = async (req, res) => {
   try {
-    const { sport, status = "open" } = req.query;
+    const { sport, status } = req.query;
 
     const conditions = [];
     if (status) conditions.push(eq(matches.status, status));
@@ -150,6 +173,9 @@ export const joinMatchController = async (req, res) => {
       .limit(1);
 
     if (!match) return res.status(404).json({ message: "مسابقه یافت نشد" });
+    if (isMatchAwaitingResult(match)) {
+      return res.status(400).json({ message: "زمان شروع بازی گذشته و امکان پیوستن وجود ندارد" });
+    }
     if (match.status !== "open") {
       return res.status(400).json({ message: "این مسابقه دیگر باز نیست" });
     }
@@ -274,6 +300,44 @@ export const leaveMatchController = async (req, res) => {
     return res.status(200).json({ match: result });
   } catch (error) {
     console.error("leaveMatch error:", error);
+    return res.status(500).json({ message: "خطای سرور" });
+  }
+};
+
+export const finalizeMatchController = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { didPlay } = req.body;
+    const userId = req.user.id;
+
+    if (typeof didPlay !== "boolean") {
+      return res.status(400).json({ message: "وضعیت انجام بازی نامعتبر است" });
+    }
+
+    const [match] = await db
+      .select()
+      .from(matches)
+      .where(eq(matches.id, id))
+      .limit(1);
+
+    if (!match) return res.status(404).json({ message: "مسابقه یافت نشد" });
+    if (match.createdBy !== userId) {
+      return res.status(403).json({ message: "فقط سازنده می‌تواند وضعیت نهایی بازی را ثبت کند" });
+    }
+    if (!hasMatchStarted(match)) {
+      return res.status(400).json({ message: "هنوز زمان شروع بازی نرسیده است" });
+    }
+
+    const nextStatus = didPlay ? "completed" : "cancelled";
+    const [updated] = await db
+      .update(matches)
+      .set({ status: nextStatus, updatedAt: new Date() })
+      .where(eq(matches.id, id))
+      .returning();
+
+    return res.status(200).json({ match: await enrichMatch(updated) });
+  } catch (error) {
+    console.error("finalizeMatch error:", error);
     return res.status(500).json({ message: "خطای سرور" });
   }
 };

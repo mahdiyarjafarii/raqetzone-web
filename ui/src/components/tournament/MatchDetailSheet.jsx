@@ -55,6 +55,59 @@ function formatDateFull(dateStr) {
   });
 }
 
+function hasMatchStarted(match) {
+  if (!match?.scheduledAt) return false;
+  return new Date(match.scheduledAt).getTime() <= Date.now();
+}
+
+function getStatusMeta(match, awaitingResult) {
+  if (awaitingResult) {
+    return {
+      label: "در انتظار اعلام نتیجه",
+      chipClass: "bg-amber-500/15 text-amber-700 border-amber-500/20 dark:text-amber-300",
+      dotClass: "bg-amber-500",
+    };
+  }
+
+  if (match?.status === "open") {
+    return {
+      label: "باز",
+      chipClass: "bg-emerald-500/15 text-emerald-700 border-emerald-500/20 dark:text-emerald-300",
+      dotClass: "bg-emerald-500",
+    };
+  }
+
+  if (match?.status === "full") {
+    return {
+      label: "پر شد",
+      chipClass: "bg-red-500/15 text-red-500 border-red-500/20",
+      dotClass: "bg-red-500",
+    };
+  }
+
+  if (match?.status === "completed") {
+    return {
+      label: "انجام شد",
+      chipClass: "bg-blue-500/15 text-blue-600 border-blue-500/20 dark:text-blue-300",
+      dotClass: "bg-blue-500",
+    };
+  }
+
+  if (match?.status === "cancelled") {
+    return {
+      label: "برگزار نشد",
+      chipClass: "bg-muted text-muted-foreground border-border",
+      dotClass: "bg-muted-foreground",
+    };
+  }
+
+  return {
+    label: match?.status ?? "نامشخص",
+    chipClass: "bg-background/60 text-muted-foreground border-border",
+    dotClass: "bg-muted-foreground",
+  };
+}
+
 export default function MatchDetailSheet() {
   const [selectedMatch, setSelectedMatch] = useAtom(selectedMatchAtom);
   const [joinLoading, setJoinLoading] = useAtom(joinLoadingAtom);
@@ -71,9 +124,13 @@ export default function MatchDetailSheet() {
   const [showEmergencyConfirm, setShowEmergencyConfirm] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [finalizeLoading, setFinalizeLoading] = useState(false);
   const isUserInMatch =
     match && [...match.teamA, ...match.teamB].some((p) => p.userId === currentUserId);
   const isCreator = match?.createdBy === currentUserId;
+  const matchStarted = hasMatchStarted(match);
+  const awaitingResult = Boolean(match?.awaitingResult ?? (matchStarted && (match?.status === "open" || match?.status === "full")));
+  const statusMeta = getStatusMeta(match, awaitingResult);
   const canUseEmergencySub =
     match && new Date(match.scheduledAt).getTime() - Date.now() <= 5 * 3600000;
 
@@ -105,6 +162,24 @@ export default function MatchDetailSheet() {
       document.execCommand("copy");
       document.body.removeChild(el);
       toast.success("لینک دعوت کپی شد!");
+    }
+  };
+
+  const handleFinalize = async (didPlay) => {
+    if (!match) return;
+    setFinalizeLoading(true);
+    try {
+      const res = await matchService.finalizeMatch(match.id, didPlay);
+      if (res.ok) {
+        const updated = res.data.match;
+        setSelectedMatch(updated);
+        setMatches((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
+        toast.success(didPlay ? "وضعیت بازی: انجام شد" : "وضعیت بازی: برگزار نشد");
+      } else {
+        toast.error(res.data?.message ?? "خطا در ثبت نتیجه بازی");
+      }
+    } finally {
+      setFinalizeLoading(false);
     }
   };
 
@@ -211,20 +286,16 @@ export default function MatchDetailSheet() {
                       <span
                         className={cn(
                           "inline-flex items-center gap-1.5 text-[11px] px-3 py-1 rounded-full font-bold border shadow-sm",
-                          match.status === "open"
-                            ? "bg-emerald-500/15 text-emerald-700 border-emerald-500/20 dark:text-emerald-300"
-                            : match.status === "full"
-                            ? "bg-red-500/15 text-red-500 border-red-500/20"
-                            : "bg-background/60 text-muted-foreground border-border"
+                          statusMeta.chipClass
                         )}
                       >
                         <span
                           className={cn(
                             "w-1.5 h-1.5 rounded-full",
-                            match.status === "open" ? "bg-emerald-500" : match.status === "full" ? "bg-red-500" : "bg-muted-foreground"
+                            statusMeta.dotClass
                           )}
                         />
-                        {match.status === "open" ? "باز" : match.status === "full" ? "پر شد" : match.status}
+                        {statusMeta.label}
                       </span>
                       {match.creator && (
                         <button
@@ -284,7 +355,7 @@ export default function MatchDetailSheet() {
                   </div>
 
                   {/* Countdown */}
-                  {countdown && (
+                  {countdown && !awaitingResult && (
                     <div className="col-span-1 flex items-center gap-2.5 bg-amber-500/10 rounded-2xl px-3.5 py-3 border border-amber-500/20 shadow-sm">
                       <div className="w-8 h-8 rounded-xl bg-amber-500/20 flex items-center justify-center shrink-0">
                         <ClockIcon className="w-4 h-4 text-amber-500" />
@@ -292,6 +363,18 @@ export default function MatchDetailSheet() {
                       <div className="min-w-0">
                         <p className="text-[10px] text-amber-600/70 dark:text-amber-400/70 font-medium">مانده تا بازی</p>
                         <p className="text-sm font-black text-amber-600 dark:text-amber-300 truncate">{countdown}</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {awaitingResult && (
+                    <div className="col-span-1 flex items-center gap-2.5 bg-amber-500/10 rounded-2xl px-3.5 py-3 border border-amber-500/20 shadow-sm">
+                      <div className="w-8 h-8 rounded-xl bg-amber-500/20 flex items-center justify-center shrink-0">
+                        <ClockIcon className="w-4 h-4 text-amber-500" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[10px] text-amber-600/70 dark:text-amber-400/70 font-medium">وضعیت بازی</p>
+                        <p className="text-sm font-black text-amber-600 dark:text-amber-300 truncate">منتظر ثبت نتیجه سازنده</p>
                       </div>
                     </div>
                   )}
@@ -319,7 +402,7 @@ export default function MatchDetailSheet() {
                   ].map(({ label, team, players, color }) => {
                     const isFull = players.length >= match.teamSize;
                     const isUserHere = players.some((p) => p.userId === currentUserId);
-                    const canJoin = match.status === "open" && !isUserInMatch && !isFull;
+                    const canJoin = match.status === "open" && !awaitingResult && !isUserInMatch && !isFull;
 
                     return (
                       <div
@@ -405,11 +488,34 @@ export default function MatchDetailSheet() {
                         {isFull && !isUserHere && (
                           <div className="text-center text-xs text-muted-foreground">تیم پر است</div>
                         )}
+
+                        {awaitingResult && !isUserHere && (
+                          <div className="text-center text-xs text-amber-600 dark:text-amber-400">زمان بازی گذشته و امکان Join وجود ندارد</div>
+                        )}
                       </div>
                     );
                   })}
                 </div>
               </div>
+
+              {isCreator && awaitingResult && (
+                <div className="px-5 pb-3 grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => handleFinalize(true)}
+                    disabled={finalizeLoading}
+                    className="py-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-xs font-bold text-emerald-700 dark:text-emerald-400 disabled:opacity-60"
+                  >
+                    {finalizeLoading ? "..." : "بازی انجام شد"}
+                  </button>
+                  <button
+                    onClick={() => handleFinalize(false)}
+                    disabled={finalizeLoading}
+                    className="py-2.5 rounded-xl border border-border bg-muted/50 text-xs font-bold text-muted-foreground disabled:opacity-60"
+                  >
+                    {finalizeLoading ? "..." : "بازی برگزار نشد"}
+                  </button>
+                </div>
+              )}
 
               {/* Quick actions row */}
               <div className="px-5 pb-3 flex gap-2">
@@ -420,7 +526,7 @@ export default function MatchDetailSheet() {
                   <ShareIcon className="w-3.5 h-3.5" />
                   دعوت
                 </button>
-                {isCreator && !match.isCertified && match.status !== "full" && match.status !== "completed" && (
+                {isCreator && !match.isCertified && !awaitingResult && match.status !== "full" && match.status !== "completed" && (
                   <button
                     onClick={handleEmergencyClick}
                     disabled={emergencyLoading}
