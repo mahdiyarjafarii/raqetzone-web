@@ -1286,6 +1286,38 @@ export const createClubDealController = async (req, res) => {
       .values({ courtId, slotDate, slotStart, slotEnd, discountPercent: parseInt(discountPercent), validUntil: parsedUntil })
       .returning();
 
+    const [existingSlotOverride] = await db
+      .select({ id: slotOverrides.id, status: slotOverrides.status, price: slotOverrides.price })
+      .from(slotOverrides)
+      .where(and(
+        eq(slotOverrides.courtId, courtId),
+        eq(slotOverrides.date, slotDate),
+        eq(slotOverrides.startTime, slotStart),
+      ))
+      .limit(1);
+
+    if (existingSlotOverride) {
+      await db
+        .update(slotOverrides)
+        .set({
+          status: existingSlotOverride.status ?? "available",
+          price: existingSlotOverride.price ?? null,
+          discountPercent: parseInt(discountPercent),
+          updatedAt: new Date(),
+        })
+        .where(eq(slotOverrides.id, existingSlotOverride.id));
+    } else {
+      await db.insert(slotOverrides).values({
+        courtId,
+        date: slotDate,
+        startTime: slotStart,
+        endTime: slotEnd,
+        status: "available",
+        price: null,
+        discountPercent: parseInt(discountPercent),
+      });
+    }
+
     const { broadcastNotification } = await import("../utils/sendNotification.js");
     broadcastNotification({
       title: `🔥 آفر ویژه ${discountPercent}% تخفیف — ${court.name}`,

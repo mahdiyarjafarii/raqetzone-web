@@ -201,6 +201,7 @@ export const createBookingController = async (req, res) => {
         id: bookings.id,
         status: bookings.status,
         date: bookings.date,
+        startTime: bookings.startTime,
         endTime: bookings.endTime,
       })
       .from(bookings)
@@ -210,13 +211,16 @@ export const createBookingController = async (req, res) => {
       ));
 
     const expiredSameDayIds = await expirePendingBookings(sameDayUserBookings);
-    const hasAnotherSameDayBooking = sameDayUserBookings.some((booking) => {
+    const hasOverlappingUserBooking = sameDayUserBookings.some((booking) => {
       if (expiredSameDayIds.includes(booking.id)) return false;
-      return booking.status !== "rejected" && booking.status !== "cancelled";
+      if (booking.status === "rejected" || booking.status === "cancelled") return false;
+      const bookingStartMin = timeToMinutes(booking.startTime);
+      const bookingEndMin = timeToMinutes(booking.endTime);
+      return startMin < bookingEndMin && endMin > bookingStartMin;
     });
 
-    if (hasAnotherSameDayBooking) {
-      return res.status(409).json({ message: "شما در این تاریخ قبلاً رزرو ثبت کرده‌اید" });
+    if (hasOverlappingUserBooking) {
+      return res.status(409).json({ message: "شما در این بازه زمانی قبلاً رزرو ثبت کرده‌اید" });
     }
 
     const [court] = await db
