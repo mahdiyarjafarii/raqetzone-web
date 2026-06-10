@@ -666,7 +666,7 @@ export default function ClubBookingSheet({ open, onClose, club, initialCourt = n
     setSelectedSlot(null);
     setSlots([]);
     setCreatedBooking(null);
-    setPendingDealSlotStart(initialSlotStart ?? null);
+    setPendingDealSlotStart(null);
     if (initialCourt) {
       setSelectedCourt(initialCourt);
       setStep("booking");
@@ -698,7 +698,7 @@ export default function ClubBookingSheet({ open, onClose, club, initialCourt = n
 
   // Fetch slots whenever court or date changes (in booking step)
   useEffect(() => {
-    if (step !== "booking" || !selectedCourt) return;
+    if (!open || step !== "booking" || !selectedCourt) return;
     setSlotsLoading(true);
     setSelectedSlot(null);
     bookingService.getAvailability(selectedCourt.id, selectedDate)
@@ -719,7 +719,7 @@ export default function ClubBookingSheet({ open, onClose, club, initialCourt = n
       })
       .catch(() => setSlots([]))
       .finally(() => setSlotsLoading(false));
-  }, [selectedCourt, selectedDate, step, pendingDealSlotStart]);
+  }, [open, selectedCourt, selectedDate, step, pendingDealSlotStart]);
 
   const handleConfirm = async (notes, discountCode, paymentMethod = "none") => {
     if (!selectedCourt || !selectedDate || !selectedSlot) return;
