@@ -3,7 +3,28 @@ import { db } from "../db/index.js";
 import { tournaments, tournamentRegistrations, tournamentMatches, users, clubs } from "../db/schema.js";
 import { sendSMS } from "../utils/sms.js";
 
+const TEHRAN_OFFSET = "+03:30";
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function parseTournamentDateTime(value) {
+  if (!value) return null;
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+
+  if (typeof value !== "string") return null;
+  const trimmedValue = value.trim();
+  if (!trimmedValue) return null;
+
+  const hasExplicitTimezone = /([zZ]|[+\-]\d{2}:\d{2})$/.test(trimmedValue);
+  const normalized = hasExplicitTimezone
+    ? trimmedValue
+    : `${trimmedValue}:00${TEHRAN_OFFSET}`;
+
+  const parsed = new Date(normalized);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
 
 async function enrichTournament(tournament) {
   const registrations = await db
@@ -417,8 +438,14 @@ export const createTournamentController = async (req, res) => {
     }
 
     const now = new Date();
-    const registrationDeadlineDate = new Date(registrationDeadline);
-    const startDateValue = new Date(startDate);
+    const registrationDeadlineDate = parseTournamentDateTime(registrationDeadline);
+    const startDateValue = parseTournamentDateTime(startDate);
+    const endDateValue = parseTournamentDateTime(endDate);
+
+    if (!registrationDeadlineDate || !startDateValue || !endDateValue) {
+      return res.status(400).json({ message: "فرمت تاریخ نامعتبر است" });
+    }
+
     if (registrationDeadlineDate < now) {
       return res.status(400).json({ message: "مهلت ثبت‌نام نباید قبل از زمان فعلی باشد" });
     }
@@ -437,9 +464,9 @@ export const createTournamentController = async (req, res) => {
         description,
         entryFee: Number(entryFee),
         maxParticipants: Number(maxParticipants),
-        registrationDeadline: new Date(registrationDeadline),
-        startDate: new Date(startDate),
-        endDate: new Date(endDate),
+        registrationDeadline: registrationDeadlineDate,
+        startDate: startDateValue,
+        endDate: endDateValue,
         minLevel: Number(minLevel),
         sportType,
         prize: prize || null,
@@ -499,9 +526,24 @@ export const updateTournamentController = async (req, res) => {
     if (patch.entryFee !== undefined) patch.entryFee = Number(patch.entryFee);
     if (patch.maxParticipants !== undefined) patch.maxParticipants = Number(patch.maxParticipants);
     if (patch.minLevel !== undefined) patch.minLevel = Number(patch.minLevel);
-    if (patch.registrationDeadline !== undefined) patch.registrationDeadline = new Date(patch.registrationDeadline);
-    if (patch.startDate !== undefined) patch.startDate = new Date(patch.startDate);
-    if (patch.endDate !== undefined) patch.endDate = new Date(patch.endDate);
+    if (patch.registrationDeadline !== undefined) {
+      patch.registrationDeadline = parseTournamentDateTime(patch.registrationDeadline);
+      if (!patch.registrationDeadline) {
+        return res.status(400).json({ message: "فرمت مهلت ثبت‌نام نامعتبر است" });
+      }
+    }
+    if (patch.startDate !== undefined) {
+      patch.startDate = parseTournamentDateTime(patch.startDate);
+      if (!patch.startDate) {
+        return res.status(400).json({ message: "فرمت تاریخ شروع نامعتبر است" });
+      }
+    }
+    if (patch.endDate !== undefined) {
+      patch.endDate = parseTournamentDateTime(patch.endDate);
+      if (!patch.endDate) {
+        return res.status(400).json({ message: "فرمت تاریخ پایان نامعتبر است" });
+      }
+    }
 
     const now = new Date();
     if (patch.registrationDeadline !== undefined && patch.registrationDeadline < now) {
