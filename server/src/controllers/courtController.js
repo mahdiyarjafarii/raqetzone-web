@@ -3,7 +3,14 @@ import { db } from "../db/index.js";
 import { courts, bookings, clubs, slotOverrides } from "../db/schema.js";
 
 // Build all slot strings for a court on a given date
-function generateSlots(openTime, closeTime, slotDuration, bookedSlots, pricePerHour = 0, overrides = []) {
+function toMinutes(time) {
+  if (!time || typeof time !== "string") return NaN;
+  const [h, m] = time.split(":").map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return NaN;
+  return h * 60 + m;
+}
+
+function generateSlots(openTime, closeTime, slotDuration, bookedSlots, pricePerHour = 0, overrides = [], currentUserId = null) {
   const slots = [];
   const [openH, openM] = openTime.split(":").map(Number);
   const [closeH, closeM] = closeTime.split(":").map(Number);
@@ -19,12 +26,16 @@ function generateSlots(openTime, closeTime, slotDuration, bookedSlots, pricePerH
     const end = `${eh}:${em}`;
 
     const override = overrides.find((o) => o.startTime === start);
-    const isPending = bookedSlots.some(
-      (b) => b.startTime === start && b.status === "pending"
-    );
-    const isBookedByUser = bookedSlots.some(
-      (b) => b.startTime === start && b.status === "approved"
-    );
+    const overlapping = bookedSlots.find((b) => {
+      if (b.status === "rejected" || b.status === "cancelled") return false;
+      const bStart = toMinutes(b.startTime);
+      const bEnd = toMinutes(b.endTime);
+      return t < bEnd && t + slotDuration > bStart;
+    });
+
+    const isPending = overlapping?.status === "pending";
+    const isBookedByUser = overlapping?.status === "approved";
+    const isMine = Boolean(currentUserId && overlapping?.userId === currentUserId);
 
     const overrideStatus = override?.status ?? "available";
     const effectivePrice = override?.price ?? pricePerHour;
@@ -38,6 +49,7 @@ function generateSlots(openTime, closeTime, slotDuration, bookedSlots, pricePerH
       isPending: isPending && !isBookedByUser,
       isBlocked: overrideStatus === "blocked",
       isManualBooked: overrideStatus === "booked",
+      isMine,
       price: finalPrice,
       originalPrice: discount > 0 ? effectivePrice : null,
       discount,
@@ -94,7 +106,7 @@ export const getCourtAvailabilityController = async (req, res) => {
     if (!court) return res.status(404).json({ message: "زمین یافت نشد" });
 
     const bookedSlots = await db
-      .select({ startTime: bookings.startTime, status: bookings.status })
+      .select({ startTime: bookings.startTime, endTime: bookings.endTime, status: bookings.status, userId: bookings.userId })
       .from(bookings)
       .where(and(eq(bookings.courtId, id), eq(bookings.date, date)));
 
@@ -113,6 +125,7 @@ export const getCourtAvailabilityController = async (req, res) => {
       bookedSlots,
       court.pricePerHour,
       overrides,
+      req.user?.id ?? null,
     );
 
     return res.status(200).json({ date, slots, court });

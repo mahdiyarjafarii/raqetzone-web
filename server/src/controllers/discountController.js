@@ -5,6 +5,24 @@ import { sendSMS } from "../utils/sms.js";
 
 const WELCOME_DISCOUNT_CODE = "WELCOME20";
 const PLATFORM_PUBLIC_DISCOUNT_CODES = new Set([WELCOME_DISCOUNT_CODE]);
+const TEHRAN_TIME_ZONE = "Asia/Tehran";
+
+function getDatePart(parts, type) {
+  return parts.find((part) => part.type === type)?.value;
+}
+
+function formatDateKeyInTehran(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone: TEHRAN_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const year = getDatePart(parts, "year");
+  const month = getDatePart(parts, "month");
+  const day = getDatePart(parts, "day");
+  return `${year}-${month}-${day}`;
+}
 
 function isPlatformPublicDiscountCode(code) {
   if (!code) return false;
@@ -343,8 +361,8 @@ export const sendSmsCampaignController = async (req, res) => {
     const now = new Date();
     const dormantBefore = new Date(now); dormantBefore.setDate(now.getDate() - 30);
     const freshAfter = new Date(now); freshAfter.setDate(now.getDate() - 14);
-    const dormantBeforeStr = dormantBefore.toISOString().split("T")[0];
-    const freshAfterStr = freshAfter.toISOString().split("T")[0];
+    const dormantBeforeStr = formatDateKeyInTehran(dormantBefore);
+    const freshAfterStr = formatDateKeyInTehran(freshAfter);
 
     let targetUserIds;
     if (recipientFilter === "booked") {
@@ -449,8 +467,8 @@ export const getMarketingSegmentsController = async (req, res) => {
     const now = new Date();
     const dormantBefore = new Date(now); dormantBefore.setDate(now.getDate() - 30);
     const freshAfter = new Date(now); freshAfter.setDate(now.getDate() - 14);
-    const dormantBeforeStr = dormantBefore.toISOString().split("T")[0];
-    const freshAfterStr = freshAfter.toISOString().split("T")[0];
+    const dormantBeforeStr = formatDateKeyInTehran(dormantBefore);
+    const freshAfterStr = formatDateKeyInTehran(freshAfter);
     const bookedUserIds = new Set(bookingRows.map(r => r.userId));
     const tournamentUserIds = new Set(tournamentRows.map(r => r.userId));
     const allUserIds = new Set([...bookedUserIds, ...tournamentUserIds]);

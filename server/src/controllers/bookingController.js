@@ -1,6 +1,6 @@
 import { eq, and, desc, count, inArray } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { bookings, courts, clubs, users, discountCodes, discountCodeUsages, slotOverrides } from "../db/schema.js";
+import { bookings, courts, clubs, users, discountCodes, discountCodeUsages, slotOverrides, deals } from "../db/schema.js";
 import { sendNotification } from "../utils/sendNotification.js";
 import { sendSMS } from "../utils/sms.js";
 import { formatBookingDateTimeFa } from "../utils/bookingTime.js";
@@ -9,7 +9,27 @@ import { payBookingWithWallet } from "./walletController.js";
 const WELCOME_DISCOUNT_CODE = "WELCOME20";
 const PLATFORM_PUBLIC_DISCOUNT_CODES = new Set([WELCOME_DISCOUNT_CODE]);
 const TEHRAN_OFFSET = "+03:30";
+const TEHRAN_TIME_ZONE = "Asia/Tehran";
 const BOOKING_TIME_PASSED_NOTE = "تایم زمین گذشته";
+
+function getDatePart(parts, type) {
+  return parts.find((part) => part.type === type)?.value;
+}
+
+function getTodayDateKeyInTehran(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone: TEHRAN_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+
+  const year = getDatePart(parts, "year");
+  const month = getDatePart(parts, "month");
+  const day = getDatePart(parts, "day");
+
+  return `${year}-${month}-${day}`;
+}
 
 function isPlatformPublicDiscountCode(code) {
   if (!code) return false;
@@ -171,9 +191,32 @@ export const createBookingController = async (req, res) => {
     }
 
     // Check date is not in the past
-    const today = new Date().toISOString().split("T")[0];
+    const today = getTodayDateKeyInTehran();
     if (date < today) {
       return res.status(400).json({ message: "نمی‌توان برای تاریخ گذشته رزرو کرد" });
+    }
+
+    const sameDayUserBookings = await db
+      .select({
+        id: bookings.id,
+        status: bookings.status,
+        date: bookings.date,
+        endTime: bookings.endTime,
+      })
+      .from(bookings)
+      .where(and(
+        eq(bookings.userId, userId),
+        eq(bookings.date, date),
+      ));
+
+    const expiredSameDayIds = await expirePendingBookings(sameDayUserBookings);
+    const hasAnotherSameDayBooking = sameDayUserBookings.some((booking) => {
+      if (expiredSameDayIds.includes(booking.id)) return false;
+      return booking.status !== "rejected" && booking.status !== "cancelled";
+    });
+
+    if (hasAnotherSameDayBooking) {
+      return res.status(409).json({ message: "شما در این تاریخ قبلاً رزرو ثبت کرده‌اید" });
     }
 
     const [court] = await db
@@ -354,6 +397,16 @@ export const createBookingController = async (req, res) => {
         createdBooking.paymentMethod = "wallet";
         createdBooking.paymentStatus = "paid";
       }
+
+      await tx
+        .update(deals)
+        .set({ isActive: false })
+        .where(and(
+          eq(deals.courtId, courtId),
+          eq(deals.slotDate, date),
+          eq(deals.slotStart, startTime),
+          eq(deals.isActive, true),
+        ));
 
       return { booking: createdBooking, walletPayment: paidByWallet };
     });

@@ -7,6 +7,26 @@ import { users, matchParticipants, matches, bookings } from "../db/schema.js";
 const XP_PER_MATCH = 15;
 const XP_PER_WIN = 25;
 const XP_PER_BOOKING = 8;
+const TEHRAN_TIME_ZONE = "Asia/Tehran";
+
+function getDatePart(parts, type) {
+  return parts.find((part) => part.type === type)?.value;
+}
+
+function formatDateKeyInTehran(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone: TEHRAN_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+
+  const year = getDatePart(parts, "year");
+  const month = getDatePart(parts, "month");
+  const day = getDatePart(parts, "day");
+
+  return `${year}-${month}-${day}`;
+}
 
 function computeLevel(xp) {
   // Level = floor(sqrt(xp / 80)) + 1, capped at 50
@@ -30,7 +50,7 @@ function getWeekKey(date) {
   const d = new Date(date);
   const monday = new Date(d);
   monday.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-  return monday.toISOString().split("T")[0];
+  return formatDateKeyInTehran(monday);
 }
 
 function buildWeeklyActivity(participations) {

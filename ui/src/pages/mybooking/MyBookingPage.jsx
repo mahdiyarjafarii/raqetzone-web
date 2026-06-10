@@ -63,8 +63,17 @@ function BookingCard({ booking, index, onCancel }) {
   const isCancelled = booking.status === "cancelled";
   const isRejected  = booking.status === "rejected";
   const sport = booking.court?.sportType ?? "padel";
-  const accentBar = isCancelled || isRejected ? "bg-red-500" : (SPORT_COLOR[sport] ?? "bg-primary");
+  const accentBar = isCancelled || isRejected
+    ? "bg-red-500"
+    : isApproved
+      ? "bg-emerald-500"
+      : (SPORT_COLOR[sport] ?? "bg-primary");
   const sportChip = SPORT_LIGHT[sport] ?? "bg-muted text-muted-foreground";
+  const cardBorder = isApproved
+    ? "border-emerald-500/40"
+    : isPending
+      ? "border-amber-500/40"
+      : "border-border";
 
   const handleCancel = async () => {
     setCancelling(true);
@@ -86,7 +95,7 @@ function BookingCard({ booking, index, onCancel }) {
       transition={{ delay: index * 0.05 }}
       layout
     >
-      <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
+      <div className={cn("rounded-2xl border bg-card overflow-hidden shadow-sm", cardBorder)}>
         {/* Sport color strip top */}
         <div className={cn("h-1", accentBar)} />
 

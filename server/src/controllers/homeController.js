@@ -26,6 +26,26 @@ function isDealExpiredByTime(deal, now = new Date()) {
   return Boolean(isValidUntilExpired || isSlotPassed);
 }
 
+function toMinutes(time) {
+  const [h, m] = String(time ?? "00:00").split(":").map(Number);
+  return h * 60 + m;
+}
+
+function isDealSlotBookedOrPending(bookingRows, deal) {
+  const dealStart = toMinutes(deal.slotStart);
+  const dealEnd = toMinutes(deal.slotEnd);
+
+  return bookingRows.some((booking) => {
+    if (booking.courtId !== deal.courtId) return false;
+    if (booking.date !== deal.slotDate) return false;
+    if (booking.status !== "pending" && booking.status !== "approved") return false;
+
+    const bookingStart = toMinutes(booking.startTime);
+    const bookingEnd = toMinutes(booking.endTime);
+    return dealStart < bookingEnd && dealEnd > bookingStart;
+  });
+}
+
 async function enrichMatches(rows) {
   return Promise.all(
     rows.map(async (match) => {
@@ -84,22 +104,44 @@ export const getHomeController = async (req, res) => {
     const activeDealRows = await db
       .select({
         id: deals.id,
+        courtId: deals.courtId,
         slotDate: deals.slotDate,
+        slotStart: deals.slotStart,
         slotEnd: deals.slotEnd,
         validUntil: deals.validUntil,
       })
       .from(deals)
       .where(eq(deals.isActive, true));
 
+    const dealCourtIds = [...new Set(activeDealRows.map((deal) => deal.courtId).filter(Boolean))];
+    const activeBookingRows = dealCourtIds.length > 0
+      ? await db
+          .select({
+            courtId: bookings.courtId,
+            date: bookings.date,
+            startTime: bookings.startTime,
+            endTime: bookings.endTime,
+            status: bookings.status,
+          })
+          .from(bookings)
+          .where(and(inArray(bookings.courtId, dealCourtIds), inArray(bookings.status, ["pending", "approved"])))
+      : [];
+
     const expiredActiveDealIds = activeDealRows
       .filter((deal) => isDealExpiredByTime(deal, now))
       .map((deal) => deal.id);
 
-    if (expiredActiveDealIds.length > 0) {
+    const bookedActiveDealIds = activeDealRows
+      .filter((deal) => isDealSlotBookedOrPending(activeBookingRows, deal))
+      .map((deal) => deal.id);
+
+    const deactivatedDealIds = [...new Set([...expiredActiveDealIds, ...bookedActiveDealIds])];
+
+    if (deactivatedDealIds.length > 0) {
       await db
         .update(deals)
         .set({ isActive: false })
-        .where(and(eq(deals.isActive, true), inArray(deals.id, expiredActiveDealIds)));
+        .where(and(eq(deals.isActive, true), inArray(deals.id, deactivatedDealIds)));
     }
 
     // ── Active deals (not expired)

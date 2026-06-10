@@ -640,7 +640,7 @@ const STEP_TITLES = {
   success: "رزرو ثبت شد",
 };
 
-export default function ClubBookingSheet({ open, onClose, club, initialCourt = null, initialDate = null }) {
+export default function ClubBookingSheet({ open, onClose, club, initialCourt = null, initialDate = null, initialSlotStart = null }) {
   const navigate = useNavigate();
   const today = getTodayDateKeyInTehran();
 
@@ -654,6 +654,7 @@ export default function ClubBookingSheet({ open, onClose, club, initialCourt = n
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [createdBooking, setCreatedBooking] = useState(null);
+  const [pendingDealSlotStart, setPendingDealSlotStart] = useState(null);
 
   const goToBooking = useCallback((court) => {
     setSelectedCourt(court);
@@ -665,6 +666,7 @@ export default function ClubBookingSheet({ open, onClose, club, initialCourt = n
     setSelectedSlot(null);
     setSlots([]);
     setCreatedBooking(null);
+    setPendingDealSlotStart(initialSlotStart ?? null);
     if (initialCourt) {
       setSelectedCourt(initialCourt);
       setStep("booking");
@@ -675,7 +677,7 @@ export default function ClubBookingSheet({ open, onClose, club, initialCourt = n
       setSelectedCourt(null);
       setStep("court");
     }
-  }, [courts, initialCourt, initialDate, today]);
+  }, [courts, initialCourt, initialDate, initialSlotStart, today]);
 
   // Init on open
   useEffect(() => {
@@ -683,6 +685,7 @@ export default function ClubBookingSheet({ open, onClose, club, initialCourt = n
     const court = initialCourt ?? (courts.length === 1 ? courts[0] : null);
     setSelectedSlot(null);
     setCreatedBooking(null);
+    setPendingDealSlotStart(initialSlotStart ?? null);
     setSelectedDate(initialDate ?? today);
     if (court) {
       setSelectedCourt(court);
@@ -691,7 +694,7 @@ export default function ClubBookingSheet({ open, onClose, club, initialCourt = n
       setSelectedCourt(null);
       setStep("court");
     }
-  }, [open]);
+  }, [open, initialCourt, initialDate, initialSlotStart, courts, today]);
 
   // Fetch slots whenever court or date changes (in booking step)
   useEffect(() => {
@@ -700,11 +703,23 @@ export default function ClubBookingSheet({ open, onClose, club, initialCourt = n
     setSelectedSlot(null);
     bookingService.getAvailability(selectedCourt.id, selectedDate)
       .then((res) => {
-        setSlots(res.ok ? (res.data?.slots ?? []) : []);
+        const nextSlots = res.ok ? (res.data?.slots ?? []) : [];
+        setSlots(nextSlots);
+
+        if (pendingDealSlotStart) {
+          const slot = nextSlots.find((item) => item.start === pendingDealSlotStart);
+          if (slot && !slot.isBooked && !slot.isPending && !slot.isBlocked && !slot.isManualBooked) {
+            setSelectedSlot(slot);
+            setStep("summary");
+          } else {
+            toast.error("این آفر دیگر در دسترس نیست");
+          }
+          setPendingDealSlotStart(null);
+        }
       })
       .catch(() => setSlots([]))
       .finally(() => setSlotsLoading(false));
-  }, [selectedCourt, selectedDate, step]);
+  }, [selectedCourt, selectedDate, step, pendingDealSlotStart]);
 
   const handleConfirm = async (notes, discountCode, paymentMethod = "none") => {
     if (!selectedCourt || !selectedDate || !selectedSlot) return;

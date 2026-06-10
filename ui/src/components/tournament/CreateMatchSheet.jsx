@@ -45,6 +45,10 @@ function getTimePart(value) {
   return value?.split("T")[1] ?? "12:00";
 }
 
+function isSlotUnavailable(slot) {
+  return slot.isBooked || slot.isPending || slot.isBlocked || slot.isManualBooked;
+}
+
 function buildDateOptions(daysAhead = 730) {
   const today = getTodayDateKeyInTehran();
   return Array.from({ length: daysAhead }, (_, index) => {
@@ -256,6 +260,8 @@ export default function CreateMatchSheet() {
   const [loading, setLoading] = useState(false);
   const [clubs, setClubs] = useState([]);
   const [clubsLoading, setClubsLoading] = useState(false);
+  const [availability, setAvailability] = useState(null);
+  const [availabilityLoading, setAvailabilityLoading] = useState(false);
 
   useEffect(() => {
     if (open && clubs.length === 0) {
@@ -278,6 +284,46 @@ export default function CreateMatchSheet() {
   const selectedCourt = availableCourts.find((c) => c.id === form.courtId);
 
   const isCustomVenue = form.venueMode === "custom";
+  const selectedDateKey = getDatePart(form.scheduledAt);
+  const selectedTimeKey = getTimePart(form.scheduledAt);
+
+  useEffect(() => {
+    if (!open || isCustomVenue || !selectedCourt || !selectedDateKey) {
+      setAvailability(null);
+      setAvailabilityLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    setAvailabilityLoading(true);
+    apiClient
+      .get(`/courts/${selectedCourt.id}/availability`, { date: selectedDateKey })
+      .then((res) => {
+        if (cancelled) return;
+        setAvailability(res.ok ? res.data : null);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setAvailability(null);
+      })
+      .finally(() => {
+        if (!cancelled) setAvailabilityLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, isCustomVenue, selectedCourt?.id, selectedDateKey]);
+
+  const selectedSlot = availability?.slots?.find((slot) => slot.start === selectedTimeKey);
+  const selectedSlotBlocked = Boolean(
+    !isCustomVenue &&
+      selectedCourt &&
+      selectedDateKey &&
+      selectedSlot &&
+      isSlotUnavailable(selectedSlot) &&
+      !selectedSlot.isMine
+  );
 
   const canNext = () => {
     if (step === 0) return form.title.trim().length > 1;
@@ -285,7 +331,7 @@ export default function CreateMatchSheet() {
       if (isCustomVenue) return form.customLocation.trim().length > 1;
       return !!form.clubId && !!form.courtId;
     }
-    if (step === 2) return !!form.scheduledAt;
+    if (step === 2) return !selectedSlotBlocked;
     return false;
   };
 
@@ -298,8 +344,17 @@ export default function CreateMatchSheet() {
     const location = isCustomVenue ? form.customLocation.trim() : (selectedClub?.name ?? form.clubId);
     const courtName = isCustomVenue ? form.customCourtName.trim() : (selectedCourt?.name ?? "");
 
-    if (!form.title || !location || !form.scheduledAt) {
+    if (!form.scheduledAt) {
+      toast.error("لطفاً تاریخ بازی را انتخاب کنید");
+      return;
+    }
+
+    if (!form.title || !location) {
       toast.error("لطفاً تمام فیلدها را پر کنید");
+      return;
+    }
+    if (selectedSlotBlocked) {
+      toast.error("این تایم برای این زمین رزرو شده و قابل انتخاب نیست");
       return;
     }
     setLoading(true);
@@ -309,6 +364,7 @@ export default function CreateMatchSheet() {
         sportType: form.sportType,
         location,
         courtName,
+        courtId: isCustomVenue ? undefined : form.courtId,
         scheduledAt: form.scheduledAt,
         teamSize: form.teamSize,
         isCertified: form.isCertified,
@@ -406,6 +462,9 @@ export default function CreateMatchSheet() {
                 setForm={setForm}
                 selectedClub={selectedClub}
                 selectedCourt={selectedCourt}
+                availability={availability}
+                availabilityLoading={availabilityLoading}
+                isCustomVenue={isCustomVenue}
               />
             )}
           </AnimatePresence>
@@ -415,10 +474,10 @@ export default function CreateMatchSheet() {
         <div className="px-5 pb-8 pt-3 border-t border-border bg-background shrink-0">
           <button
             onClick={handleNext}
-            disabled={!canNext() || loading}
+            disabled={loading || (step < 2 && !canNext())}
             className={cn(
               "w-full py-4 rounded-2xl font-bold text-base transition-all active:scale-[0.98]",
-              canNext() && !loading
+              (step === 2 || canNext()) && !loading
                 ? "bg-primary text-primary-foreground shadow-lg shadow-primary/25"
                 : "bg-muted text-muted-foreground cursor-not-allowed"
             )}
@@ -634,7 +693,10 @@ function StepClub({ form, setForm, clubs, clubsLoading, availableCourts }) {
 }
 
 /* ─── Step 3: Date/Time + Team size ─────────────────────────────────────── */
-function StepTime({ form, setForm, selectedClub, selectedCourt }) {
+function StepTime({ form, setForm, selectedClub, selectedCourt, availability, availabilityLoading, isCustomVenue }) {
+  const selectedDateKey = getDatePart(form.scheduledAt);
+  const selectedTimeKey = getTimePart(form.scheduledAt);
+
   return (
     <motion.div
       initial={{ opacity: 0, x: 40 }}
@@ -657,12 +719,64 @@ function StepTime({ form, setForm, selectedClub, selectedCourt }) {
       </div>
 
       <div className="space-y-2.5">
-        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">زمان بازی</label>
+        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+          زمان بازی <span className="text-destructive">*</span>
+        </label>
         <PersianDateTimeInput
           value={form.scheduledAt}
           onChange={(value) => setForm((f) => ({ ...f, scheduledAt: value }))}
         />
       </div>
+
+      {!isCustomVenue && selectedCourt && (
+        <div className="space-y-2.5">
+          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">اسلات‌های زمین در همین تاریخ</label>
+
+          {!selectedDateKey ? (
+            <p className="text-xs text-muted-foreground rounded-2xl bg-muted/40 p-3 text-center">اول تاریخ رو انتخاب کن تا تایم‌های آزاد نمایش داده بشه</p>
+          ) : availabilityLoading ? (
+            <div className="grid grid-cols-3 gap-2">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="h-11 rounded-xl bg-muted animate-pulse" />
+              ))}
+            </div>
+          ) : (availability?.slots?.length ?? 0) === 0 ? (
+            <p className="text-xs text-muted-foreground rounded-2xl bg-muted/40 p-3 text-center">تایم فعالی برای این تاریخ پیدا نشد</p>
+          ) : (
+            <div className="grid grid-cols-3 gap-2">
+              {(availability?.slots ?? []).map((slot) => {
+                const selected = selectedTimeKey === slot.start;
+                const unavailable = isSlotUnavailable(slot);
+                const disabled = unavailable && !slot.isMine;
+
+                return (
+                  <button
+                    key={`${slot.start}-${slot.end}`}
+                    type="button"
+                    disabled={disabled}
+                    onClick={() => setForm((f) => ({ ...f, scheduledAt: `${selectedDateKey}T${slot.start}` }))}
+                    className={cn(
+                      "relative rounded-xl border-2 py-2.5 text-xs font-bold transition-all",
+                      selected
+                        ? "border-primary bg-primary/10 text-primary"
+                        : disabled
+                        ? "border-border bg-muted/30 text-muted-foreground/60 line-through cursor-not-allowed"
+                        : slot.isMine
+                        ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
+                        : "border-border bg-muted/40 text-foreground"
+                    )}
+                  >
+                    <span>{slot.start}</span>
+                    {slot.isMine && (
+                      <span className="absolute -top-1 -right-1 text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500 text-white">رزرو خودت</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="space-y-2.5">
         <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">

@@ -1,7 +1,7 @@
 import { eq, and, asc, ne, gte, lte, notInArray, inArray } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { db } from "../db/index.js";
-import { matches, matchParticipants, matchRatings, users } from "../db/schema.js";
+import { matches, matchParticipants, matchRatings, users, courts, bookings, slotOverrides } from "../db/schema.js";
 import { sendSMS } from "../utils/sms.js";
 
 const RATING_TAGS = [
@@ -10,6 +10,7 @@ const RATING_TAGS = [
 ];
 
 const SPORT_TYPES = ["padel", "tennis", "squash", "badminton", "ping-pong"];
+const TEHRAN_OFFSET = "+03:30";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -46,6 +47,45 @@ async function enrichMatch(match) {
   const teamB = participants.filter((p) => p.team === "B");
 
   return { ...match, creator, teamA, teamB };
+}
+
+function timeToMinutes(value) {
+  if (!value || typeof value !== "string") return NaN;
+  const [h, m] = value.split(":").map(Number);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return NaN;
+  return h * 60 + m;
+}
+
+function getTehranDateAndTimeKey(date) {
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone: "Asia/Tehran",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+
+  const map = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return {
+    dateKey: `${map.year}-${map.month}-${map.day}`,
+    timeKey: `${map.hour}:${map.minute}`,
+  };
+}
+
+function parseScheduledAt(value) {
+  if (!value || typeof value !== "string") return null;
+  const trimmedValue = value.trim();
+  if (!trimmedValue) return null;
+
+  const hasExplicitTimezone = /([zZ]|[+\-]\d{2}:\d{2})$/.test(trimmedValue);
+  const normalized = hasExplicitTimezone
+    ? trimmedValue
+    : `${trimmedValue}:00${TEHRAN_OFFSET}`;
+
+  const parsed = new Date(normalized);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 // ─── Controllers ─────────────────────────────────────────────────────────────
@@ -240,7 +280,7 @@ export const leaveMatchController = async (req, res) => {
 
 export const createMatchController = async (req, res) => {
   try {
-    const { title, sportType, location, courtName, scheduledAt, teamSize = 2, isCertified = false } = req.body;
+    const { title, sportType, location, courtName, scheduledAt, teamSize = 2, isCertified = false, courtId } = req.body;
     const userId = req.user.id;
 
     if (!title || !sportType || !location || !scheduledAt) {
@@ -251,9 +291,60 @@ export const createMatchController = async (req, res) => {
       return res.status(400).json({ message: "نوع ورزش نامعتبر است" });
     }
 
-    const parsedDate = new Date(scheduledAt);
-    if (isNaN(parsedDate.getTime()) || parsedDate <= new Date()) {
+    const parsedDate = parseScheduledAt(scheduledAt);
+    if (!parsedDate || parsedDate <= new Date()) {
       return res.status(400).json({ message: "زمان مسابقه باید در آینده باشد" });
+    }
+
+    if (courtId) {
+      const [court] = await db
+        .select({ id: courts.id, slotDuration: courts.slotDuration, isActive: courts.isActive })
+        .from(courts)
+        .where(eq(courts.id, courtId))
+        .limit(1);
+
+      if (!court || !court.isActive) {
+        return res.status(404).json({ message: "زمین یافت نشد" });
+      }
+
+      const { dateKey, timeKey } = getTehranDateAndTimeKey(parsedDate);
+      const matchStartMin = timeToMinutes(timeKey);
+      const matchEndMin = matchStartMin + (court.slotDuration || 60);
+
+      const sameDayBookings = await db
+        .select({ userId: bookings.userId, startTime: bookings.startTime, endTime: bookings.endTime, status: bookings.status })
+        .from(bookings)
+        .where(and(eq(bookings.courtId, courtId), eq(bookings.date, dateKey)));
+
+      const conflictingBooking = sameDayBookings.find((booking) => {
+        if (booking.status === "rejected" || booking.status === "cancelled") return false;
+        if (booking.userId === userId) return false;
+
+        const bookingStart = timeToMinutes(booking.startTime);
+        const bookingEnd = timeToMinutes(booking.endTime);
+        return matchStartMin < bookingEnd && matchEndMin > bookingStart;
+      });
+
+      if (conflictingBooking) {
+        return res.status(409).json({ message: "این بازه زمانی برای این زمین قبلاً رزرو شده است" });
+      }
+
+      const [blockingOverride] = await db
+        .select({ id: slotOverrides.id })
+        .from(slotOverrides)
+        .where(
+          and(
+            eq(slotOverrides.courtId, courtId),
+            eq(slotOverrides.date, dateKey),
+            eq(slotOverrides.startTime, timeKey),
+            inArray(slotOverrides.status, ["blocked", "booked"]),
+          )
+        )
+        .limit(1);
+
+      if (blockingOverride) {
+        return res.status(409).json({ message: "این تایم برای این زمین در دسترس نیست" });
+      }
     }
 
     const [match] = await db

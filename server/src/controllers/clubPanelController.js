@@ -5,6 +5,10 @@ import { sendNotification } from "../utils/sendNotification.js";
 import { formatBookingDateTimeFa } from "../utils/bookingTime.js";
 import { validateIranianPhone } from "../utils/validation.js";
 
+const TEHRAN_TIME_ZONE = "Asia/Tehran";
+const TEHRAN_OFFSET = "+03:30";
+const BOOKING_TIME_PASSED_NOTE = "تایم زمین گذشته";
+
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 function ownerFilter(req) {
@@ -39,8 +43,21 @@ function addDays(date, days) {
   return d;
 }
 
+function getDatePart(parts, type) {
+  return parts.find((part) => part.type === type)?.value;
+}
+
 function toDateStr(date) {
-  return date.toISOString().split("T")[0];
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone: TEHRAN_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const year = getDatePart(parts, "year");
+  const month = getDatePart(parts, "month");
+  const day = getDatePart(parts, "day");
+  return `${year}-${month}-${day}`;
 }
 
 function minutes(time) {
@@ -50,6 +67,12 @@ function minutes(time) {
 
 function timeStr(total) {
   return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
+function parseTehranDateTime(date, time) {
+  if (!date || !time) return null;
+  const parsed = new Date(`${date}T${time}:00${TEHRAN_OFFSET}`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 function buildCourtSlots(court) {
@@ -63,17 +86,30 @@ function buildCourtSlots(court) {
   return slots;
 }
 
+function isDealSlotBookedOrPending(bookingRows, deal) {
+  const dealStart = minutes(deal.slotStart);
+  const dealEnd = minutes(deal.slotEnd);
+
+  return bookingRows.some((booking) => {
+    if (booking.courtId !== deal.courtId) return false;
+    if (booking.date !== deal.slotDate) return false;
+    if (booking.status !== "pending" && booking.status !== "approved") return false;
+
+    const bookingStart = minutes(booking.startTime);
+    const bookingEnd = minutes(booking.endTime);
+    return dealStart < bookingEnd && dealEnd > bookingStart;
+  });
+}
+
 function recommendedDiscount(date, startTime) {
-  const target = new Date(`${date}T${startTime}:00`);
+  const target = parseTehranDateTime(date, startTime);
+  if (!target) return 10;
   const hoursLeft = (target.getTime() - Date.now()) / 36e5;
   const hour = Number(startTime.slice(0, 2));
   if (hoursLeft <= 24) return 30;
   if (hoursLeft <= 48) return hour >= 12 && hour <= 17 ? 25 : 20;
   return hour >= 12 && hour <= 17 ? 20 : 10;
 }
-
-const TEHRAN_OFFSET = "+03:30";
-const BOOKING_TIME_PASSED_NOTE = "تایم زمین گذشته";
 
 function parseDealSlotDateTime(slotDate, slotTime) {
   if (!slotDate || !slotTime) return null;
@@ -613,10 +649,10 @@ export const getClubStatsController = async (req, res) => {
     const courtIds = ownerCourts.map(c => c.id);
 
     const now = new Date();
-    const todayStr = now.toISOString().split("T")[0];
+    const todayStr = toDateStr(now);
     const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
     const thirtyDaysAgo = new Date(now); thirtyDaysAgo.setDate(now.getDate() - 29);
-    const thirtyDaysAgoStr = thirtyDaysAgo.toISOString().split("T")[0];
+    const thirtyDaysAgoStr = toDateStr(thirtyDaysAgo);
 
     let allBookings = [];
     if (courtIds.length > 0) {
@@ -646,7 +682,7 @@ export const getClubStatsController = async (req, res) => {
     const dailyMap = {};
     for (let i = 0; i < 30; i++) {
       const d = new Date(thirtyDaysAgo); d.setDate(thirtyDaysAgo.getDate() + i);
-      dailyMap[d.toISOString().split("T")[0]] = { bookings: 0, revenue: 0 };
+      dailyMap[toDateStr(d)] = { bookings: 0, revenue: 0 };
     }
     allBookings
       .filter(b => b.date >= thirtyDaysAgoStr && b.date <= todayStr)
@@ -795,7 +831,8 @@ export const getAutoFillOpportunitiesController = async (req, res) => {
         const date = toDateStr(addDays(today, i));
         for (const slot of buildCourtSlots(court)) {
           const key = `${court.id}|${date}|${slot.startTime}`;
-          const targetTime = new Date(`${date}T${slot.startTime}:00`);
+          const targetTime = parseTehranDateTime(date, slot.startTime);
+          if (!targetTime) continue;
           const override = overrides.get(key);
           if (targetTime <= today || booked.has(key) || override?.status === "blocked" || override?.status === "booked" || Number(override?.discountPercent ?? 0) > 0) continue;
           const discountPercent = Math.max(Number(override?.discountPercent ?? 0), recommendedDiscount(date, slot.startTime));
@@ -849,7 +886,9 @@ export const runAutoFillController = async (req, res) => {
       } else {
         await db.insert(slotOverrides).values({ courtId: item.courtId, date: item.date, startTime: item.startTime, endTime: item.endTime, status: "available", price: item.hourlyPrice ?? null, discountPercent });
       }
-      await db.insert(deals).values({ courtId: item.courtId, slotDate: item.date, slotStart: item.startTime, slotEnd: item.endTime, discountPercent, validUntil: new Date(`${item.date}T${item.startTime}:00`) });
+      const validUntil = parseTehranDateTime(item.date, item.startTime);
+      if (!validUntil) continue;
+      await db.insert(deals).values({ courtId: item.courtId, slotDate: item.date, slotStart: item.startTime, slotEnd: item.endTime, discountPercent, validUntil });
       applied++;
     }
 
@@ -1079,15 +1118,32 @@ export const getClubDealsController = async (req, res) => {
       .from(deals)
       .where(and(inArray(deals.courtId, courtIds), eq(deals.isActive, true)));
 
+    const activeBookingRows = await db
+      .select({
+        courtId: bookings.courtId,
+        date: bookings.date,
+        startTime: bookings.startTime,
+        endTime: bookings.endTime,
+        status: bookings.status,
+      })
+      .from(bookings)
+      .where(and(inArray(bookings.courtId, courtIds), inArray(bookings.status, ["pending", "approved"])));
+
     const expiredActiveDealIds = activeDealRows
       .filter((deal) => isDealExpiredByTime(deal, now))
       .map((deal) => deal.id);
 
-    if (expiredActiveDealIds.length > 0) {
+    const bookedActiveDealIds = activeDealRows
+      .filter((deal) => isDealSlotBookedOrPending(activeBookingRows, deal))
+      .map((deal) => deal.id);
+
+    const deactivatedDealIds = [...new Set([...expiredActiveDealIds, ...bookedActiveDealIds])];
+
+    if (deactivatedDealIds.length > 0) {
       await db
         .update(deals)
         .set({ isActive: false })
-        .where(inArray(deals.id, expiredActiveDealIds));
+        .where(inArray(deals.id, deactivatedDealIds));
     }
 
     const rows = await db
@@ -1151,6 +1207,43 @@ export const createClubDealController = async (req, res) => {
       .where(eq(courts.id, courtId))
       .limit(1);
     if (!court) return res.status(404).json({ message: "زمین یافت نشد" });
+
+    const slotDefinition = buildCourtSlots(court).find(
+      (slot) => slot.startTime === slotStart && slot.endTime === slotEnd
+    );
+    if (!slotDefinition) {
+      return res.status(400).json({ message: "آفر باید دقیقاً روی سانس معتبر زمین ثبت شود" });
+    }
+
+    const [existingBookedOrPending] = await db
+      .select({ id: bookings.id })
+      .from(bookings)
+      .where(and(
+        eq(bookings.courtId, courtId),
+        eq(bookings.date, slotDate),
+        eq(bookings.startTime, slotStart),
+        inArray(bookings.status, ["pending", "approved"])
+      ))
+      .limit(1);
+
+    if (existingBookedOrPending) {
+      return res.status(409).json({ message: "این سانس قبلاً رزرو شده و قابل آفر نیست" });
+    }
+
+    const [existingBlockedOverride] = await db
+      .select({ id: slotOverrides.id })
+      .from(slotOverrides)
+      .where(and(
+        eq(slotOverrides.courtId, courtId),
+        eq(slotOverrides.date, slotDate),
+        eq(slotOverrides.startTime, slotStart),
+        inArray(slotOverrides.status, ["blocked", "booked"])
+      ))
+      .limit(1);
+
+    if (existingBlockedOverride) {
+      return res.status(409).json({ message: "این سانس در دسترس نیست و نمی‌توان برای آن آفر ساخت" });
+    }
 
     const parsedUntil = new Date(validUntil);
     if (isNaN(parsedUntil.getTime()) || parsedUntil <= new Date()) {

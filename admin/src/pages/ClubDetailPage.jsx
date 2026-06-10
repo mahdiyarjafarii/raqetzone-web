@@ -481,8 +481,12 @@ export default function ClubDetailPage() {
                   </td>
                   <td className="px-4 py-3 text-muted-foreground text-xs">{SURFACE_LABELS[c.surfaceType]??c.surfaceType}</td>
                   <td className="px-4 py-3 font-semibold text-primary">{fmt(c.pricePerHour)} ت</td>
-                  <td className="px-4 py-3 text-muted-foreground" dir="ltr">{c.openTime}–{c.closeTime}</td>
-                  <td className="px-4 py-3 text-muted-foreground text-xs" dir="ltr">{c.managerPhone??"-"}</td>
+                  <td className="px-4 py-3 text-muted-foreground text-right">
+                    <span dir="ltr" className="inline-block">{c.openTime}–{c.closeTime}</span>
+                  </td>
+                  <td className="px-4 py-3 text-muted-foreground text-xs text-right">
+                    <span dir="ltr" className="inline-block">{c.managerPhone??"-"}</span>
+                  </td>
                   <td className="px-4 py-3">
                     <Badge variant={c.isActive?"success":"muted"}>{c.isActive?"فعال":"غیرفعال"}</Badge>
                   </td>

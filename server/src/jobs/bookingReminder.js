@@ -5,6 +5,14 @@ import { bookings, courts, users } from "../db/schema.js";
 import { sendSMS } from "../utils/sms.js";
 import { formatBookingDateTimeFa } from "../utils/bookingTime.js";
 
+const TEHRAN_OFFSET = "+03:30";
+
+function parseBookingDateTimeInTehran(date, time) {
+  if (!date || !time) return null;
+  const parsed = new Date(`${date}T${time}:00${TEHRAN_OFFSET}`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
 async function sendBookingReminders() {
   try {
     const now = new Date();
@@ -12,10 +20,6 @@ async function sendBookingReminders() {
     // Window: bookings starting between 115 and 125 minutes from now
     const windowStart = new Date(now.getTime() + 115 * 60 * 1000);
     const windowEnd   = new Date(now.getTime() + 125 * 60 * 1000);
-
-    // Convert to YYYY-MM-DD and HH:mm for DB comparison
-    const fmt = (d) => d.toISOString().slice(0, 10);
-    const fmtTime = (d) => d.toTimeString().slice(0, 5);
 
     // Fetch approved bookings that haven't been reminded yet
     const upcoming = await db
@@ -40,8 +44,14 @@ async function sendBookingReminders() {
 
     // Filter to the 2-hour window in JS (avoids complex time arithmetic in SQL)
     const targets = upcoming.filter((b) => {
-      const bookingDateTime = new Date(`${b.date}T${b.startTime}:00`);
-      return bookingDateTime >= windowStart && bookingDateTime <= windowEnd;
+      const bookingStartDateTime = parseBookingDateTimeInTehran(b.date, b.startTime);
+      const bookingEndDateTime = parseBookingDateTimeInTehran(b.date, b.endTime);
+      if (!bookingStartDateTime || !bookingEndDateTime) return false;
+
+      if (bookingEndDateTime <= now) return false;
+      if (bookingStartDateTime <= now) return false;
+
+      return bookingStartDateTime >= windowStart && bookingStartDateTime <= windowEnd;
     });
 
     if (targets.length === 0) return;

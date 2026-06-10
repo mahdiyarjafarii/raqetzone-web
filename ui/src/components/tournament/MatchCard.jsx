@@ -112,7 +112,7 @@ export default function MatchCard({ match, onClick, index = 0 }) {
           </div>
         )}
 
-        <div className="p-4">
+        <div className={cn("p-4", (match.isCertified || isFull) && "pt-12")}>
           {/* Header */}
           <div className="flex items-start justify-between gap-2 mb-3">
             <div className="flex items-center gap-2">

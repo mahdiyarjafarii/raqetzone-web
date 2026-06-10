@@ -80,11 +80,13 @@ export default function ClubDetailPage() {
   const onboarding = useAtomValue(showOnboardingSheetAtom);
   const [bookingCourt, setBookingCourt] = useState(null);
   const [bookingDate, setBookingDate] = useState(null);
+  const [bookingSlotStart, setBookingSlotStart] = useState(null);
   const [reviewStats, setReviewStats] = useState({ average: 0, total: 0 });
 
-  const openBooking = (court = null, date = null) => {
+  const openBooking = (court = null, date = null, slotStart = null) => {
     setBookingCourt(court);
     setBookingDate(date);
+    setBookingSlotStart(slotStart);
     setBookingOpen(true);
   };
 
@@ -119,7 +121,7 @@ export default function ClubDetailPage() {
     const court = bookingIntent.courtId
       ? club.courts?.find((c) => c.id === bookingIntent.courtId) ?? null
       : null;
-    openBooking(court, bookingIntent.slotDate ?? null);
+    openBooking(court, bookingIntent.slotDate ?? null, bookingIntent.slotStart ?? null);
     navigate(`/clubs/${clubId}`, { replace: true, state: null });
   }, [bookingIntent, club, clubId, navigate]);
 
@@ -176,14 +178,6 @@ export default function ClubDetailPage() {
             <ShareIcon className="w-4 h-4 text-gray-600" />
           </button>
         </div>
-
-        {reviewStats.total > 0 && (
-          <div className="absolute bottom-3 right-3 z-1 flex items-center gap-1.5 bg-black/60 backdrop-blur-sm rounded-full px-3 py-1.5">
-            <StarIcon className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-            <span className="text-white font-black text-sm">{reviewStats.average}</span>
-            <span className="text-white/60 text-xs">({reviewStats.total})</span>
-          </div>
-        )}
       </div>
 
       <div className="px-4 pt-5 pb-4">
@@ -301,10 +295,11 @@ export default function ClubDetailPage() {
       {/* ── Booking Sheet ── */}
       <ClubBookingSheet
         open={bookingOpen}
-        onClose={() => { setBookingOpen(false); setBookingCourt(null); setBookingDate(null); }}
+        onClose={() => { setBookingOpen(false); setBookingCourt(null); setBookingDate(null); setBookingSlotStart(null); }}
         club={club}
         initialCourt={bookingCourt}
         initialDate={bookingDate}
+        initialSlotStart={bookingSlotStart}
       />
     </div>
   );

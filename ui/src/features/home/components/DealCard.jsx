@@ -90,6 +90,7 @@ export default function DealCard({ deal, index = 0 }) {
           openBooking: true,
           courtId: deal.court.id,
           slotDate: deal.slotDate,
+          slotStart: deal.slotStart,
         },
       });
     } else {

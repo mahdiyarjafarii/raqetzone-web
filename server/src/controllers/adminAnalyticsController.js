@@ -5,7 +5,12 @@ import { formatBookingDateTimeFa } from "../utils/bookingTime.js";
 import { sendNotification } from "../utils/sendNotification.js";
 
 const TEHRAN_OFFSET = "+03:30";
+const TEHRAN_TIME_ZONE = "Asia/Tehran";
 const BOOKING_TIME_PASSED_NOTE = "تایم زمین گذشته";
+
+function getDatePart(parts, type) {
+  return parts.find((part) => part.type === type)?.value;
+}
 
 function parseBookingEndDateTime(date, endTime) {
   if (!date || !endTime) return null;
@@ -66,7 +71,16 @@ function subtractDays(n) {
 }
 
 function dateStr(d) {
-  return d.toISOString().split("T")[0];
+  const parts = new Intl.DateTimeFormat("en", {
+    timeZone: TEHRAN_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(d);
+  const year = getDatePart(parts, "year");
+  const month = getDatePart(parts, "month");
+  const day = getDatePart(parts, "day");
+  return `${year}-${month}-${day}`;
 }
 
 export const getAdminStatsController = async (req, res) => {
