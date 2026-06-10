@@ -117,6 +117,17 @@ function formatTimeFa(time) {
   return `${fmt(hour)}:${String(minute).padStart(2, "0").replace(/\d/g, d => "۰۱۲۳۴۵۶۷۸۹"[d])}`;
 }
 
+function formatDateTimeFa(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString("fa-IR", {
+    timeZone: TEHRAN_TIME_ZONE,
+    dateStyle: "short",
+    timeStyle: "short",
+  });
+}
+
 function PersianDateInput({ value, onChange, required }) {
   const datePart = value || "";
 
@@ -239,9 +250,19 @@ function DealCard({ deal, onDelete, index }) {
           </div>
         </div>
 
-        <div className="bg-muted/60 rounded-xl px-3 py-2 mb-3 flex items-center gap-2 text-xs text-muted-foreground">
-          <ClockIcon className="w-3.5 h-3.5 shrink-0" />
-          <span>{formatDateFa(deal.slotDate)} — {formatTimeFa(deal.slotStart)} تا {formatTimeFa(deal.slotEnd)}</span>
+        <div className="bg-muted/60 rounded-xl px-3 py-2 mb-3 space-y-1.5 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <ClockIcon className="w-3.5 h-3.5 shrink-0" />
+            <span>تاریخ سانس: {formatDateFa(deal.slotDate)}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <ClockIcon className="w-3.5 h-3.5 shrink-0" />
+            <span>زمان سانس: {formatTimeFa(deal.slotStart)} تا {formatTimeFa(deal.slotEnd)}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <ClockIcon className="w-3.5 h-3.5 shrink-0" />
+            <span>پایان آفر: {formatDateTimeFa(deal.validUntil)}</span>
+          </div>
         </div>
 
         <div className="flex items-end justify-between">
@@ -317,6 +338,7 @@ function CreateDealForm({ courts, onCreated, onClose }) {
   };
 
   const selectedCourt = courts.find(c => c.id === form.courtId);
+  const totalSlots = availableSlots.length;
   const selectedSlot = availableSlots.find((slot) => slot.start === form.slotStart && slot.end === form.slotEnd);
   const slotBasePrice = selectedCourt && selectedSlot
     ? Math.round(selectedCourt.pricePerHour * getSlotDurationHours(selectedSlot.start, selectedSlot.end))
@@ -357,6 +379,9 @@ function CreateDealForm({ courts, onCreated, onClose }) {
 
       <div className="flex flex-col gap-1.5">
         <label className="text-xs font-semibold text-muted-foreground">سانس قابل آفر</label>
+        {!!form.courtId && !!form.slotDate && !slotsLoading && (
+          <p className="text-[11px] text-muted-foreground">{fmt(totalSlots)} سانس خالی برای این روز پیدا شد</p>
+        )}
         <select
           value={form.slotStart && form.slotEnd ? `${form.slotStart}-${form.slotEnd}` : ""}
           onChange={(e) => {
@@ -379,7 +404,7 @@ function CreateDealForm({ courts, onCreated, onClose }) {
           </option>
           {availableSlots.map((slot) => (
             <option key={`${slot.start}-${slot.end}`} value={`${slot.start}-${slot.end}`}>
-              {formatTimeFa(slot.start)} تا {formatTimeFa(slot.end)}
+              {formatDateFa(form.slotDate)} | {formatTimeFa(slot.start)} تا {formatTimeFa(slot.end)}
             </option>
           ))}
         </select>

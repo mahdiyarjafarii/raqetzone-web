@@ -1215,33 +1215,43 @@ export const createClubDealController = async (req, res) => {
       return res.status(400).json({ message: "آفر باید دقیقاً روی سانس معتبر زمین ثبت شود" });
     }
 
-    const [existingBookedOrPending] = await db
-      .select({ id: bookings.id })
+    const bookingRows = await db
+      .select({ startTime: bookings.startTime, endTime: bookings.endTime })
       .from(bookings)
       .where(and(
         eq(bookings.courtId, courtId),
         eq(bookings.date, slotDate),
-        eq(bookings.startTime, slotStart),
         inArray(bookings.status, ["pending", "approved"])
-      ))
-      .limit(1);
+      ));
 
-    if (existingBookedOrPending) {
+    const requestedStartMinutes = minutes(slotStart);
+    const requestedEndMinutes = minutes(slotEnd);
+    const hasOverlappingBookedOrPending = bookingRows.some((booking) => {
+      const bookingStart = minutes(booking.startTime);
+      const bookingEnd = minutes(booking.endTime);
+      return requestedStartMinutes < bookingEnd && requestedEndMinutes > bookingStart;
+    });
+
+    if (hasOverlappingBookedOrPending) {
       return res.status(409).json({ message: "این سانس قبلاً رزرو شده و قابل آفر نیست" });
     }
 
-    const [existingBlockedOverride] = await db
-      .select({ id: slotOverrides.id })
+    const overrideRows = await db
+      .select({ startTime: slotOverrides.startTime, endTime: slotOverrides.endTime })
       .from(slotOverrides)
       .where(and(
         eq(slotOverrides.courtId, courtId),
         eq(slotOverrides.date, slotDate),
-        eq(slotOverrides.startTime, slotStart),
         inArray(slotOverrides.status, ["blocked", "booked"])
-      ))
-      .limit(1);
+      ));
 
-    if (existingBlockedOverride) {
+    const hasOverlappingBlockedOverride = overrideRows.some((override) => {
+      const overrideStart = minutes(override.startTime);
+      const overrideEnd = minutes(override.endTime);
+      return requestedStartMinutes < overrideEnd && requestedEndMinutes > overrideStart;
+    });
+
+    if (hasOverlappingBlockedOverride) {
       return res.status(409).json({ message: "این سانس در دسترس نیست و نمی‌توان برای آن آفر ساخت" });
     }
 
