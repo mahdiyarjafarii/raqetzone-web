@@ -261,14 +261,50 @@ function DealCard({ deal, onDelete, index }) {
 
 function CreateDealForm({ courts, onCreated, onClose }) {
   const [form, setForm] = useState({
-    courtId: "", slotDate: "", slotStart: "09:00", slotEnd: "10:00",
-    discountPercent: "20", validUntil: "",
+    courtId: "", slotDate: "", slotStart: "", slotEnd: "",
+    discountPercent: "20",
   });
+  const [availableSlots, setAvailableSlots] = useState([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const f = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
+  useEffect(() => {
+    if (!form.courtId || !form.slotDate) {
+      setAvailableSlots([]);
+      setForm((prev) => ({ ...prev, slotStart: "", slotEnd: "" }));
+      return;
+    }
+
+    let cancelled = false;
+    setSlotsLoading(true);
+    apiClient.get(`/courts/${form.courtId}/availability`, { date: form.slotDate })
+      .then(({ ok, data }) => {
+        if (cancelled) return;
+        const nextSlots = ok
+          ? (data?.slots ?? []).filter((slot) => !(slot.isBooked || slot.isPending || slot.isBlocked || slot.isManualBooked))
+          : [];
+        setAvailableSlots(nextSlots);
+        setForm((prev) => {
+          const stillValid = nextSlots.some((slot) => slot.start === prev.slotStart && slot.end === prev.slotEnd);
+          return stillValid ? prev : { ...prev, slotStart: "", slotEnd: "" };
+        });
+      })
+      .finally(() => {
+        if (!cancelled) setSlotsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [form.courtId, form.slotDate]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!form.slotStart || !form.slotEnd) {
+      toast.error("لطفاً یک سانس قابل‌رزرو انتخاب کنید");
+      return;
+    }
     setSaving(true);
     const { ok, data } = await apiClient.post("/club-panel/deals", {
       ...form, discountPercent: parseInt(form.discountPercent),
@@ -281,8 +317,12 @@ function CreateDealForm({ courts, onCreated, onClose }) {
   };
 
   const selectedCourt = courts.find(c => c.id === form.courtId);
-  const preview = selectedCourt
-    ? Math.round(selectedCourt.pricePerHour * (1 - parseInt(form.discountPercent || 0) / 100))
+  const selectedSlot = availableSlots.find((slot) => slot.start === form.slotStart && slot.end === form.slotEnd);
+  const slotBasePrice = selectedCourt && selectedSlot
+    ? Math.round(selectedCourt.pricePerHour * getSlotDurationHours(selectedSlot.start, selectedSlot.end))
+    : null;
+  const preview = slotBasePrice !== null
+    ? Math.round(slotBasePrice * (1 - parseInt(form.discountPercent || 0) / 100))
     : null;
 
   return (
@@ -315,33 +355,52 @@ function CreateDealForm({ courts, onCreated, onClose }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-semibold text-muted-foreground">ساعت شروع اسلات</label>
-          <PersianTimePicker value={form.slotStart} onChange={value => f("slotStart", value)} required />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs font-semibold text-muted-foreground">ساعت پایان اسلات</label>
-          <PersianTimePicker value={form.slotEnd} onChange={value => f("slotEnd", value)} required />
-        </div>
-      </div>
-
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-semibold text-muted-foreground">تاریخ و ساعت انقضای آفر</label>
-        <PersianDateTimeInput value={form.validUntil} onChange={value => f("validUntil", value)} required />
+        <label className="text-xs font-semibold text-muted-foreground">سانس قابل آفر</label>
+        <select
+          value={form.slotStart && form.slotEnd ? `${form.slotStart}-${form.slotEnd}` : ""}
+          onChange={(e) => {
+            const [start, end] = e.target.value.split("-");
+            f("slotStart", start || "");
+            f("slotEnd", end || "");
+          }}
+          required
+          disabled={!form.courtId || !form.slotDate || slotsLoading}
+          className="h-10 rounded-xl border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/30 disabled:opacity-60"
+        >
+          <option value="">
+            {!form.courtId || !form.slotDate
+              ? "اول زمین و تاریخ را انتخاب کنید"
+              : slotsLoading
+              ? "در حال بارگذاری سانس‌ها..."
+              : availableSlots.length === 0
+              ? "سانس خالی برای آفر وجود ندارد"
+              : "انتخاب سانس..."}
+          </option>
+          {availableSlots.map((slot) => (
+            <option key={`${slot.start}-${slot.end}`} value={`${slot.start}-${slot.end}`}>
+              {formatTimeFa(slot.start)} تا {formatTimeFa(slot.end)}
+            </option>
+          ))}
+        </select>
+        {selectedSlot && (
+          <p className="text-[11px] text-muted-foreground">
+            انقضای آفر به‌صورت خودکار تا شروع سانس ({formatTimeFa(selectedSlot.start)}) تنظیم می‌شود یا با رزرو شدن همان سانس بلافاصله غیرفعال می‌شود.
+          </p>
+        )}
       </div>
 
-      {selectedCourt && form.discountPercent && (
+      {selectedCourt && selectedSlot && form.discountPercent && (
         <div className="rounded-xl bg-primary/5 border border-primary/15 p-3 flex items-center justify-between">
           <div className="text-xs text-muted-foreground">قیمت پس از تخفیف:</div>
           <div className="flex items-center gap-2">
-            <span className="text-xs line-through text-muted-foreground">{fmt(selectedCourt.pricePerHour)}</span>
+            <span className="text-xs line-through text-muted-foreground">{fmt(slotBasePrice)}</span>
             <span className="font-black text-primary">{fmt(preview)} تومان</span>
           </div>
         </div>
       )}
 
-      <Button type="submit" disabled={saving} className="w-full gap-2">
+      <Button type="submit" disabled={saving || !form.slotStart || !form.slotEnd} className="w-full gap-2">
         <FlameIcon className="w-4 h-4" />
         {saving ? "در حال ایجاد..." : "ایجاد آفر و اطلاع‌رسانی به کاربران"}
       </Button>

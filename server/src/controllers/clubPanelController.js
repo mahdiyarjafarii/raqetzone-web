@@ -1187,9 +1187,9 @@ export const getClubDealsController = async (req, res) => {
 
 export const createClubDealController = async (req, res) => {
   try {
-    const { courtId, slotDate, slotStart, slotEnd, discountPercent, validUntil } = req.body;
+    const { courtId, slotDate, slotStart, slotEnd, discountPercent } = req.body;
 
-    if (!courtId || !slotDate || !slotStart || !slotEnd || !discountPercent || !validUntil) {
+    if (!courtId || !slotDate || !slotStart || !slotEnd || !discountPercent) {
       return res.status(400).json({ message: "تمام فیلدها الزامی هستند" });
     }
 
@@ -1245,10 +1245,12 @@ export const createClubDealController = async (req, res) => {
       return res.status(409).json({ message: "این سانس در دسترس نیست و نمی‌توان برای آن آفر ساخت" });
     }
 
-    const parsedUntil = new Date(validUntil);
-    if (isNaN(parsedUntil.getTime()) || parsedUntil <= new Date()) {
-      return res.status(400).json({ message: "زمان انقضا باید در آینده باشد" });
+    const parsedSlotStartDateTime = parseTehranDateTime(slotDate, slotStart);
+    if (!parsedSlotStartDateTime || parsedSlotStartDateTime <= new Date()) {
+      return res.status(400).json({ message: "فقط برای سانس‌های آینده می‌توانید آفر ثبت کنید" });
     }
+
+    const parsedUntil = parsedSlotStartDateTime;
 
     const [deal] = await db
       .insert(deals)
@@ -1258,7 +1260,7 @@ export const createClubDealController = async (req, res) => {
     const { broadcastNotification } = await import("../utils/sendNotification.js");
     broadcastNotification({
       title: `🔥 آفر ویژه ${discountPercent}% تخفیف — ${court.name}`,
-      message: `زمین «${court.name}» برای ${slotDate} ساعت ${slotStart} تا ${slotEnd} با ${discountPercent}٪ تخفیف! تا ${new Date(validUntil).toLocaleString("fa-IR")} فرصت داری.`,
+      message: `زمین «${court.name}» برای ${slotDate} ساعت ${slotStart} تا ${slotEnd} با ${discountPercent}٪ تخفیف! تا شروع سانس فرصت رزرو داری.`,
       type: "PROMOTION",
       isPinned: true,
       metadata: { discountCode: null, discountPct: discountPercent, ctaHref: "/mybooking", ctaLabel: "رزرو با تخفیف", dealId: deal.id },
