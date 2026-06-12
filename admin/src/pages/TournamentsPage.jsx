@@ -15,11 +15,7 @@ import Modal from "@/components/ui/Modal";
 import { cn, getUserFullName } from "@/lib/utils";
 
 const ADMIN_BASE = import.meta.env.VITE_API_URL?.replace("/api", "") ?? "http://localhost:3000";
-const PUBLIC_APP_BASE = (
-  import.meta.env.VITE_PUBLIC_APP_URL
-  ?? import.meta.env.VITE_WEBSITE_URL
-  ?? (typeof window !== "undefined" ? window.location.origin : "")
-).replace(/\/$/, "");
+const PUBLIC_APP_BASE = "https://app.raqetzone.com";
 
 function buildUserImageUrl(image) {
   if (!image) return null;

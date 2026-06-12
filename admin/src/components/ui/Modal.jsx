@@ -9,7 +9,7 @@ export default function Modal({ open, onClose, title, children, size = "md" }) {
   return (
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4">
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -22,7 +22,10 @@ export default function Modal({ open, onClose, title, children, size = "md" }) {
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 10 }}
             transition={{ duration: 0.18 }}
-            className={cn("relative w-full rounded-2xl border border-border bg-card shadow-2xl overflow-hidden", widths[size])}
+            className={cn(
+              "relative flex max-h-[calc(100vh-2rem)] w-full flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-2xl",
+              widths[size]
+            )}
           >
             <div className="flex items-center justify-between px-5 py-4 border-b border-border">
               <h2 className="font-bold text-foreground">{title}</h2>
@@ -30,7 +33,7 @@ export default function Modal({ open, onClose, title, children, size = "md" }) {
                 <XIcon className="w-4 h-4 text-muted-foreground" />
               </button>
             </div>
-            <div className="px-5 py-4 max-h-[80vh] overflow-y-auto">
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
               {children}
             </div>
           </motion.div>

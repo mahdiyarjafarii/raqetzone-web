@@ -5,7 +5,7 @@ import toast from "react-hot-toast";
 import {
   XIcon, CalendarIcon, UsersIcon, CoinsIcon, StarIcon,
   TrophyIcon, ClockIcon, ShieldCheckIcon, GiftIcon,
-  CheckCircleIcon, ChevronDownIcon, CheckIcon,
+  CheckCircleIcon, ChevronDownIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { currentUserAtom } from "@/config/state";
@@ -23,44 +23,6 @@ const PHASE_CONFIG = {
   ongoing:      { label:"در حال اجرا", dot:"bg-blue-500",    badge:"text-blue-600   bg-blue-500/10   border-blue-500/25"    },
   completed:    { label:"پایان یافته", dot:"bg-zinc-400",    badge:"text-zinc-500   bg-zinc-500/10   border-zinc-500/25"    },
 };
-
-const PHASES = ["registration", "ongoing", "completed"];
-const PHASE_LABELS = { registration:"ثبت‌نام", ongoing:"اجرا", completed:"پایان" };
-
-// ─── Phase stepper ─────────────────────────────────────────────────────────────
-
-function PhaseSteps({ phase }) {
-  const currentIdx = PHASES.indexOf(phase);
-  return (
-    <div className="flex items-center gap-0">
-      {PHASES.map((p, i) => {
-        const done   = i < currentIdx;
-        const active = i === currentIdx;
-        return (
-          <React.Fragment key={p}>
-            <div className="flex flex-col items-center gap-0.5">
-              <div className={cn(
-                "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border-2 transition-all shadow-sm",
-                done   ? "bg-emerald-500 border-emerald-500 text-white" :
-                active ? "bg-blue-500   border-blue-500   text-white" :
-                         "bg-white/85   border-white/70   text-slate-600"
-              )}>
-                {done ? <CheckIcon className="w-3.5 h-3.5" /> : i + 1}
-              </div>
-              <span className={cn(
-                "text-[9px] font-semibold leading-none",
-                active ? "text-white" : done ? "text-emerald-300" : "text-white/70"
-              )}>{PHASE_LABELS[p]}</span>
-            </div>
-            {i < PHASES.length - 1 && (
-              <div className={cn("flex-1 h-0.5 mb-3 mx-1 rounded-full", i < currentIdx ? "bg-emerald-400" : "bg-white/35")} />
-            )}
-          </React.Fragment>
-        );
-      })}
-    </div>
-  );
-}
 
 // ─── Countdown ─────────────────────────────────────────────────────────────────
 
@@ -461,67 +423,54 @@ export default function TournamentDetailSheet() {
             </div>
 
             {/* Hero header */}
-            <div className="relative shrink-0 overflow-hidden">
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.24),transparent_50%),linear-gradient(135deg,#0f172a_0%,#111827_55%,#1f2937_100%)]" />
-              <div className="absolute inset-0 bg-gradient-to-b from-white/6 via-transparent to-black/26" />
-              <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-background via-background/55 to-transparent" />
+            <div className="relative shrink-0 overflow-hidden border-b border-white/10">
+              <div className="absolute inset-0 bg-[linear-gradient(135deg,#0f172a_0%,#111827_65%,#1f2937_100%)]" />
+              <div className="absolute inset-0 bg-gradient-to-b from-white/5 via-transparent to-black/18" />
               <button
                 onClick={() => setOpen(false)}
-                className="absolute top-4 left-4 z-10 w-8 h-8 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center shadow-sm hover:bg-white/30 transition-colors"
+                className="absolute top-3 left-4 z-10 w-7 h-7 rounded-full bg-white/18 backdrop-blur-sm border border-white/25 flex items-center justify-center hover:bg-white/28 transition-colors"
               >
-                <XIcon className="w-4 h-4 text-white" />
+                <XIcon className="w-3.5 h-3.5 text-white" />
               </button>
 
-              <div className="relative px-4 pt-8 pb-3 space-y-2.5">
-                <div className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-2 py-0.5 text-[9px] font-bold text-white/85 backdrop-blur-md">
-                  <TrophyIcon className="w-2.5 h-2.5" />
-                  جزئیات تورنومنت
-                </div>
-
-                <div className="rounded-2xl border border-white/20 bg-black/16 p-2.5 backdrop-blur-md shadow-lg shadow-black/25">
-                  <div className="flex items-start gap-2.5">
-                    <div className="w-10 h-10 rounded-xl bg-white/12 border border-white/20 flex items-center justify-center text-2xl shrink-0 shadow-md shadow-black/20 backdrop-blur-md">
+              <div className="relative px-4 pt-7 pb-5 space-y-2">
+                <div className="flex items-start gap-2.5 pl-9">
+                  <div className="w-9 h-9 rounded-lg bg-white/12 border border-white/20 flex items-center justify-center text-xl shrink-0">
                     {SPORT_ICONS[tournament.sportType] ?? "🏅"}
-                    </div>
-                    <div className="flex-1 min-w-0 pt-0.5">
-                      <h2 className="font-black text-[19px] text-white leading-tight line-clamp-2 drop-shadow-sm">{tournament.title}</h2>
-                      {organizerClubName && <p className="text-white/90 text-[11px] mt-1 font-semibold">🏢 باشگاه برگزارکننده: {organizerClubName}</p>}
-                    </div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h2 className="font-black text-[17px] text-white leading-tight line-clamp-2">{tournament.title}</h2>
+                    {organizerClubName && <p className="text-white/80 text-[10px] mt-0.5 font-medium truncate">{organizerClubName}</p>}
                   </div>
                 </div>
 
-                {/* Badges */}
                 <div className="flex flex-wrap gap-1.5">
-                  <span className={cn("inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold border backdrop-blur-md", phaseHeaderBadge)}>
+                  <span className={cn("inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold border", phaseHeaderBadge)}>
                     <span className={cn("w-1.5 h-1.5 rounded-full", phaseCfg.dot)} />
                     {phaseCfg.label}
                   </span>
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/14 border border-white/22 text-white/95 backdrop-blur-md">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/14 border border-white/22 text-white/95">
                     <CoinsIcon className="w-3 h-3" />
                     {isFree ? "رایگان" : `${tournament.entryFee.toLocaleString("fa-IR")} تومان`}
                   </span>
                   {tournament.minLevel > 1 && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-400/18 border border-amber-200/40 text-amber-50 backdrop-blur-md">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-400/18 border border-amber-200/40 text-amber-50">
                       <StarIcon className="w-3 h-3" />سطح {tournament.minLevel}+
                     </span>
                   )}
                 </div>
 
-                {/* Phase stepper */}
-                <PhaseSteps phase={phase} />
-
-                {/* Capacity */}
-                <div className="rounded-2xl border border-white/16 bg-black/14 p-2.5 backdrop-blur-sm">
-                  <div className="flex justify-between text-[10px] text-white mb-1.5 font-semibold">
-                    <span className="flex items-center gap-1"><UsersIcon className="w-3 h-3" />{tournament.registeredCount} ثبت‌نام</span>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[10px] text-white/85 font-medium">
+                    <span>{tournament.registeredCount}/{tournament.maxParticipants} ثبت‌نام</span>
                     <span>{tournament.maxParticipants - tournament.registeredCount} جای خالی</span>
                   </div>
                   <div className="h-1 bg-white/20 rounded-full overflow-hidden">
                     <motion.div
-                      initial={{ width:0 }}
-                      animate={{ width:`${Math.min(fillRatio*100,100)}%` }}
-                      transition={{ duration:0.8, ease:"easeOut" }}
-                      className={cn("h-full rounded-full", fillRatio>=1?"bg-amber-400":fillRatio>0.7?"bg-violet-400":"bg-emerald-400")}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${Math.min(fillRatio * 100, 100)}%` }}
+                      transition={{ duration: 0.8, ease: "easeOut" }}
+                      className={cn("h-full rounded-full", fillRatio >= 1 ? "bg-amber-400" : fillRatio > 0.7 ? "bg-violet-400" : "bg-emerald-400")}
                     />
                   </div>
                 </div>
