@@ -19,6 +19,20 @@ import { cn } from "@/lib/utils";
 import { adminUserAtom } from "@/store/authStore";
 
 const API_BASE = import.meta.env.VITE_API_URL?.replace("/api", "") ?? "http://localhost:3000";
+const MAX_IMAGE_UPLOAD_SIZE_MB = 5;
+const MAX_IMAGE_UPLOAD_SIZE_BYTES = MAX_IMAGE_UPLOAD_SIZE_MB * 1024 * 1024;
+const ALLOWED_IMAGE_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/jpg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+  "image/avif",
+  "image/bmp",
+  "image/tiff",
+]);
 
 const SPORTS = ["padel","tennis","squash","badminton","ping-pong"];
 const AMENITIES = ["parking","locker","shower","cafe","wifi","lighting","shop","coaching","firstaid","ac"];
@@ -77,22 +91,101 @@ function MultiCheck({ label, options, labelMap, value, onChange }) {
 function ImageUploader({ images, onChange }) {
   const inputRef = useRef();
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadCurrentIndex, setUploadCurrentIndex] = useState(0);
+  const [uploadTotalCount, setUploadTotalCount] = useState(0);
+
+  const getUploadErrorMessage = (response, file) => {
+    const serverMessage = response?.data?.message;
+    if (typeof serverMessage === "string" && serverMessage.trim()) {
+      return `آپلود ${file.name} انجام نشد: ${serverMessage}`;
+    }
+
+    if (response?.status === 413) {
+      return `آپلود ${file.name} انجام نشد: حجم فایل بیشتر از ${MAX_IMAGE_UPLOAD_SIZE_MB} مگابایت است`;
+    }
+
+    if (response?.problem === "NETWORK_ERROR") {
+      return `آپلود ${file.name} انجام نشد: مشکل ارتباط با سرور`;
+    }
+
+    if (response?.problem === "TIMEOUT_ERROR") {
+      return `آپلود ${file.name} انجام نشد: زمان پاسخ‌گویی سرور تمام شد`;
+    }
+
+    if (response?.problem === "CONNECTION_ERROR") {
+      return `آپلود ${file.name} انجام نشد: اتصال اینترنت را بررسی کنید`;
+    }
+
+    return `آپلود ${file.name} انجام نشد`;
+  };
+
+  const validateFile = (file) => {
+    if (file.size > MAX_IMAGE_UPLOAD_SIZE_BYTES) {
+      return `آپلود ${file.name} انجام نشد: حجم فایل بیشتر از ${MAX_IMAGE_UPLOAD_SIZE_MB} مگابایت است`;
+    }
+
+    if (file.type && !ALLOWED_IMAGE_MIME_TYPES.has(file.type)) {
+      return `آپلود ${file.name} انجام نشد: فرمت فایل پشتیبانی نمی‌شود`;
+    }
+
+    return null;
+  };
 
   const handleFiles = async (files) => {
     if (!files?.length) return;
+    const selectedFiles = Array.from(files);
+
     setUploading(true);
+    setUploadProgress(0);
+    setUploadCurrentIndex(0);
+    setUploadTotalCount(selectedFiles.length);
+
     const uploaded = [];
-    for (const file of Array.from(files)) {
-      const fd = new FormData();
-      fd.append("image", file);
-      const { ok, data } = await apiClient.post("/club-panel/upload-image", fd, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
-      if (ok && data.url) uploaded.push(data.url);
-      else toast.error(`خطا در آپلود ${file.name}`);
+
+    try {
+      for (let i = 0; i < selectedFiles.length; i += 1) {
+        const file = selectedFiles[i];
+        setUploadCurrentIndex(i + 1);
+        setUploadProgress(0);
+
+        const validationError = validateFile(file);
+        if (validationError) {
+          toast.error(validationError);
+          continue;
+        }
+
+        const fd = new FormData();
+        fd.append("image", file);
+
+        let response;
+        try {
+          response = await apiClient.post("/club-panel/upload-image", fd, {
+            headers: { "Content-Type": "multipart/form-data" },
+            onUploadProgress: (event) => {
+              if (!event.total) return;
+              const percent = Math.min(100, Math.round((event.loaded * 100) / event.total));
+              setUploadProgress(percent);
+            },
+          });
+        } catch {
+          response = { ok: false, problem: "NETWORK_ERROR" };
+        }
+
+        if (response.ok && response.data?.url) {
+          uploaded.push(response.data.url);
+        } else {
+          toast.error(getUploadErrorMessage(response, file));
+        }
+      }
+
+      onChange([...images, ...uploaded]);
+    } finally {
+      setUploading(false);
+      setUploadProgress(0);
+      setUploadCurrentIndex(0);
+      setUploadTotalCount(0);
     }
-    onChange([...images, ...uploaded]);
-    setUploading(false);
   };
 
   const remove = (url) => onChange(images.filter(u => u !== url));
@@ -132,13 +225,30 @@ function ImageUploader({ images, onChange }) {
           )}
         </button>
       </div>
+      {uploading && (
+        <div className="mt-3 rounded-xl border border-border bg-muted/30 px-3 py-2">
+          <div className="mb-1 flex items-center justify-between text-[11px] font-medium text-muted-foreground">
+            <span>در حال آپلود تصویر {uploadCurrentIndex} از {uploadTotalCount}</span>
+            <span>{uploadProgress}%</span>
+          </div>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+            <div
+              className="h-full rounded-full bg-primary transition-all duration-200"
+              style={{ width: `${uploadProgress}%` }}
+            />
+          </div>
+        </div>
+      )}
       <input
         ref={inputRef}
         type="file"
         accept="image/*"
         multiple
         className="hidden"
-        onChange={e => handleFiles(e.target.files)}
+        onChange={(e) => {
+          handleFiles(e.target.files);
+          e.target.value = "";
+        }}
       />
     </div>
   );

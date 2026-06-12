@@ -1,5 +1,77 @@
 @import "tailwindcss";
 
+@font-face {
+  font-family: Vazirmatn UI FD;
+  src: url("./assets/fonts/Vazirmatn-UI-FD-Thin.woff2") format("woff2");
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Vazirmatn UI FD;
+  src: url("./assets/fonts/Vazirmatn-UI-FD-ExtraLight.woff2") format("woff2");
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Vazirmatn UI FD;
+  src: url("./assets/fonts/Vazirmatn-UI-FD-Light.woff2") format("woff2");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Vazirmatn UI FD;
+  src: url("./assets/fonts/Vazirmatn-UI-FD-Regular.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Vazirmatn UI FD;
+  src: url("./assets/fonts/Vazirmatn-UI-FD-Medium.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Vazirmatn UI FD;
+  src: url("./assets/fonts/Vazirmatn-UI-FD-SemiBold.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Vazirmatn UI FD;
+  src: url("./assets/fonts/Vazirmatn-UI-FD-Bold.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Vazirmatn UI FD;
+  src: url("./assets/fonts/Vazirmatn-UI-FD-ExtraBold.woff2") format("woff2");
+  font-weight: 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: Vazirmatn UI FD;
+  src: url("./assets/fonts/Vazirmatn-UI-FD-Black.woff2") format("woff2");
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 @theme inline {
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
@@ -84,7 +156,7 @@
 
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; }
-body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+body { font-family: "Vazirmatn UI FD", system-ui, -apple-system, "Segoe UI", sans-serif; }
 
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

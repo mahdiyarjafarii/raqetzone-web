@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { currentUserAtom } from "@/config/state";
 import UserAvatar from "@/components/ui/UserAvatar";
 import UserProfileSheet from "@/components/ui/UserProfileSheet";
-import { selectedTournamentAtom, tournamentDetailOpenAtom } from "../store/tournamentStore";
+import { selectedTournamentAtom, tournamentDetailOpenAtom, tournamentsAtom } from "../store/tournamentStore";
 import { tournamentService } from "../services/tournamentService";
 
 const SPORT_ICONS = {
@@ -38,9 +38,9 @@ function PhaseSteps({ phase }) {
         const active = i === currentIdx;
         return (
           <React.Fragment key={p}>
-            <div className="flex flex-col items-center gap-1">
+            <div className="flex flex-col items-center gap-0.5">
               <div className={cn(
-                "w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition-all shadow-sm",
+                "w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold border-2 transition-all shadow-sm",
                 done   ? "bg-emerald-500 border-emerald-500 text-white" :
                 active ? "bg-blue-500   border-blue-500   text-white" :
                          "bg-white/85   border-white/70   text-slate-600"
@@ -48,12 +48,12 @@ function PhaseSteps({ phase }) {
                 {done ? <CheckIcon className="w-3.5 h-3.5" /> : i + 1}
               </div>
               <span className={cn(
-                "text-[10px] font-semibold",
+                "text-[9px] font-semibold leading-none",
                 active ? "text-white" : done ? "text-emerald-300" : "text-white/70"
               )}>{PHASE_LABELS[p]}</span>
             </div>
             {i < PHASES.length - 1 && (
-              <div className={cn("flex-1 h-0.5 mb-4 mx-1 rounded-full", i < currentIdx ? "bg-emerald-400" : "bg-white/35")} />
+              <div className={cn("flex-1 h-0.5 mb-3 mx-1 rounded-full", i < currentIdx ? "bg-emerald-400" : "bg-white/35")} />
             )}
           </React.Fragment>
         );
@@ -286,6 +286,7 @@ function TournamentResultsBlock({ loading, matches, standings }) {
 export default function TournamentDetailSheet() {
   const [tournament, setTournament] = useAtom(selectedTournamentAtom);
   const [open, setOpen] = useAtom(tournamentDetailOpenAtom);
+  const [, setTournaments] = useAtom(tournamentsAtom);
   const currentUser = useAtomValue(currentUserAtom);
   const [loading, setLoading] = useState(false);
   const [registered, setRegistered] = useState(false);
@@ -294,6 +295,72 @@ export default function TournamentDetailSheet() {
   const [standings, setStandings] = useState([]);
 
   const userId = currentUser?.id ?? null;
+
+  function patchTournamentState(patchFn, { syncFullObjectInList = false } = {}) {
+    let nextTournament = null;
+
+    setTournament((prev) => {
+      if (!prev) return prev;
+      nextTournament = patchFn(prev);
+      return nextTournament;
+    });
+
+    if (!nextTournament?.id) return;
+
+    setTournaments((prev) =>
+      prev.map((item) => {
+        if (String(item.id) !== String(nextTournament.id)) return item;
+        return syncFullObjectInList
+          ? { ...item, ...nextTournament }
+          : { ...item, registeredCount: nextTournament.registeredCount };
+      })
+    );
+  }
+
+  function applyOptimisticRegistration(isRegistering) {
+    patchTournamentState((prev) => {
+      const participants = Array.isArray(prev.participants) ? prev.participants : [];
+      const alreadyRegistered = participants.some((p) => String(p.userId) === String(userId));
+      const baseCount = Number(prev.registeredCount ?? participants.length ?? 0);
+      const maxCount = Number(prev.maxParticipants ?? Number.MAX_SAFE_INTEGER);
+
+      if (isRegistering) {
+        const nextParticipants = alreadyRegistered
+          ? participants
+          : [
+              {
+                id: `local-${userId}`,
+                userId,
+                name: currentUser?.name ?? currentUser?.fullName ?? "شما",
+                image: currentUser?.image ?? null,
+                paymentStatus: prev.entryFee === 0 ? "paid" : "pending",
+              },
+              ...participants,
+            ];
+
+        return {
+          ...prev,
+          participants: nextParticipants,
+          registeredCount: Math.min(baseCount + (alreadyRegistered ? 0 : 1), maxCount),
+        };
+      }
+
+      const nextParticipants = participants.filter((p) => String(p.userId) !== String(userId));
+      const wasRegistered = nextParticipants.length !== participants.length;
+
+      return {
+        ...prev,
+        participants: nextParticipants,
+        registeredCount: Math.max(baseCount - (wasRegistered ? 1 : 0), 0),
+      };
+    });
+
+    setRegistered(isRegistering);
+  }
+
+  function syncFetchedTournament(nextTournament) {
+    patchTournamentState(() => nextTournament, { syncFullObjectInList: true });
+  }
 
   useEffect(() => {
     if (!tournament || !userId) {
@@ -347,9 +414,9 @@ export default function TournamentDetailSheet() {
       const res = await tournamentService.register(tournament.id);
       if (res.ok) {
         toast.success("ثبت‌نام با موفقیت انجام شد 🎉");
+        applyOptimisticRegistration(true);
         const detail = await tournamentService.getTournament(tournament.id);
-        if (detail.ok) setTournament(detail.data.tournament);
-        setRegistered(true);
+        if (detail.ok) syncFetchedTournament(detail.data.tournament);
       } else {
         toast.error(res.data?.message ?? "خطا در ثبت‌نام");
       }
@@ -362,9 +429,9 @@ export default function TournamentDetailSheet() {
       const res = await tournamentService.unregister(tournament.id);
       if (res.ok) {
         toast.success("انصراف ثبت شد");
+        applyOptimisticRegistration(false);
         const detail = await tournamentService.getTournament(tournament.id);
-        if (detail.ok) setTournament(detail.data.tournament);
-        setRegistered(false);
+        if (detail.ok) syncFetchedTournament(detail.data.tournament);
       } else {
         toast.error(res.data?.message ?? "خطا");
       }
@@ -386,7 +453,7 @@ export default function TournamentDetailSheet() {
             key="sheet"
             initial={{ y:"100%" }} animate={{ y:0 }} exit={{ y:"100%" }}
             transition={{ type:"spring", damping:32, stiffness:320 }}
-            className="fixed bottom-0 left-0 right-0 z-50 bg-background rounded-t-[28px] max-h-[92vh] flex flex-col overflow-hidden shadow-2xl shadow-black/30"
+            className="fixed inset-0 z-50 bg-background h-[100dvh] pt-[env(safe-area-inset-top)] flex flex-col overflow-hidden shadow-2xl shadow-black/30"
           >
             {/* Drag pill */}
             <div className="absolute top-3 left-1/2 z-20 -translate-x-1/2">
@@ -394,47 +461,47 @@ export default function TournamentDetailSheet() {
             </div>
 
             {/* Hero header */}
-            <div className="relative shrink-0 overflow-hidden rounded-t-[28px]">
+            <div className="relative shrink-0 overflow-hidden">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.24),transparent_50%),linear-gradient(135deg,#0f172a_0%,#111827_55%,#1f2937_100%)]" />
               <div className="absolute inset-0 bg-gradient-to-b from-white/6 via-transparent to-black/26" />
-              <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-background via-background/55 to-transparent" />
+              <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-background via-background/55 to-transparent" />
               <button
                 onClick={() => setOpen(false)}
-                className="absolute top-5 left-4 z-10 w-9 h-9 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center shadow-sm hover:bg-white/30 transition-colors"
+                className="absolute top-4 left-4 z-10 w-8 h-8 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center shadow-sm hover:bg-white/30 transition-colors"
               >
-                <XIcon className="w-[18px] h-[18px] text-white" />
+                <XIcon className="w-4 h-4 text-white" />
               </button>
 
-              <div className="relative px-5 pt-11 pb-6 space-y-3.5">
-                <div className="inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-white/10 px-2.5 py-1 text-[10px] font-bold text-white/90 backdrop-blur-md">
-                  <TrophyIcon className="w-3 h-3" />
+              <div className="relative px-4 pt-8 pb-3 space-y-2.5">
+                <div className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-2 py-0.5 text-[9px] font-bold text-white/85 backdrop-blur-md">
+                  <TrophyIcon className="w-2.5 h-2.5" />
                   جزئیات تورنومنت
                 </div>
 
-                <div className="rounded-2xl border border-white/20 bg-black/18 p-3.5 backdrop-blur-md shadow-lg shadow-black/25">
-                  <div className="flex items-start gap-3">
-                    <div className="w-14 h-14 rounded-2xl bg-white/14 border border-white/20 flex items-center justify-center text-3xl shrink-0 shadow-lg shadow-black/20 backdrop-blur-md">
+                <div className="rounded-2xl border border-white/20 bg-black/16 p-2.5 backdrop-blur-md shadow-lg shadow-black/25">
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-10 h-10 rounded-xl bg-white/12 border border-white/20 flex items-center justify-center text-2xl shrink-0 shadow-md shadow-black/20 backdrop-blur-md">
                     {SPORT_ICONS[tournament.sportType] ?? "🏅"}
                     </div>
                     <div className="flex-1 min-w-0 pt-0.5">
-                      <h2 className="font-black text-[22px] text-white leading-tight line-clamp-2 drop-shadow-sm">{tournament.title}</h2>
-                      {organizerClubName && <p className="text-white/95 text-xs mt-1.5 font-semibold">🏢 باشگاه برگزارکننده: {organizerClubName}</p>}
+                      <h2 className="font-black text-[19px] text-white leading-tight line-clamp-2 drop-shadow-sm">{tournament.title}</h2>
+                      {organizerClubName && <p className="text-white/90 text-[11px] mt-1 font-semibold">🏢 باشگاه برگزارکننده: {organizerClubName}</p>}
                     </div>
                   </div>
                 </div>
 
                 {/* Badges */}
-                <div className="flex flex-wrap gap-2">
-                  <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border backdrop-blur-md", phaseHeaderBadge)}>
+                <div className="flex flex-wrap gap-1.5">
+                  <span className={cn("inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold border backdrop-blur-md", phaseHeaderBadge)}>
                     <span className={cn("w-1.5 h-1.5 rounded-full", phaseCfg.dot)} />
                     {phaseCfg.label}
                   </span>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-white/14 border border-white/22 text-white/95 backdrop-blur-md">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-white/14 border border-white/22 text-white/95 backdrop-blur-md">
                     <CoinsIcon className="w-3 h-3" />
                     {isFree ? "رایگان" : `${tournament.entryFee.toLocaleString("fa-IR")} تومان`}
                   </span>
                   {tournament.minLevel > 1 && (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-400/18 border border-amber-200/40 text-amber-50 backdrop-blur-md">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-400/18 border border-amber-200/40 text-amber-50 backdrop-blur-md">
                       <StarIcon className="w-3 h-3" />سطح {tournament.minLevel}+
                     </span>
                   )}
@@ -444,12 +511,12 @@ export default function TournamentDetailSheet() {
                 <PhaseSteps phase={phase} />
 
                 {/* Capacity */}
-                <div className="rounded-2xl border border-white/18 bg-black/16 p-3 backdrop-blur-sm">
-                  <div className="flex justify-between text-[11px] text-white mb-1.5 font-semibold">
+                <div className="rounded-2xl border border-white/16 bg-black/14 p-2.5 backdrop-blur-sm">
+                  <div className="flex justify-between text-[10px] text-white mb-1.5 font-semibold">
                     <span className="flex items-center gap-1"><UsersIcon className="w-3 h-3" />{tournament.registeredCount} ثبت‌نام</span>
                     <span>{tournament.maxParticipants - tournament.registeredCount} جای خالی</span>
                   </div>
-                  <div className="h-1.5 bg-white/20 rounded-full overflow-hidden">
+                  <div className="h-1 bg-white/20 rounded-full overflow-hidden">
                     <motion.div
                       initial={{ width:0 }}
                       animate={{ width:`${Math.min(fillRatio*100,100)}%` }}
@@ -559,7 +626,7 @@ export default function TournamentDetailSheet() {
             </div>
 
             {/* CTA */}
-            <div className="shrink-0 px-5 pb-8 pt-3 border-t border-border bg-background/95 backdrop-blur-sm">
+            <div className="shrink-0 px-5 pb-3 pt-3 border-t border-border bg-background/95 backdrop-blur-sm">
               {registered ? (
                 <div className="space-y-2.5">
                   <div className="flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/25">

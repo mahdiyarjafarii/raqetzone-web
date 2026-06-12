@@ -518,12 +518,12 @@ export default function CustomersPage() {
           </div>
         ) : (
           <div className="rounded-2xl border border-border bg-card overflow-hidden">
-            <div className="hidden sm:grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-4 py-2.5 bg-muted/50 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider text-right">
-              <span>کاربر</span>
-              <span>رزروها</span>
-              <span>پرداخت کل</span>
-              <span>آخرین مراجعه</span>
-              <span>برچسب</span>
+            <div className="hidden sm:grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-4 px-4 py-2.5 bg-muted/50 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+              <span className="text-right">کاربر</span>
+              <span className="text-center">رزروها</span>
+              <span className="text-center">پرداخت کل</span>
+              <span className="text-center">آخرین مراجعه</span>
+              <span className="text-left">برچسب</span>
             </div>
 
             <div className="divide-y divide-border">
@@ -535,7 +535,7 @@ export default function CustomersPage() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   transition={{ delay: i * 0.03 }}
-                  className="grid grid-cols-1 sm:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-3 sm:gap-4 items-center px-4 py-3 hover:bg-muted/30 transition-colors"
+                  className="grid grid-cols-1 sm:grid-cols-[2fr_1fr_1fr_1fr_auto] gap-3 sm:gap-4 items-center px-4 py-3 text-right hover:bg-muted/30 transition-colors"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <Avatar customer={c} />
@@ -544,7 +544,7 @@ export default function CustomersPage() {
                         {fullName}
                       </p>
                       {c.phone && (
-                        <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <p className="text-xs text-muted-foreground flex items-center justify-end gap-1">
                           <PhoneIcon className="w-3 h-3" />
                           <span dir="ltr" className="inline-block">{c.phone}</span>
                         </p>
@@ -552,22 +552,22 @@ export default function CustomersPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5 sm:block sm:text-right">
+                  <div className="flex items-center gap-1.5 sm:justify-self-center sm:text-center">
                     <span className="text-xs text-muted-foreground sm:hidden">رزروها: </span>
-                    <div className="flex items-center gap-1 text-sm font-bold text-foreground">
+                    <div className="flex items-center gap-1 text-sm font-bold text-foreground sm:justify-center">
                       <CalendarCheckIcon className="w-3.5 h-3.5 text-blue-500" />
                       <span dir="ltr" className="inline-block">{c.bookCount}</span>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5 sm:block sm:text-right">
+                  <div className="flex items-center gap-1.5 sm:justify-self-center sm:text-center">
                     <span className="text-xs text-muted-foreground sm:hidden">پرداخت: </span>
                     <p className="text-sm font-bold text-primary">
                       <span dir="ltr" className="inline-block">{fmt(c.totalSpent)} ت</span>
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-1.5 sm:block sm:text-right">
+                  <div className="flex items-center gap-1.5 sm:justify-self-center sm:text-center">
                     <span className="text-xs text-muted-foreground sm:hidden">آخرین مراجعه: </span>
                     <p className="text-xs text-muted-foreground">
                       {c.lastVisit ? (
@@ -578,7 +578,7 @@ export default function CustomersPage() {
                     </p>
                   </div>
 
-                  <div className="flex flex-wrap gap-1">
+                  <div className="flex flex-wrap gap-1 sm:justify-self-start sm:justify-end">
                     {c.bookCount > 0 && (
                       <Badge className="bg-blue-500/10 text-blue-600">
                         <CalendarCheckIcon className="w-2.5 h-2.5" />

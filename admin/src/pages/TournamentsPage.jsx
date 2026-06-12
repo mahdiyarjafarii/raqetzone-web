@@ -15,7 +15,11 @@ import Modal from "@/components/ui/Modal";
 import { cn, getUserFullName } from "@/lib/utils";
 
 const ADMIN_BASE = import.meta.env.VITE_API_URL?.replace("/api", "") ?? "http://localhost:3000";
-const PUBLIC_APP_BASE = import.meta.env.VITE_PUBLIC_APP_URL ?? import.meta.env.VITE_WEBSITE_URL ?? "http://localhost:5173";
+const PUBLIC_APP_BASE = (
+  import.meta.env.VITE_PUBLIC_APP_URL
+  ?? import.meta.env.VITE_WEBSITE_URL
+  ?? (typeof window !== "undefined" ? window.location.origin : "")
+).replace(/\/$/, "");
 
 function buildUserImageUrl(image) {
   if (!image) return null;
@@ -1051,7 +1055,7 @@ function TournamentAdminCard({ tournament, onStatusChange, onViewParticipants, o
   }
 
   async function copyInviteLink() {
-    const url = `${PUBLIC_APP_BASE.replace(/\/$/, "")}/tournament/invite/${tournament.id}`;
+    const url = `${PUBLIC_APP_BASE}/tournament/invite/${tournament.id}`;
     try {
       await navigator.clipboard.writeText(url);
       toast.success("لینک دعوت کپی شد");

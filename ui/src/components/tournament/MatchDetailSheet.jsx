@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MapPinIcon, CalendarIcon, LogOutIcon, UsersIcon, ClockIcon, ShareIcon, ZapIcon, StarIcon, ShieldCheckIcon, Trash2Icon } from "lucide-react";
+import { MapPinIcon, CalendarIcon, LogOutIcon, UsersIcon, ClockIcon, ShareIcon, ZapIcon, StarIcon, ShieldCheckIcon, Trash2Icon, XIcon } from "lucide-react";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import toast from "react-hot-toast";
 
@@ -268,6 +268,12 @@ export default function MatchDetailSheet() {
               <div className="relative overflow-hidden rounded-t-[28px] px-5 pt-11 pb-6">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.34),transparent_36%),radial-gradient(circle_at_bottom_left,rgba(139,92,246,0.28),transparent_34%),linear-gradient(180deg,rgba(248,250,252,1)_0%,rgba(245,243,255,0.92)_100%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.24),transparent_36%),radial-gradient(circle_at_bottom_left,rgba(139,92,246,0.22),transparent_34%),linear-gradient(180deg,rgba(24,24,27,1)_0%,rgba(30,27,75,0.82)_100%)]" />
                 <div className="absolute inset-x-5 bottom-0 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+                <button
+                  onClick={() => setSelectedMatch(null)}
+                  className="absolute top-4 left-4 z-10 w-8 h-8 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center shadow-sm hover:bg-white/30 transition-colors"
+                >
+                  <XIcon className="w-4 h-4 text-black" />
+                </button>
                 <div className="relative flex items-start gap-4">
                   <div className="relative w-20 h-20 rounded-[26px] bg-white/80 dark:bg-white/10 border border-white/80 dark:border-white/15 flex items-center justify-center text-4xl shrink-0 shadow-xl shadow-blue-500/10 backdrop-blur-md">
                     <div className="absolute inset-2 rounded-[20px] bg-gradient-to-br from-white/70 to-white/20 dark:from-white/10 dark:to-white/5" />

@@ -148,26 +148,7 @@ export default function ProfilePage() {
   };
 
   const handleTopup = async () => {
-    const amount = Number(topupAmount);
-    if (!Number.isInteger(amount) || amount < 10000) {
-      toast.error("حداقل مبلغ شارژ ۱۰٬۰۰۰ تومان است");
-      return;
-    }
-    setTopupLoading(true);
-    try {
-      const res = await walletService.topup(amount);
-      if (res.ok) {
-        setWallet(res.data?.wallet ?? null);
-        window.dispatchEvent(new CustomEvent("wallet:updated", { detail: res.data?.wallet ?? null }));
-        toast.success("کیف پول با موفقیت شارژ شد");
-      } else {
-        toast.error(res.data?.message ?? "خطا در شارژ کیف پول");
-      }
-    } catch {
-      toast.error("خطا در شارژ کیف پول");
-    } finally {
-      setTopupLoading(false);
-    }
+    toast.error("شارژ کیف پول به‌زودی فعال می‌شود");
   };
 
   const user = profileData?.user ?? currentUser;
