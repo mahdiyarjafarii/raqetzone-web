@@ -1,6 +1,7 @@
 import * as Sentry from "@sentry/react";
 import { createRoot } from "react-dom/client";
 import { GoogleOAuthProvider } from "@react-oauth/google";
+import { registerSW } from "virtual:pwa-register";
 
 import App from "./App.jsx";
 
@@ -13,6 +14,10 @@ Sentry.init({
   dsn: SENTRY_DSN,
   sendDefaultPii: true,
   enableLogs: true,
+});
+
+registerSW({
+  immediate: true,
 });
 
 createRoot(document.getElementById("root")).render(
