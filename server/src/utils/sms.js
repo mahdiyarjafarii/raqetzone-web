@@ -66,24 +66,25 @@ export const sendSMS = async (phone, message) => {
  * @returns {Promise<boolean>} Success status
  */
 export const sendOTP = async (phone, code) => {
-  console.log(phone)
-  console.log(code)
+  const receptor = normalizePhone(phone);
+  if (!receptor) return false;
+
   try {
-    if (!kavenegar || !sender) {
+    if (!kavenegar) {
       console.error('SMS sending error: Kavenegar configuration is missing');
       return false;
     }
 
     await new Promise((resolve, reject) => {
-      kavenegar.Send(
+      kavenegar.VerifyLookup(
         {
-          message: `کد تایید راکت زون: ${code}`,
-          sender,
-          receptor: phone,
+          receptor,
+          token: String(code),
+          template: 'token',
         },
         (response, status) => {
           if (status >= 200 && status < 300) return resolve(response);
-          const error = new Error(`Kavenegar send failed with status ${status}: ${JSON.stringify(response)}`);
+          const error = new Error(`Kavenegar verify lookup failed with status ${status}: ${JSON.stringify(response)}`);
           error.response = response;
           error.status = status;
           return reject(error);

@@ -69,8 +69,11 @@ const AuthBottomSheet = () => {
   const [code, setCode] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
+  const [otpExpireTimer, setOtpExpireTimer] = useState(0);
 
   const OTP_LENGTH = 4;
+  const OTP_EXPIRE_SECONDS = 5 * 60;
+  const RESEND_SECONDS = 5 * 60;
 
   // Countdown timer for resend OTP
   useEffect(() => {
@@ -79,6 +82,13 @@ const AuthBottomSheet = () => {
       return () => clearTimeout(timer);
     }
   }, [resendTimer]);
+
+  useEffect(() => {
+    if (otpExpireTimer > 0 && currentForm === "enter-code") {
+      const timer = setTimeout(() => setOtpExpireTimer(otpExpireTimer - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [otpExpireTimer, currentForm]);
 
   // Auto-submit when all digits are entered
   useEffect(() => {
@@ -94,11 +104,27 @@ const AuthBottomSheet = () => {
       setPhone("");
       setCode("");
       setResendTimer(0);
+      setOtpExpireTimer(0);
     }
   }, [open]);
 
   const startResendTimer = () => {
-    setResendTimer(60);
+    setResendTimer(RESEND_SECONDS);
+  };
+
+  const startOtpExpireTimer = () => {
+    setOtpExpireTimer(OTP_EXPIRE_SECONDS);
+  };
+
+  const formatRemainingTime = (seconds) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = seconds % 60;
+    return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
+  };
+
+  const maskPhone = (value) => {
+    if (!value || value.length < 7) return value;
+    return `${value.slice(0, 4)}***${value.slice(-3)}`;
   };
 
   const handleSubmitPhone = async (e) => {
@@ -113,6 +139,7 @@ const AuthBottomSheet = () => {
     toast.success("کد تایید ارسال شد");
     setCurrentForm("enter-code");
     startResendTimer();
+    startOtpExpireTimer();
   };
 
   const handleSubmitCode = async (e) => {
@@ -150,6 +177,7 @@ const AuthBottomSheet = () => {
     setCode("");
     toast.success("کد تایید مجدداً ارسال شد");
     startResendTimer();
+    startOtpExpireTimer();
   };
 
   const handleDismiss = () => {
@@ -164,19 +192,24 @@ const AuthBottomSheet = () => {
     <BottomSheet
       open={open}
       onDismiss={handleDismiss}
-      defaultSnap={({ maxHeight }) => maxHeight * 0.58}
-      snapPoints={({ maxHeight }) => [maxHeight * 0.58, maxHeight * 0.78]}
+      defaultSnap={({ maxHeight }) => maxHeight * 0.68}
+      snapPoints={({ maxHeight }) => [maxHeight * 0.68, maxHeight * 0.9]}
       blocking={true}
       scrollLocking={true}
       className="auth-bottom-sheet bottom-sheet"
     >
-      <div className="relative overflow-hidden bg-[#fbfaf8] px-5 pb-6 pt-4 text-foreground dark:bg-background">
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_70%_0%,rgba(43,15,217,0.12),transparent_38%)]" />
-        <div className="relative rounded-[28px] border border-black/[0.06] bg-white p-4 shadow-lg shadow-slate-200/50 dark:border-white/10 dark:bg-card dark:shadow-black/10">
+      <div className="relative overflow-hidden bg-[#fbfaf8] px-5 pb-7 pt-5 text-foreground dark:bg-background">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-48 bg-[radial-gradient(circle_at_80%_0%,rgba(43,15,217,0.14),transparent_40%),radial-gradient(circle_at_15%_8%,rgba(14,165,233,0.12),transparent_36%)]" />
+        <div className="relative rounded-[32px] border border-black/[0.06] bg-white/95 p-5 shadow-xl shadow-slate-200/60 backdrop-blur-sm dark:border-white/10 dark:bg-card/95 dark:shadow-black/10">
         {currentForm === "enter-phone" ? (
           <form onSubmit={handleSubmitPhone}>
             <FieldGroup>
-              <div className="flex flex-col items-center gap-1.5 text-center mb-3">
+              <div className="mb-1 flex items-center justify-center">
+                <span className="rounded-full border border-primary/15 bg-primary/8 px-3 py-1 text-[11px] font-extrabold text-primary">
+                  ورود سریع به رکت‌زون
+                </span>
+              </div>
+              <div className="mb-3 flex flex-col items-center gap-1.5 text-center">
                 <div className="flex size-13 items-center justify-center rounded-[20px] bg-primary/8 border border-primary/10">
                   <img src="/logo.png" alt="Raqet Zone" className="size-10 object-contain" />
                 </div>
@@ -209,7 +242,7 @@ const AuthBottomSheet = () => {
                 <Button
                   type="submit"
                   disabled={isSubmitting || !phone}
-                  className="w-full h-11 rounded-2xl font-black"
+                  className="h-11 w-full rounded-2xl bg-primary font-black shadow-lg shadow-primary/30 transition hover:scale-[1.01]"
                 >
                   {isSubmitting ? <Spinner /> : "ورود"}
                 </Button>
@@ -224,13 +257,18 @@ const AuthBottomSheet = () => {
         ) : (
           <form onSubmit={handleSubmitCode}>
             <FieldGroup>
-              <div className="flex flex-col items-center gap-1.5 text-center mb-3">
+              <div className="mb-1 flex items-center justify-center">
+                <span className="rounded-full border border-primary/15 bg-primary/8 px-3 py-1 text-[11px] font-extrabold text-primary">
+                  احراز هویت با پیامک
+                </span>
+              </div>
+              <div className="mb-3 flex flex-col items-center gap-2 text-center">
                 <div className="flex size-13 items-center justify-center rounded-[20px] bg-primary/8 border border-primary/10">
                   <img src="/logo.png" alt="Raqet Zone" className="size-10 object-contain" />
                 </div>
                 <h1 className="text-xl font-black tracking-tight">کد تایید را وارد کنید</h1>
                 <p className="text-xs text-muted-foreground font-medium leading-relaxed">
-                  کد تایید ۴ رقمی به شماره {phone} ارسال شد
+                  کد تایید ۴ رقمی به شماره {maskPhone(phone)} ارسال شد
                 </p>
               </div>
 
@@ -247,22 +285,24 @@ const AuthBottomSheet = () => {
                     classNames={{
                       container: "gap-3",
                       character:
-                        "rounded-2xl border !border-border bg-muted/40 !w-11 !h-13 text-xl font-black",
+                        "rounded-2xl border !border-border bg-muted/40 !w-12 !h-14 text-xl font-black shadow-sm",
                       characterInactive: "!bg-muted/40",
                       characterSelected: "!border-primary ring-2 ring-primary/20",
                     }}
                   />
                 </div>
                 <FieldDescription className="text-center text-xs">
-                  کد را از پیامک دریافتی خود وارد کنید
+                  {otpExpireTimer > 0
+                    ? "کد را از پیامک دریافتی خود وارد کنید"
+                    : "برای دریافت کد جدید، ارسال مجدد را بزنید"}
                 </FieldDescription>
               </Field>
 
               <Field>
                 <Button
                   type="submit"
-                  disabled={code.length !== OTP_LENGTH || isSubmitting}
-                  className="w-full h-11 rounded-2xl font-black"
+                  disabled={code.length !== OTP_LENGTH || isSubmitting || otpExpireTimer === 0}
+                  className="h-11 w-full rounded-2xl bg-primary font-black shadow-lg shadow-primary/30 transition hover:scale-[1.01]"
                 >
                   {isSubmitting ? <Spinner /> : "تایید کد"}
                 </Button>
@@ -299,7 +339,7 @@ const AuthBottomSheet = () => {
                   disabled={resendTimer > 0 || isSubmitting}
                 >
                   {resendTimer > 0
-                    ? `ارسال مجدد کد (${resendTimer})`
+                    ? `ارسال مجدد کد تا ${formatRemainingTime(resendTimer)}`
                     : "ارسال مجدد کد"}
                 </button>
               </FieldDescription>

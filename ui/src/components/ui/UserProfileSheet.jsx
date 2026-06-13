@@ -1,20 +1,16 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  XIcon, TrophyIcon, SwordsIcon, TrendingUpIcon,
-  StarIcon, ZapIcon, CalendarIcon, MessageCircleIcon,
+  CalendarIcon,
+  MessageCircleIcon,
+  TrophyIcon,
+  TrendingUpIcon,
+  XIcon,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import apiClient from "@/lib/apiClient";
 import useAuth from "@/auth/useAuth";
-
-const SKILL_CONFIG = {
-  beginner:     { label: "مبتدی",   color: "bg-emerald-500/15 text-emerald-600 border-emerald-500/30" },
-  intermediate: { label: "متوسط",   color: "bg-blue-500/15    text-blue-600    border-blue-500/30"    },
-  advanced:     { label: "پیشرفته", color: "bg-violet-500/15  text-violet-600  border-violet-500/30"  },
-  pro:          { label: "حرفه‌ای", color: "bg-amber-500/15   text-amber-600   border-amber-500/30"   },
-};
 
 const SPORT_EMOJI = {
   padel: "🥎", tennis: "🎾", squash: "🟡", badminton: "🏸", "ping-pong": "🏓",
@@ -26,7 +22,15 @@ function buildImageUrl(image) {
   return `${import.meta.env.VITE_WEBSITE_URL}/uploads/user/${image}`;
 }
 
-function StatCard({ icon: Icon, value, label, color }) {
+const TOURNAMENT_STATUS_LABEL = {
+  open: "باز",
+  full: "تکمیل ظرفیت",
+  closed: "بسته",
+  ongoing: "درحال برگزاری",
+  completed: "تکمیل‌شده",
+};
+
+function StatCard({ value, label, color }) {
   return (
     <div className="flex-1 flex flex-col items-center gap-1 py-4 px-2">
       <span className={cn("text-2xl font-black tabular-nums", color)}>{value ?? "—"}</span>
@@ -35,29 +39,24 @@ function StatCard({ icon: Icon, value, label, color }) {
   );
 }
 
-function XpBar({ level }) {
-  if (!level) return null;
-  const { current, progressPct, rank, progressXp, neededXp } = level;
-  return (
-    <div className="space-y-2">
-      <div className="flex justify-between items-center text-xs">
-        <span className="font-black text-foreground">سطح {current}</span>
-        <span className="text-muted-foreground">{progressXp} / {neededXp} XP</span>
-      </div>
-      <div className="h-2 bg-muted rounded-full overflow-hidden">
-        <motion.div
-          initial={{ width: 0 }}
-          animate={{ width: `${progressPct}%` }}
-          transition={{ duration: 0.7, ease: "easeOut" }}
-          className="h-full rounded-full"
-          style={{ background: `linear-gradient(90deg, ${rank?.gradient?.[0] ?? "#6366f1"}, ${rank?.gradient?.[1] ?? "#8b5cf6"})` }}
-        />
-      </div>
-    </div>
-  );
+function formatFaDate(value, options) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat("fa-IR", options).format(date);
 }
 
-export default function UserProfileSheet({ userId, name, image: initialImage, onClose }) {
+function MatchResultBadge({ isWin }) {
+  if (isWin === true) {
+    return <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 border border-emerald-500/25">برد</span>;
+  }
+  if (isWin === false) {
+    return <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-600 border border-rose-500/25">باخت</span>;
+  }
+  return <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">نامشخص</span>;
+}
+
+export default function UserProfileSheet({ userId, name, image: initialImage, sportType = "padel", onClose }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -67,21 +66,20 @@ export default function UserProfileSheet({ userId, name, image: initialImage, on
   useEffect(() => {
     if (!userId) return;
     setLoading(true);
-    apiClient.get(`/profile/${userId}`).then(({ ok, data }) => {
+    apiClient.get(`/profile/${userId}`, { sport: sportType }).then(({ ok, data }) => {
       if (ok) setProfile(data);
       setLoading(false);
     });
-  }, [userId]);
+  }, [userId, sportType]);
 
   const user = profile?.user;
   const stats = profile?.stats;
-  const level = profile?.level;
-  const skill = SKILL_CONFIG[user?.skillLevel] ?? null;
+  const ranking = profile?.ranking;
+  const recentMatches = Array.isArray(profile?.recentMatches) ? profile.recentMatches : [];
+  const recentTournaments = Array.isArray(profile?.recentTournaments) ? profile.recentTournaments : [];
   const avatarSrc = buildImageUrl(user?.image ?? initialImage);
 
-  const joinedYear = user?.createdAt
-    ? new Intl.DateTimeFormat("fa-IR", { year: "numeric", month: "long" }).format(new Date(user.createdAt))
-    : null;
+  const joinedDateLabel = formatFaDate(user?.createdAt, { year: "numeric", month: "long", day: "numeric" });
 
   return (
     <AnimatePresence>
@@ -118,15 +116,7 @@ export default function UserProfileSheet({ userId, name, image: initialImage, on
         <div className="flex-1 overflow-y-auto">
           {/* Hero */}
           <div className="relative px-5 pt-6 pb-5 overflow-hidden">
-            {/* Gradient bg */}
-            <div
-              className="absolute inset-0 opacity-30"
-              style={{
-                background: level?.rank?.gradient
-                  ? `radial-gradient(circle at 60% 0%, ${level.rank.gradient[0]}55, transparent 60%), radial-gradient(circle at 20% 30%, ${level.rank.gradient[1]}33, transparent 50%)`
-                  : "radial-gradient(circle at 60% 0%, #6366f155, transparent 60%)",
-              }}
-            />
+            <div className="absolute inset-0 opacity-30 bg-[radial-gradient(circle_at_65%_0%,rgba(59,130,246,0.18),transparent_55%),radial-gradient(circle_at_20%_30%,rgba(34,197,94,0.15),transparent_45%)]" />
 
             <div className="relative flex flex-col items-center gap-3">
               {/* Avatar */}
@@ -139,22 +129,12 @@ export default function UserProfileSheet({ userId, name, image: initialImage, on
                   ) : (
                     <div
                       className="w-full h-full flex items-center justify-center text-3xl font-black text-white"
-                      style={{ background: `linear-gradient(135deg, ${level?.rank?.gradient?.[0] ?? "#6366f1"}, ${level?.rank?.gradient?.[1] ?? "#8b5cf6"})` }}
+                      style={{ background: "linear-gradient(135deg, #2563eb, #0ea5e9)" }}
                     >
                       {(user?.name ?? name)?.[0]?.toUpperCase() ?? "?"}
                     </div>
                   )}
                 </div>
-
-                {/* Level badge */}
-                {!loading && level && (
-                  <div
-                    className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full border-2 border-background flex items-center justify-center text-xs font-black text-white shadow-md"
-                    style={{ background: `linear-gradient(135deg, ${level.rank?.gradient?.[0] ?? "#6366f1"}, ${level.rank?.gradient?.[1] ?? "#8b5cf6"})` }}
-                  >
-                    {level.current}
-                  </div>
-                )}
               </div>
 
               {/* Name */}
@@ -168,22 +148,9 @@ export default function UserProfileSheet({ userId, name, image: initialImage, on
                   <h2 className="text-2xl font-black text-foreground">{user?.name ?? name ?? "بازیکن"}</h2>
 
                   <div className="flex items-center justify-center gap-2 flex-wrap">
-                    {skill && (
-                      <span className={cn("text-xs px-3 py-1 rounded-full font-bold border", skill.color)}>
-                        {skill.label}
-                      </span>
-                    )}
                     {user?.favoriteSport && (
                       <span className="text-xs px-3 py-1 rounded-full bg-muted text-muted-foreground font-semibold">
                         {SPORT_EMOJI[user.favoriteSport]} {user.favoriteSport}
-                      </span>
-                    )}
-                    {level?.rank && (
-                      <span
-                        className="text-xs px-3 py-1 rounded-full font-bold text-white"
-                        style={{ background: `linear-gradient(90deg, ${level.rank.gradient[0]}, ${level.rank.gradient[1]})` }}
-                      >
-                        {level.rank.label}
                       </span>
                     )}
                   </div>
@@ -196,30 +163,93 @@ export default function UserProfileSheet({ userId, name, image: initialImage, on
             </div>
           </div>
 
-          {/* XP bar */}
-          {!loading && level && (
-            <div className="px-5 pb-4">
-              <XpBar level={level} />
-            </div>
-          )}
-
-          {/* Stats */}
-          {!loading && stats && (
+          {!loading && ranking && (
             <div className="mx-5 rounded-2xl border border-border bg-card overflow-hidden mb-4">
               <div className="flex divide-x divide-x-reverse divide-border">
-                <StatCard icon={SwordsIcon}    value={stats.totalMatches}                         label="کل بازی‌ها"   color="text-foreground" />
-                <StatCard icon={TrophyIcon}    value={stats.wins}                                 label="برد"          color="text-emerald-500" />
-                <StatCard icon={TrendingUpIcon} value={stats.winRate != null ? `${stats.winRate}%` : null} label="نرخ برد" color="text-primary" />
+                <StatCard value={ranking.rank != null ? `#${ranking.rank}` : null} label="رنک" color="text-primary" />
+                <StatCard value={ranking.points} label="امتیاز" color="text-foreground" />
+                <StatCard value={ranking.matchesCount} label="مچ" color="text-emerald-600" />
+                <StatCard value={ranking.tournamentsCount} label="تورنومنت" color="text-amber-600" />
               </div>
             </div>
           )}
 
+          {!loading && (
+            <div className="mx-5 rounded-2xl border border-border bg-card p-3 mb-4">
+              <div className="flex items-center gap-1.5 font-bold text-foreground text-sm mb-2">
+                <TrendingUpIcon className="w-4 h-4 text-primary" />
+                تاریخچه مچ‌ها
+              </div>
+              {recentMatches.length === 0 ? (
+                <p className="text-xs text-muted-foreground">تاریخچه مچی ثبت نشده است.</p>
+              ) : (
+                <div className="space-y-2">
+                  {recentMatches.map((match) => {
+                    const dateLabel = formatFaDate(match.scheduledAt ?? match.joinedAt, {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                    });
+                    return (
+                      <div key={`${match.matchId}-${match.joinedAt}`} className="rounded-xl border border-border/70 bg-muted/20 px-3 py-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-semibold text-foreground truncate">{match.title ?? "مسابقه"}</p>
+                          <MatchResultBadge isWin={match.isWin} />
+                        </div>
+                        <div className="mt-1 flex items-center gap-2 text-[11px] text-muted-foreground">
+                          <span>{SPORT_EMOJI[match.sportType] ?? "🎾"} {match.sportType ?? "-"}</span>
+                          <span>•</span>
+                          <span>{dateLabel ?? "-"}</span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {!loading && (
+            <div className="mx-5 rounded-2xl border border-border bg-card p-3 mb-4">
+              <div className="flex items-center gap-1.5 font-bold text-foreground text-sm mb-2">
+                <TrophyIcon className="w-4 h-4 text-amber-500" />
+                تورنومنت‌ها
+              </div>
+              {recentTournaments.length === 0 ? (
+                <p className="text-xs text-muted-foreground">تورنومنتی برای این بازیکن ثبت نشده است.</p>
+              ) : (
+                <div className="space-y-2">
+                  {recentTournaments.map((item) => {
+                    const startDateLabel = formatFaDate(item.startDate, {
+                      year: "numeric",
+                      month: "short",
+                      day: "numeric",
+                    });
+                    return (
+                      <div key={item.registrationId} className="rounded-xl border border-border/70 bg-muted/20 px-3 py-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-semibold text-foreground truncate">{item.title ?? "تورنومنت"}</p>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted border border-border text-muted-foreground">
+                            {TOURNAMENT_STATUS_LABEL[item.status] ?? item.status ?? "-"}
+                          </span>
+                        </div>
+                        <div className="mt-1 text-[11px] text-muted-foreground">
+                          {SPORT_EMOJI[item.sportType] ?? "🎾"} {item.sportType ?? "-"} • شروع: {startDateLabel ?? "-"}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Joined date */}
-          {!loading && joinedYear && (
+          {!loading && joinedDateLabel && (
             <div className="mx-5 mb-6 flex items-center gap-2 px-4 py-3 rounded-2xl bg-muted/50 border border-border">
               <CalendarIcon className="w-4 h-4 text-muted-foreground shrink-0" />
               <span className="text-sm text-muted-foreground">
-                عضو از <span className="font-semibold text-foreground">{joinedYear}</span>
+                عضو از <span className="font-semibold text-foreground">{joinedDateLabel}</span>
               </span>
             </div>
           )}

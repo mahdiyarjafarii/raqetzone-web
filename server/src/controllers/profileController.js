@@ -1,6 +1,15 @@
-import { eq, and, desc, gte, asc } from "drizzle-orm";
+import { eq, and, desc, gte, asc, gt, isNull, or, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { users, matchParticipants, matches, bookings } from "../db/schema.js";
+import {
+  bookings,
+  clubs,
+  matchParticipants,
+  matches,
+  tournamentRegistrations,
+  tournaments,
+  userRankings,
+  users,
+} from "../db/schema.js";
 
 // ─── XP / Level helpers ───────────────────────────────────────────────────────
 
@@ -11,6 +20,13 @@ const TEHRAN_TIME_ZONE = "Asia/Tehran";
 
 function getDatePart(parts, type) {
   return parts.find((part) => part.type === type)?.value;
+}
+
+function toDate(value) {
+  if (!value) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 function formatDateKeyInTehran(date = new Date()) {
@@ -246,6 +262,9 @@ export const updateSportsProfileController = async (req, res) => {
 export const getPublicProfileController = async (req, res) => {
   try {
     const { userId } = req.params;
+    const sport = typeof req.query.sport === "string" && req.query.sport.trim()
+      ? req.query.sport.trim()
+      : "padel";
 
     const [user] = await db
       .select({
@@ -268,13 +287,85 @@ export const getPublicProfileController = async (req, res) => {
     const participations = await db
       .select({
         matchId: matchParticipants.matchId,
+        team: matchParticipants.team,
         isWin: matchParticipants.isWin,
         joinedAt: matchParticipants.joinedAt,
+        matchTitle: matches.title,
+        matchLocation: matches.location,
+        matchScheduledAt: matches.scheduledAt,
+        matchStatus: matches.status,
         matchSportType: matches.sportType,
       })
       .from(matchParticipants)
       .innerJoin(matches, eq(matchParticipants.matchId, matches.id))
       .where(eq(matchParticipants.userId, userId));
+
+    const [rankingRow] = await db
+      .select({
+        points: sql`COALESCE(${userRankings.points}, 0)`,
+        matchPoints: sql`COALESCE(${userRankings.matchPoints}, 0)`,
+        tournamentPoints: sql`COALESCE(${userRankings.tournamentPoints}, 0)`,
+        matchesCount: sql`COALESCE(${userRankings.matchesCount}, 0)`,
+        tournamentsCount: sql`COALESCE(${userRankings.tournamentsCount}, 0)`,
+      })
+      .from(users)
+      .leftJoin(userRankings, and(eq(userRankings.userId, users.id), eq(userRankings.sportType, sport)))
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    const userCreatedAt = toDate(user.createdAt);
+    const tieBreakerCondition = userCreatedAt ? gt(users.createdAt, userCreatedAt) : sql`false`;
+    const userPoints = Number(rankingRow?.points ?? 0);
+
+    const [rankCountRow] = await db
+      .select({ count: sql`count(*)` })
+      .from(users)
+      .leftJoin(userRankings, and(eq(userRankings.userId, users.id), eq(userRankings.sportType, sport)))
+      .leftJoin(clubs, eq(clubs.ownerId, users.id))
+      .where(
+        and(
+          isNull(clubs.ownerId),
+          or(
+            sql`COALESCE(${userRankings.points}, 0) > ${userPoints}`,
+            and(
+              sql`COALESCE(${userRankings.points}, 0) = ${userPoints}`,
+              tieBreakerCondition
+            )
+          )
+        )
+      );
+
+    const recentMatches = [...participations]
+      .sort((a, b) => new Date(b.joinedAt).getTime() - new Date(a.joinedAt).getTime())
+      .slice(0, 6)
+      .map((p) => ({
+        matchId: p.matchId,
+        title: p.matchTitle,
+        location: p.matchLocation,
+        sportType: p.matchSportType,
+        scheduledAt: p.matchScheduledAt,
+        status: p.matchStatus,
+        team: p.team,
+        isWin: p.isWin,
+        joinedAt: p.joinedAt,
+      }));
+
+    const recentTournaments = await db
+      .select({
+        registrationId: tournamentRegistrations.id,
+        tournamentId: tournaments.id,
+        title: tournaments.title,
+        status: tournaments.status,
+        sportType: tournaments.sportType,
+        startDate: tournaments.startDate,
+        endDate: tournaments.endDate,
+        registeredAt: tournamentRegistrations.registeredAt,
+      })
+      .from(tournamentRegistrations)
+      .innerJoin(tournaments, eq(tournamentRegistrations.tournamentId, tournaments.id))
+      .where(eq(tournamentRegistrations.userId, userId))
+      .orderBy(desc(tournamentRegistrations.registeredAt))
+      .limit(6);
 
     const totalMatches = participations.length;
     const decidedMatches = participations.filter((p) => p.isWin !== null);
@@ -294,6 +385,17 @@ export const getPublicProfileController = async (req, res) => {
       user,
       stats: { totalMatches, wins, winRate },
       level: { current: currentLevel, xp: earnedXp, progressXp, neededXp, progressPct, rank },
+      ranking: {
+        sportType: sport,
+        rank: Number(rankCountRow?.count ?? 0) + 1,
+        points: userPoints,
+        matchPoints: Number(rankingRow?.matchPoints ?? 0),
+        tournamentPoints: Number(rankingRow?.tournamentPoints ?? 0),
+        matchesCount: Number(rankingRow?.matchesCount ?? 0),
+        tournamentsCount: Number(rankingRow?.tournamentsCount ?? 0),
+      },
+      recentMatches,
+      recentTournaments,
     });
   } catch (error) {
     console.error("getPublicProfile error:", error);

@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { useAtomValue } from "jotai";
 import { currentUserAtom } from "@/config/state";
 import UserAvatar from "@/components/ui/UserAvatar";
+import UserProfileSheet from "@/components/ui/UserProfileSheet";
 
 const TOP_BADGES = {
   1: "bg-amber-500/15 text-amber-600 border-amber-500/25",
@@ -42,6 +43,7 @@ export default function LeaderboardSection({ mode = "embedded" }) {
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, totalPages: 1, limit: 100, offset: 0 });
   const [currentUserRank, setCurrentUserRank] = useState(null);
+  const [viewingUser, setViewingUser] = useState(null);
 
   const pageSize = isFullPage ? 50 : 100;
 
@@ -170,7 +172,11 @@ export default function LeaderboardSection({ mode = "embedded" }) {
               <span className={cn("inline-flex items-center justify-center rounded-full border px-2 py-0.5 text-[10px] font-bold", TOP_BADGES[row.rank])}>
                 #{row.rank}
               </span>
-              <div className="mt-2 flex items-center justify-center gap-1.5 min-w-0">
+              <button
+                type="button"
+                onClick={() => setViewingUser({ userId: row.userId, name: getDisplayName(row, row.rank), image: row.image, sport })}
+                className="mt-2 w-full flex items-center justify-center gap-1.5 min-w-0"
+              >
                 <UserAvatar
                   image={row.image}
                   name={getDisplayName(row, row.rank)}
@@ -180,7 +186,7 @@ export default function LeaderboardSection({ mode = "embedded" }) {
                 <p className="text-xs font-bold text-foreground truncate max-w-[90px]">
                   {getDisplayName(row, row.rank)}
                 </p>
-              </div>
+              </button>
               <p className="mt-1 text-sm font-black text-primary inline-flex items-center justify-center gap-1">
                 {row.points}
                 {RANK_MEDALS[row.rank] ? <span>{RANK_MEDALS[row.rank]}</span> : null}
@@ -222,7 +228,11 @@ export default function LeaderboardSection({ mode = "embedded" }) {
                   >
                     <td className="px-2 py-2 font-bold">{row.rank}</td>
                     <td className="px-2 py-2 max-w-[180px]">
-                      <div className="flex items-center gap-2 min-w-0">
+                      <button
+                        type="button"
+                        onClick={() => setViewingUser({ userId: row.userId, name: getDisplayName(row, row.rank), image: row.image, sport })}
+                        className="w-full flex items-center gap-2 min-w-0 text-right"
+                      >
                         <UserAvatar
                           image={row.image}
                           name={getDisplayName(row, row.rank)}
@@ -233,7 +243,7 @@ export default function LeaderboardSection({ mode = "embedded" }) {
                         {currentUser?.id && String(row.userId) === String(currentUser.id) && (
                           <span className="text-[10px] font-bold text-primary shrink-0">(شما)</span>
                         )}
-                      </div>
+                      </button>
                     </td>
                     <td className="px-2 py-2 font-bold">
                       <span className="inline-flex items-center gap-1">
@@ -282,6 +292,16 @@ export default function LeaderboardSection({ mode = "embedded" }) {
         </div>
         برد در هر مچ تاییدشده: ۳ امتیاز · تورنومنت: بر اساس جدول نهایی و امتیاز پایه تورنومنت
       </div>
+
+      {viewingUser && (
+        <UserProfileSheet
+          userId={viewingUser.userId}
+          name={viewingUser.name}
+          image={viewingUser.image}
+          sportType={viewingUser.sport}
+          onClose={() => setViewingUser(null)}
+        />
+      )}
     </div>
   );
 }
