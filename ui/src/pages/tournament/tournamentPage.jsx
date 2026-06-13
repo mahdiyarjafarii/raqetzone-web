@@ -21,11 +21,13 @@ import MatchDetailSheet from "@/components/tournament/MatchDetailSheet";
 import JoinConfirmModal from "@/components/tournament/JoinConfirmModal";
 import CreateMatchSheet from "@/components/tournament/CreateMatchSheet";
 import TournamentListSection from "@/features/tournaments/components/TournamentListSection";
+import LeaderboardSection from "@/features/ranking/LeaderboardSection";
 import { cn } from "@/lib/utils";
 
 const MAIN_TABS = [
   { value: "matchmaking", label: "بازی‌ها", icon: <ZapIcon className="w-3.5 h-3.5" /> },
   { value: "tournaments", label: "تورنومنت", icon: <TrophyIcon className="w-3.5 h-3.5" /> },
+  { value: "leaderboard", label: "رنکینگ", icon: <TrophyIcon className="w-3.5 h-3.5" /> },
 ];
 
 function MatchmakingSection() {
@@ -143,7 +145,11 @@ export default function TournamentPage() {
           animate={{ opacity: 1, y: 0 }}
           className="text-2xl font-black mb-1"
         >
-          {activeTab === "matchmaking" ? "مسابقات" : "تورنومنت‌ها"}
+          {activeTab === "matchmaking"
+            ? "مسابقات"
+            : activeTab === "tournaments"
+            ? "تورنومنت‌ها"
+            : "رنکینگ"}
         </motion.h1>
         <motion.p
           initial={{ opacity: 0, y: -6 }}
@@ -153,7 +159,9 @@ export default function TournamentPage() {
         >
           {activeTab === "matchmaking"
             ? "به مسابقه‌ای بپیوند یا یک مسابقه جدید بساز"
-            : "تورنومنت‌های کلاب‌ها را کشف کن و ثبت‌نام کن"}
+            : activeTab === "tournaments"
+            ? "تورنومنت‌های کلاب‌ها را کشف کن و ثبت‌نام کن"
+            : "جدول رتبه‌بندی بازیکنان را ببین"}
         </motion.p>
 
         {/* Tab switcher */}
@@ -172,6 +180,8 @@ export default function TournamentPage() {
                 activeTab === tab.value
                   ? tab.value === "tournaments"
                     ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-sm"
+                    : tab.value === "leaderboard"
+                    ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-sm"
                     : "bg-background text-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
               )}
@@ -195,7 +205,7 @@ export default function TournamentPage() {
             >
               <MatchmakingSection />
             </motion.div>
-          ) : (
+          ) : activeTab === "tournaments" ? (
             <motion.div
               key="tournaments"
               initial={{ opacity: 0, x: 20 }}
@@ -204,6 +214,16 @@ export default function TournamentPage() {
               transition={{ duration: 0.2 }}
             >
               <TournamentListSection isClubOwner={isClubOwner} />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="leaderboard"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.2 }}
+            >
+              <LeaderboardSection mode="full" />
             </motion.div>
           )}
         </AnimatePresence>

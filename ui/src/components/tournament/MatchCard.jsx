@@ -33,7 +33,7 @@ function useCountdown(targetDate) {
 }
 
 const SPORT_ICONS = {
-  padel: "🏓",
+  padel: "🥎",
   tennis: "🎾",
   squash: "🟡",
   badminton: "🏸",
@@ -74,6 +74,10 @@ export default function MatchCard({ match, onClick, index = 0 }) {
   const totalSlots = match.teamSize * 2;
   const filledSlots = match.teamA.length + match.teamB.length;
   const isFull = match.status === "full";
+  const isInProgress = Boolean(match.isInProgress);
+  const awaitingResult = Boolean(match.awaitingResult);
+  const hasStatusBadge = isInProgress || awaitingResult || isFull;
+  const badgeCount = Number(Boolean(match.isCertified)) + Number(hasStatusBadge);
   const sportIcon = SPORT_ICONS[match.sportType] ?? "🏅";
   const accentBorder = SPORT_ACCENT[match.sportType] ?? "border-l-primary";
   const countdown = useCountdown(match.scheduledAt);
@@ -93,33 +97,43 @@ export default function MatchCard({ match, onClick, index = 0 }) {
     >
       <div
         className={cn(
-          "relative rounded-2xl border border-border bg-card overflow-hidden shadow-sm",
+          "relative rounded-2xl border border-border/80 bg-gradient-to-br from-card via-card to-muted/20 overflow-hidden shadow-sm",
           "border-l-4",
           accentBorder
         )}
       >
-        {/* Certified badge */}
-        {match.isCertified && (
-          <div className="absolute top-3 left-3 bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold px-2 py-1 rounded-full border border-emerald-500/30 z-10 flex items-center gap-1">
-            <span>✓</span> گارانتی رکت‌زون
-          </div>
-        )}
+        <div className="absolute top-3 left-3 z-10 flex flex-col items-start gap-1.5">
+          {match.isCertified && (
+            <div className="bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold px-2 py-1 rounded-full border border-emerald-500/30 flex items-center gap-1">
+              <span>✓</span> گارانتی رکت‌زون
+            </div>
+          )}
 
-        {/* Full badge */}
-        {isFull && (
-          <div className="absolute top-3 left-3 bg-destructive/10 text-destructive text-[10px] font-bold px-2 py-1 rounded-full border border-destructive/20 uppercase tracking-wider z-10">
-            پر شد
-          </div>
-        )}
+          {isInProgress ? (
+            <div className="bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[10px] font-bold px-2 py-1 rounded-full border border-blue-500/25 uppercase tracking-wider">
+              در حال برگزاری
+            </div>
+          ) : awaitingResult ? (
+            <div className="bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] font-bold px-2 py-1 rounded-full border border-amber-500/25 uppercase tracking-wider">
+              انتظار نتیجه
+            </div>
+          ) : isFull ? (
+            <div className="bg-destructive/10 text-destructive text-[10px] font-bold px-2 py-1 rounded-full border border-destructive/20 uppercase tracking-wider">
+              پر شد
+            </div>
+          ) : null}
+        </div>
 
-        <div className={cn("p-4", (match.isCertified || isFull) && "pt-12")}>
+        <div className={cn("p-4", badgeCount === 2 ? "pt-16" : badgeCount === 1 ? "pt-12" : "pt-4")}>
           {/* Header */}
           <div className="flex items-start justify-between gap-2 mb-3">
             <div className="flex items-center gap-2">
               <span className="text-2xl">{sportIcon}</span>
               <div>
                 <h3 className="text-card-foreground font-bold text-base leading-tight">{match.title}</h3>
-                <span className="text-muted-foreground text-xs capitalize">{match.sportType}</span>
+                <span className="inline-flex items-center mt-1 rounded-full border border-border bg-background/65 px-2 py-0.5 text-muted-foreground text-[11px] capitalize">
+                  {match.sportType}
+                </span>
               </div>
             </div>
             <ChevronRightIcon className="w-4 h-4 text-muted-foreground mt-1 shrink-0 rotate-180" />
@@ -128,26 +142,34 @@ export default function MatchCard({ match, onClick, index = 0 }) {
           {/* Info */}
           <div className="space-y-1.5 mb-4">
             {creator?.name && (
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); setViewingCreator(creator); }}
-                className="flex items-center gap-2 text-xs w-full text-right active:opacity-70 transition-opacity"
-              >
-                {creator.image ? (
-                  <UserAvatar
-                    image={creator.image}
-                    name={creator.name}
-                    className="h-5 w-5 rounded-full text-[9px] text-white shrink-0"
-                    fallbackClassName="h-5 w-5 rounded-full bg-primary text-primary-foreground text-[9px] shrink-0"
-                  />
-                ) : (
-                  <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center shrink-0">
-                    <UserIcon className="w-3 h-3 text-muted-foreground" />
-                  </div>
-                )}
+              <div className="flex items-center gap-1.5 text-xs">
                 <span className="text-muted-foreground shrink-0">سازنده:</span>
-                <span className="font-bold text-foreground truncate">{creator.name}</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (creator.id) setViewingCreator(creator);
+                  }}
+                  className={cn(
+                    "inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-background/70 px-2 py-1 text-foreground",
+                    "active:scale-95 transition-transform"
+                  )}
+                >
+                  {creator.image ? (
+                    <UserAvatar
+                      image={creator.image}
+                      name={creator.name}
+                      className="h-5 w-5 rounded-full text-[9px] text-white shrink-0"
+                      fallbackClassName="h-5 w-5 rounded-full bg-primary text-primary-foreground text-[9px] shrink-0"
+                    />
+                  ) : (
+                    <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center shrink-0">
+                      <UserIcon className="w-3 h-3 text-muted-foreground" />
+                    </div>
+                  )}
+                  <span className="font-bold truncate max-w-[120px]">{creator.name}</span>
+                </button>
+              </div>
             )}
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-muted-foreground text-xs">
@@ -168,7 +190,7 @@ export default function MatchCard({ match, onClick, index = 0 }) {
           </div>
 
           {/* Teams preview */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 rounded-xl border border-border/70 bg-background/60 px-2.5 py-2">
             {/* Team A */}
             <div className="flex -space-x-1.5">
               {Array.from({ length: match.teamSize }).map((_, i) => {

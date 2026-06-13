@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { MapPinIcon, ChevronLeftIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const SPORT_ICONS = { padel: "🏓", tennis: "🎾", squash: "🟡", badminton: "🏸" };
+const SPORT_ICONS = { padel: "🥎", tennis: "🎾", squash: "🟡", badminton: "🏸" };
 
 function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString("fa-IR", {

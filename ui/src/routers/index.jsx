@@ -15,6 +15,7 @@ const NotFoundPage = lazy(() => import("@/pages/404Page"));
 const ProfilePage = lazy(() => import("@/pages/user/ProfilePage"));
 const HomePage = lazy(() => import("@/pages/HomePage"));
 const TournamentPage = lazy(() => import("@/pages/tournament/tournamentPage"));
+const LeaderboardPage = lazy(() => import("@/pages/LeaderboardPage"));
 const NotificationsPage = lazy(() => import("@/pages/notifications/NotificationsPage"));
 const ClubsPage = lazy(() => import("@/pages/clubs/ClubsPage"));
 const ClubDetailPage = lazy(() => import("@/pages/clubs/ClubDetailPage"));
@@ -47,6 +48,7 @@ const router = createBrowserRouter([
       { index: true, element: s(HomePage) },
       { path: "ai", element: s(AiPage) },
       { path: "tournament", element: s(TournamentPage) },
+      { path: "leaderboard", element: s(LeaderboardPage) },
       { path: "clubs", element: s(ClubsPage) },
       { path: "clubs/:clubId", element: s(ClubDetailPage) },
       { path: "mybooking", element: s(MyBookingPage) },

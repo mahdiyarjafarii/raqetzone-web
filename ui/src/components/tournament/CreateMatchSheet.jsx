@@ -15,7 +15,7 @@ import {
 import apiClient from "@/lib/apiClient";
 
 const SPORTS = [
-  { value: "padel", label: "پدل", icon: "🏓" },
+  { value: "padel", label: "پدل", icon: "🥎" },
   { value: "tennis", label: "تنیس", icon: "🎾" },
   { value: "squash", label: "اسکواش", icon: "🟡" },
   { value: "badminton", label: "بدمینتون", icon: "🏸" },

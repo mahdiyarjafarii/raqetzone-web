@@ -10,6 +10,7 @@ import { CameraIcon, MapPinIcon, UserCircleIcon } from "lucide-react";
 import { showOnboardingSheetAtom, currentUserAtom } from "@/config/state";
 import apiClient from "@/lib/apiClient";
 import authStorage from "@/auth/storage";
+import { profileService } from "@/features/profile/services/profileService";
 import { cn } from "@/lib/utils";
 
 // ── data ──────────────────────────────────────────────────────────────────────
@@ -45,8 +46,6 @@ const PROVINCES = [
 
 // 0=welcome, 1=profile, 2=photo, 3=sport, 4=level, 5=duration
 const TOTAL_STEPS = 6;
-const MAX_ONBOARDING_IMAGE_SIZE_MB = 5;
-const MAX_ONBOARDING_IMAGE_SIZE_BYTES = MAX_ONBOARDING_IMAGE_SIZE_MB * 1024 * 1024;
 
 const getOnboardingUserImage = (image) => {
   if (!image) return null;
@@ -199,7 +198,7 @@ function ProvincePickerSheet({ open, onClose, query, onQueryChange, provinces, o
   );
 }
 
-function StepPhoto({ preview, onSelect, uploading }) {
+function StepPhoto({ preview, onSelect, uploading, uploadProgress }) {
   const inputRef = useRef(null);
 
   return (
@@ -250,6 +249,21 @@ function StepPhoto({ preview, onSelect, uploading }) {
           <CameraIcon className="w-4 h-4" />
           {uploading ? "در حال آپلود..." : preview ? "عوض کردن عکس" : "انتخاب عکس"}
         </button>
+
+        {uploading && (
+          <div className="w-full max-w-xs space-y-1">
+            <div className="flex items-center justify-between text-[11px] text-muted-foreground font-medium">
+              <span>در حال آپلود تصویر</span>
+              <span>{uploadProgress}%</span>
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-full rounded-full bg-primary transition-all duration-200"
+                style={{ width: `${uploadProgress}%` }}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -407,6 +421,7 @@ export default function OnboardingSheet() {
   const [provinceQuery, setProvinceQuery] = useState("");
   const [photoPreview, setPhotoPreview] = useState(null);
   const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoUploadProgress, setPhotoUploadProgress] = useState(0);
   const [sports, setSports] = useState(["padel"]);
   const [level, setLevel] = useState("beginner");
   const [weeklyHours, setWeeklyHours] = useState("2");
@@ -428,6 +443,7 @@ export default function OnboardingSheet() {
     const localUrl = URL.createObjectURL(file);
     setPhotoPreview(localUrl);
     setPhotoUploading(true);
+    setPhotoUploadProgress(0);
     try {
       const startPayload = {
         name: file?.name,
@@ -438,47 +454,28 @@ export default function OnboardingSheet() {
       console.log("Onboarding image upload start:", startPayload);
       sendOnboardingUploadDebugLog("onboarding_upload_start", startPayload);
 
-      if (file?.size > MAX_ONBOARDING_IMAGE_SIZE_BYTES) {
-        const message = `حجم عکس نباید بیشتر از ${MAX_ONBOARDING_IMAGE_SIZE_MB} مگابایت باشد`;
-        sendOnboardingUploadDebugLog("onboarding_upload_rejected_client_size", {
-          ...startPayload,
-          maxSizeMb: MAX_ONBOARDING_IMAGE_SIZE_MB,
-        });
-        toast.error(message);
-        setPhotoPreview(null);
-        return;
-      }
-
-      const form = new FormData();
-      form.append("image", file);
-      const res = await fetch(`${import.meta.env.VITE_WEBSITE_URL}/api/users/upload-image`, {
-        method: "POST",
-        headers: { "x-auth-token": authStorage.getToken() ?? "" },
-        body: form,
+      const res = await profileService.uploadImage(file, {
+        onProgress: (percent) => {
+          setPhotoUploadProgress(percent);
+        },
       });
-      const data = await res.json().catch(() => ({}));
       const responsePayload = {
-        status: res.status,
+        status: res?.status,
         ok: res.ok,
-        data,
+        data: res.data,
       };
       console.log("Onboarding image upload response:", responsePayload);
       sendOnboardingUploadDebugLog("onboarding_upload_response", responsePayload);
 
-      if (res.status === 413 && !data?.message) {
-        toast.error(`حجم عکس نباید بیشتر از ${MAX_ONBOARDING_IMAGE_SIZE_MB} مگابایت باشد`);
+      if (!res.ok || !res.data?.user) {
+        toast.error(res.data?.message ?? "خطا در آپلود عکس");
         setPhotoPreview(null);
         return;
       }
 
-      if (!res.ok) {
-        toast.error(data?.message ?? "خطا در آپلود عکس");
-        setPhotoPreview(null);
-      } else if (data?.user) {
-        setCurrentUser(data.user);
-        const uploadedImageUrl = getOnboardingUserImage(data.user.image);
-        if (uploadedImageUrl) setPhotoPreview(`${uploadedImageUrl}?v=${Date.now()}`);
-      }
+      setCurrentUser(res.data.user);
+      const uploadedImageUrl = getOnboardingUserImage(res.data.user.image);
+      if (uploadedImageUrl) setPhotoPreview(`${uploadedImageUrl}?v=${Date.now()}`);
     } catch (error) {
       console.error("Onboarding image upload failed:", error);
       sendOnboardingUploadDebugLog("onboarding_upload_failed", {
@@ -489,6 +486,7 @@ export default function OnboardingSheet() {
       setPhotoPreview(null);
     } finally {
       setPhotoUploading(false);
+      setPhotoUploadProgress(0);
     }
   };
 
@@ -557,6 +555,7 @@ export default function OnboardingSheet() {
                 preview={photoPreview}
                 onSelect={handlePhotoSelect}
                 uploading={photoUploading}
+                uploadProgress={photoUploadProgress}
               />
             )}
             {step === 3 && <StepSport value={sports} onChange={setSports} />}

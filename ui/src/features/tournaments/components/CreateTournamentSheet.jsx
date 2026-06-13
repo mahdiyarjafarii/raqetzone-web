@@ -17,7 +17,7 @@ import { createTournamentOpenAtom, tournamentsAtom } from "../store/tournamentSt
 import { tournamentService } from "../services/tournamentService";
 
 const SPORTS = [
-  { value: "padel",     label: "پدل",      icon: "🏓" },
+  { value: "padel",     label: "پدل",      icon: "🥎" },
   { value: "tennis",    label: "تنیس",      icon: "🎾" },
   { value: "squash",    label: "اسکواش",    icon: "🟡" },
   { value: "badminton", label: "بدمینتون",  icon: "🏸" },

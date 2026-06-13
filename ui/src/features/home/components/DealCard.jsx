@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { useCountdown } from "../hooks/useCountdown";
 import { cn } from "@/lib/utils";
 
-const SPORT_ICONS = { padel: "🏓", tennis: "🎾", squash: "🟡", badminton: "🏸" };
+const SPORT_ICONS = { padel: "🥎", tennis: "🎾", squash: "🟡", badminton: "🏸" };
 
 function pad(n) {
   return String(n).padStart(2, "0");

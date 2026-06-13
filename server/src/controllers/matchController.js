@@ -1,8 +1,19 @@
 import { eq, and, asc, ne, gte, lte, notInArray, inArray } from "drizzle-orm";
 import { randomBytes } from "crypto";
 import { db } from "../db/index.js";
-import { matches, matchParticipants, matchRatings, users, courts, bookings, slotOverrides } from "../db/schema.js";
+import {
+  matches,
+  matchParticipants,
+  matchRatings,
+  matchResults,
+  matchResultVotes,
+  users,
+  courts,
+  bookings,
+  slotOverrides,
+} from "../db/schema.js";
 import { sendSMS } from "../utils/sms.js";
+import { awardRankingPoints, MATCH_WIN_POINTS } from "../utils/ranking.js";
 
 const RATING_TAGS = [
   "وقت‌شناس", "خوش‌اخلاق", "تیمی", "رقابتی", "مبتدی‌فرندلی",
@@ -11,6 +22,8 @@ const RATING_TAGS = [
 
 const SPORT_TYPES = ["padel", "tennis", "squash", "badminton", "ping-pong"];
 const TEHRAN_OFFSET = "+03:30";
+const MATCH_DURATION_MINUTES = 90;
+const AWAITING_RESULT_GRACE_MS = 24 * 60 * 60 * 1000;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -48,6 +61,203 @@ async function enrichMatch(match) {
 
   return { ...withMatchState(match), creator, teamA, teamB };
 }
+
+export const getMatchResultController = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [match] = await db
+      .select()
+      .from(matches)
+      .where(eq(matches.id, id))
+      .limit(1);
+
+    if (!match) return res.status(404).json({ message: "مسابقه یافت نشد" });
+
+    const expired = await expireAwaitingResultMatchIfNeeded(match);
+    if (expired) {
+      return res.status(410).json({ message: "مهلت ثبت نتیجه این بازی تمام شده است" });
+    }
+
+    const payload = await buildMatchResultPayload(match, req.user.id);
+    return res.status(200).json(payload);
+  } catch (error) {
+    console.error("getMatchResult error:", error);
+    return res.status(500).json({ message: "خطای سرور" });
+  }
+};
+
+export const submitMatchResultController = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const { sets } = req.body;
+
+    const [match] = await db
+      .select()
+      .from(matches)
+      .where(eq(matches.id, id))
+      .limit(1);
+
+    if (!match) return res.status(404).json({ message: "مسابقه یافت نشد" });
+
+    const expired = await expireAwaitingResultMatchIfNeeded(match);
+    if (expired) {
+      return res.status(410).json({ message: "مهلت ثبت نتیجه این بازی تمام شده است" });
+    }
+
+    if (!hasMatchEnded(match)) {
+      return res.status(400).json({ message: "نتیجه‌گذاری بعد از پایان زمان بازی فعال می‌شود" });
+    }
+    if (match.status === "cancelled") {
+      return res.status(409).json({ message: "برای بازی لغوشده نمی‌توان نتیجه ثبت کرد" });
+    }
+
+    const [participant] = await db
+      .select({ id: matchParticipants.id })
+      .from(matchParticipants)
+      .where(and(eq(matchParticipants.matchId, id), eq(matchParticipants.userId, userId)))
+      .limit(1);
+
+    if (!participant) {
+      return res.status(403).json({ message: "فقط بازیکنان همین مسابقه می‌توانند نتیجه ثبت کنند" });
+    }
+
+    const normalizedSets = normalizeMatchScoreSets(sets);
+    if (!normalizedSets) {
+      return res.status(400).json({ message: "فرمت نتیجه نامعتبر است" });
+    }
+
+    const winnerTeam = computeWinnerTeamFromSets(normalizedSets);
+    if (!winnerTeam) {
+      return res.status(400).json({ message: "از مجموع ست‌ها برنده مشخص نیست" });
+    }
+
+    const [existingResult] = await db
+      .select()
+      .from(matchResults)
+      .where(eq(matchResults.matchId, id))
+      .limit(1);
+
+    let resultId = existingResult?.id;
+
+    if (existingResult?.status === "confirmed") {
+      return res.status(409).json({ message: "نتیجه این مسابقه قبلاً نهایی شده است" });
+    }
+
+    if (existingResult) {
+      await db
+        .update(matchResults)
+        .set({
+          submittedByUserId: userId,
+          winnerTeam,
+          scoreSets: normalizedSets,
+          status: "pending",
+          confirmedAt: null,
+          updatedAt: new Date(),
+        })
+        .where(eq(matchResults.id, existingResult.id));
+
+      await db
+        .delete(matchResultVotes)
+        .where(eq(matchResultVotes.matchResultId, existingResult.id));
+    } else {
+      const [createdResult] = await db
+        .insert(matchResults)
+        .values({
+          matchId: id,
+          submittedByUserId: userId,
+          winnerTeam,
+          scoreSets: normalizedSets,
+          status: "pending",
+        })
+        .returning();
+
+      resultId = createdResult.id;
+    }
+
+    await db
+      .insert(matchResultVotes)
+      .values({ matchResultId: resultId, userId, vote: "confirm" })
+      .onConflictDoUpdate({
+        target: [matchResultVotes.matchResultId, matchResultVotes.userId],
+        set: { vote: "confirm", updatedAt: new Date() },
+      });
+
+    await evaluateMatchResultStatus(match, resultId);
+
+    const payload = await buildMatchResultPayload(match, userId);
+    return res.status(200).json({ message: "نتیجه ثبت شد", ...payload });
+  } catch (error) {
+    console.error("submitMatchResult error:", error);
+    return res.status(500).json({ message: "خطای سرور" });
+  }
+};
+
+export const voteMatchResultController = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const { vote } = req.body;
+
+    if (!vote || !["confirm", "reject"].includes(vote)) {
+      return res.status(400).json({ message: "رای نامعتبر است" });
+    }
+
+    const [match] = await db
+      .select()
+      .from(matches)
+      .where(eq(matches.id, id))
+      .limit(1);
+
+    if (!match) return res.status(404).json({ message: "مسابقه یافت نشد" });
+
+    const expired = await expireAwaitingResultMatchIfNeeded(match);
+    if (expired) {
+      return res.status(410).json({ message: "مهلت ثبت نتیجه این بازی تمام شده است" });
+    }
+
+    const [participant] = await db
+      .select({ id: matchParticipants.id })
+      .from(matchParticipants)
+      .where(and(eq(matchParticipants.matchId, id), eq(matchParticipants.userId, userId)))
+      .limit(1);
+
+    if (!participant) {
+      return res.status(403).json({ message: "فقط بازیکنان همین مسابقه می‌توانند رای دهند" });
+    }
+
+    const [resultRow] = await db
+      .select()
+      .from(matchResults)
+      .where(eq(matchResults.matchId, id))
+      .limit(1);
+
+    if (!resultRow) {
+      return res.status(404).json({ message: "ابتدا باید نتیجه‌ای ثبت شود" });
+    }
+
+    if (resultRow.status === "confirmed") {
+      return res.status(409).json({ message: "نتیجه این مسابقه نهایی شده است" });
+    }
+
+    await db
+      .insert(matchResultVotes)
+      .values({ matchResultId: resultRow.id, userId, vote })
+      .onConflictDoUpdate({
+        target: [matchResultVotes.matchResultId, matchResultVotes.userId],
+        set: { vote, updatedAt: new Date() },
+      });
+
+    await evaluateMatchResultStatus(match, resultRow.id);
+
+    const payload = await buildMatchResultPayload(match, userId);
+    return res.status(200).json({ message: "رای شما ثبت شد", ...payload });
+  } catch (error) {
+    console.error("voteMatchResult error:", error);
+    return res.status(500).json({ message: "خطای سرور" });
+  }
+};
 
 function timeToMinutes(value) {
   if (!value || typeof value !== "string") return NaN;
@@ -95,20 +305,242 @@ function hasMatchStarted(match, now = new Date()) {
   return scheduledAt <= now;
 }
 
+function hasMatchEnded(match, now = new Date()) {
+  if (!match?.scheduledAt) return false;
+  const scheduledAt = new Date(match.scheduledAt);
+  if (Number.isNaN(scheduledAt.getTime())) return false;
+  const endAt = new Date(scheduledAt.getTime() + MATCH_DURATION_MINUTES * 60 * 1000);
+  return endAt <= now;
+}
+
+function isMatchInProgress(match, now = new Date()) {
+  if (!match) return false;
+  if (!("status" in match)) return false;
+  if (match.status !== "open" && match.status !== "full") return false;
+  return hasMatchStarted(match, now) && !hasMatchEnded(match, now);
+}
+
 function isMatchAwaitingResult(match, now = new Date()) {
   if (!match) return false;
   if (!("status" in match)) return false;
   if (match.status !== "open" && match.status !== "full") return false;
-  return hasMatchStarted(match, now);
+  return hasMatchEnded(match, now);
+}
+
+function getAwaitingResultDeadline(match) {
+  if (!match?.scheduledAt) return null;
+  const scheduledAt = new Date(match.scheduledAt);
+  if (Number.isNaN(scheduledAt.getTime())) return null;
+  return new Date(scheduledAt.getTime() + MATCH_DURATION_MINUTES * 60 * 1000 + AWAITING_RESULT_GRACE_MS);
+}
+
+function isAwaitingResultWindowExpired(match, now = new Date()) {
+  if (!isMatchAwaitingResult(match, now)) return false;
+  const deadline = getAwaitingResultDeadline(match);
+  if (!deadline) return false;
+  return now > deadline;
+}
+
+async function expireAwaitingResultMatchIfNeeded(match, now = new Date()) {
+  if (!match) return false;
+  if (!isAwaitingResultWindowExpired(match, now)) return false;
+  if (match.status !== "open" && match.status !== "full") return false;
+
+  const [updated] = await db
+    .update(matches)
+    .set({ status: "cancelled", updatedAt: now })
+    .where(and(eq(matches.id, match.id), inArray(matches.status, ["open", "full"])))
+    .returning({ id: matches.id });
+
+  return Boolean(updated);
 }
 
 function withMatchState(match, now = new Date()) {
   const awaitingResult = isMatchAwaitingResult(match, now);
+  const isInProgress = isMatchInProgress(match, now);
   return {
     ...match,
+    isInProgress,
     awaitingResult,
-    isJoinClosed: awaitingResult || match.status !== "open",
+    isJoinClosed: hasMatchStarted(match, now) || match.status !== "open",
   };
+}
+
+function normalizeMatchScoreSets(rawSets) {
+  if (!Array.isArray(rawSets) || rawSets.length === 0) return null;
+
+  const sets = rawSets
+    .map((set) => ({ a: Number(set?.a), b: Number(set?.b) }))
+    .filter((set) => Number.isFinite(set.a) && Number.isFinite(set.b) && set.a >= 0 && set.b >= 0 && set.a !== set.b);
+
+  return sets.length > 0 ? sets : null;
+}
+
+function computeWinnerTeamFromSets(sets) {
+  let aWins = 0;
+  let bWins = 0;
+
+  for (const set of sets) {
+    if (set.a > set.b) aWins += 1;
+    else bWins += 1;
+  }
+
+  if (aWins === bWins) return null;
+  return aWins > bWins ? "A" : "B";
+}
+
+async function getMatchParticipantRows(matchId) {
+  return db
+    .select({
+      userId: matchParticipants.userId,
+      team: matchParticipants.team,
+      name: users.name,
+      image: users.image,
+    })
+    .from(matchParticipants)
+    .innerJoin(users, eq(matchParticipants.userId, users.id))
+    .where(eq(matchParticipants.matchId, matchId));
+}
+
+async function buildMatchResultPayload(match, currentUserId) {
+  const participants = await getMatchParticipantRows(match.id);
+
+  const [result] = await db
+    .select()
+    .from(matchResults)
+    .where(eq(matchResults.matchId, match.id))
+    .limit(1);
+
+  if (!result) {
+    return {
+      result: null,
+      participants,
+      canSubmit: participants.some((p) => String(p.userId) === String(currentUserId))
+        && hasMatchEnded(match)
+        && match.status !== "cancelled",
+      canVote: false,
+      myVote: null,
+      awaitingVotes: [],
+    };
+  }
+
+  const votes = await db
+    .select({
+      userId: matchResultVotes.userId,
+      vote: matchResultVotes.vote,
+      name: users.name,
+    })
+    .from(matchResultVotes)
+    .innerJoin(users, eq(matchResultVotes.userId, users.id))
+    .where(eq(matchResultVotes.matchResultId, result.id));
+
+  const participantIds = new Set(participants.map((p) => String(p.userId)));
+  const confirmIds = new Set(votes.filter((v) => v.vote === "confirm").map((v) => String(v.userId)));
+  const awaitingVotes = participants.filter((p) => !confirmIds.has(String(p.userId))).map((p) => p.userId);
+  const myVote = votes.find((v) => String(v.userId) === String(currentUserId))?.vote ?? null;
+
+  const canVote = participantIds.has(String(currentUserId))
+    && result.status !== "confirmed"
+    && match.status !== "cancelled";
+
+  const canSubmit = participantIds.has(String(currentUserId))
+    && hasMatchEnded(match)
+    && result.status !== "confirmed"
+    && match.status !== "cancelled";
+
+  return {
+    result: {
+      ...result,
+      votes,
+    },
+    participants,
+    canSubmit,
+    canVote,
+    myVote,
+    awaitingVotes,
+  };
+}
+
+async function syncConfirmedMatchResult(match, resultRow) {
+  if (!resultRow?.winnerTeam) return;
+
+  await db
+    .update(matches)
+    .set({ status: "completed", updatedAt: new Date() })
+    .where(eq(matches.id, match.id));
+
+  await db
+    .update(matchParticipants)
+    .set({ isWin: resultRow.winnerTeam === "A" })
+    .where(and(eq(matchParticipants.matchId, match.id), eq(matchParticipants.team, "A")));
+
+  await db
+    .update(matchParticipants)
+    .set({ isWin: resultRow.winnerTeam === "B" })
+    .where(and(eq(matchParticipants.matchId, match.id), eq(matchParticipants.team, "B")));
+
+  const winnerParticipants = await db
+    .select({ userId: matchParticipants.userId })
+    .from(matchParticipants)
+    .where(and(eq(matchParticipants.matchId, match.id), eq(matchParticipants.team, resultRow.winnerTeam)));
+
+  await awardRankingPoints({
+    sourceType: "match",
+    sourceId: match.id,
+    category: "match",
+    sportType: match.sportType,
+    awards: winnerParticipants.map((row) => ({ userId: row.userId, points: MATCH_WIN_POINTS })),
+    metadata: { winnerTeam: resultRow.winnerTeam, sportType: match.sportType },
+  });
+}
+
+async function evaluateMatchResultStatus(match, resultId) {
+  const [resultRow] = await db
+    .select()
+    .from(matchResults)
+    .where(eq(matchResults.id, resultId))
+    .limit(1);
+
+  if (!resultRow || resultRow.status === "confirmed") return;
+
+  const participants = await db
+    .select({ userId: matchParticipants.userId })
+    .from(matchParticipants)
+    .where(eq(matchParticipants.matchId, match.id));
+
+  if (participants.length === 0) return;
+
+  const votes = await db
+    .select({ userId: matchResultVotes.userId, vote: matchResultVotes.vote })
+    .from(matchResultVotes)
+    .where(eq(matchResultVotes.matchResultId, resultId));
+
+  if (votes.some((voteRow) => voteRow.vote === "reject")) {
+    await db
+      .update(matchResults)
+      .set({ status: "disputed", updatedAt: new Date() })
+      .where(eq(matchResults.id, resultId));
+    return;
+  }
+
+  const participantIds = participants.map((p) => String(p.userId));
+  const confirmIds = new Set(votes.filter((v) => v.vote === "confirm").map((v) => String(v.userId)));
+  const allConfirmed = participantIds.every((id) => confirmIds.has(id));
+
+  if (!allConfirmed) {
+    await db
+      .update(matchResults)
+      .set({ status: "pending", updatedAt: new Date() })
+      .where(eq(matchResults.id, resultId));
+    return;
+  }
+
+  await db
+    .update(matchResults)
+    .set({ status: "confirmed", confirmedAt: new Date(), updatedAt: new Date() })
+    .where(eq(matchResults.id, resultId));
+
+  await syncConfirmedMatchResult(match, resultRow);
 }
 
 // ─── Controllers ─────────────────────────────────────────────────────────────
@@ -118,7 +550,11 @@ export const getMatchesController = async (req, res) => {
     const { sport, status } = req.query;
 
     const conditions = [];
-    if (status) conditions.push(eq(matches.status, status));
+    if (status) {
+      conditions.push(eq(matches.status, status));
+    } else {
+      conditions.push(inArray(matches.status, ["open", "full"]));
+    }
     if (sport) conditions.push(eq(matches.sportType, sport));
 
     const rows = await db
@@ -127,7 +563,14 @@ export const getMatchesController = async (req, res) => {
       .where(conditions.length ? and(...conditions) : undefined)
       .orderBy(asc(matches.scheduledAt));
 
-    const enriched = await Promise.all(rows.map(enrichMatch));
+    const now = new Date();
+    const visibleRows = [];
+    for (const row of rows) {
+      const expired = await expireAwaitingResultMatchIfNeeded(row, now);
+      if (!expired) visibleRows.push(row);
+    }
+
+    const enriched = await Promise.all(visibleRows.map(enrichMatch));
 
     return res.status(200).json({ matches: enriched });
   } catch (error) {
@@ -173,8 +616,8 @@ export const joinMatchController = async (req, res) => {
       .limit(1);
 
     if (!match) return res.status(404).json({ message: "مسابقه یافت نشد" });
-    if (isMatchAwaitingResult(match)) {
-      return res.status(400).json({ message: "زمان شروع بازی گذشته و امکان پیوستن وجود ندارد" });
+    if (hasMatchStarted(match)) {
+      return res.status(400).json({ message: "بازی شروع شده و امکان پیوستن وجود ندارد" });
     }
     if (match.status !== "open") {
       return res.status(400).json({ message: "این مسابقه دیگر باز نیست" });
@@ -328,7 +771,13 @@ export const finalizeMatchController = async (req, res) => {
       return res.status(400).json({ message: "هنوز زمان شروع بازی نرسیده است" });
     }
 
-    const nextStatus = didPlay ? "completed" : "cancelled";
+    if (didPlay) {
+      return res.status(409).json({
+        message: "برای ثبت بازی انجام‌شده باید نتیجه توسط بازیکنان ثبت و تایید شود",
+      });
+    }
+
+    const nextStatus = "cancelled";
     const [updated] = await db
       .update(matches)
       .set({ status: nextStatus, updatedAt: new Date() })
@@ -491,6 +940,7 @@ export const emergencySubController = async (req, res) => {
 
     const [match] = await db.select().from(matches).where(eq(matches.id, id)).limit(1);
     if (!match) return res.status(404).json({ message: "مسابقه یافت نشد" });
+
     if (match.createdBy !== userId) {
       return res.status(403).json({ message: "فقط سازنده بازی می‌تواند این کار را کند" });
     }
@@ -566,6 +1016,15 @@ export const rateMatchController = async (req, res) => {
 
     const [match] = await db.select().from(matches).where(eq(matches.id, id)).limit(1);
     if (!match) return res.status(404).json({ message: "مسابقه یافت نشد" });
+
+    const expired = await expireAwaitingResultMatchIfNeeded(match);
+    if (expired) {
+      return res.status(410).json({ message: "مهلت امتیازدهی این بازی تمام شده است" });
+    }
+
+    if (!isMatchAwaitingResult(match)) {
+      return res.status(400).json({ message: "امتیازدهی فقط تا ۲۴ ساعت بعد از پایان بازی مجاز است" });
+    }
 
     const participant = await db
       .select()

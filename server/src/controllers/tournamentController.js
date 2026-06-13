@@ -2,6 +2,7 @@ import { eq, and, asc, desc, ilike, or, sql, inArray } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { tournaments, tournamentRegistrations, tournamentMatches, users, clubs } from "../db/schema.js";
 import { sendSMS } from "../utils/sms.js";
+import { awardRankingPoints, buildTournamentAwards } from "../utils/ranking.js";
 
 const TEHRAN_OFFSET = "+03:30";
 
@@ -341,6 +342,31 @@ async function buildTournamentStandings(tournamentId) {
   return standings;
 }
 
+async function maybeAwardTournamentRankings(tournament) {
+  if (!tournament) return;
+  if (tournament.status !== "completed") return;
+  if (tournament.rankingAwardedAt) return;
+
+  const standings = await buildTournamentStandings(tournament.id);
+  const awards = buildTournamentAwards(standings, tournament.rankingPoints ?? 10);
+
+  if (awards.length > 0) {
+    await awardRankingPoints({
+      sourceType: "tournament",
+      sourceId: tournament.id,
+      category: "tournament",
+      sportType: tournament.sportType,
+      awards,
+      metadata: { pointsBase: tournament.rankingPoints ?? 10, sportType: tournament.sportType },
+    });
+  }
+
+  await db
+    .update(tournaments)
+    .set({ rankingAwardedAt: new Date(), updatedAt: new Date() })
+    .where(eq(tournaments.id, tournament.id));
+}
+
 // ─── List Tournaments ─────────────────────────────────────────────────────────
 
 export const getTournamentsController = async (req, res) => {
@@ -415,6 +441,7 @@ export const createTournamentController = async (req, res) => {
       endDate,
       minLevel = 1,
       sportType = "padel",
+      rankingPoints = 10,
       prize,
       rules,
     } = req.body;
@@ -469,6 +496,7 @@ export const createTournamentController = async (req, res) => {
         endDate: endDateValue,
         minLevel: Number(minLevel),
         sportType,
+        rankingPoints: Math.max(1, Number(rankingPoints) || 10),
         prize: prize || null,
         rules,
       })
@@ -515,9 +543,12 @@ export const updateTournamentController = async (req, res) => {
       .limit(1);
 
     if (!tournament) return res.status(404).json({ message: "تورنومنت یافت نشد" });
+    if (!(await canManageTournament(req.user, tournament))) {
+      return res.status(403).json({ message: "دسترسی ندارید" });
+    }
 
     const allowed = ["title", "description", "entryFee", "maxParticipants",
-      "registrationDeadline", "startDate", "endDate", "minLevel", "sportType", "prize", "rules", "status"];
+      "registrationDeadline", "startDate", "endDate", "minLevel", "sportType", "rankingPoints", "prize", "rules", "status"];
 
     const patch = {};
     for (const key of allowed) {
@@ -526,6 +557,7 @@ export const updateTournamentController = async (req, res) => {
     if (patch.entryFee !== undefined) patch.entryFee = Number(patch.entryFee);
     if (patch.maxParticipants !== undefined) patch.maxParticipants = Number(patch.maxParticipants);
     if (patch.minLevel !== undefined) patch.minLevel = Number(patch.minLevel);
+    if (patch.rankingPoints !== undefined) patch.rankingPoints = Math.max(1, Number(patch.rankingPoints) || 10);
     if (patch.registrationDeadline !== undefined) {
       patch.registrationDeadline = parseTournamentDateTime(patch.registrationDeadline);
       if (!patch.registrationDeadline) {
@@ -558,7 +590,15 @@ export const updateTournamentController = async (req, res) => {
       .where(eq(tournaments.id, id))
       .returning();
 
-    const enriched = await enrichTournament(updated);
+    await maybeAwardTournamentRankings(updated);
+
+    const [finalTournament] = await db
+      .select()
+      .from(tournaments)
+      .where(eq(tournaments.id, id))
+      .limit(1);
+
+    const enriched = await enrichTournament(finalTournament ?? updated);
     return res.status(200).json({ tournament: enriched });
   } catch (error) {
     console.error("updateTournament error:", error);
@@ -778,6 +818,9 @@ export const setTournamentMatchResultController = async (req, res) => {
     if (!tournament) return res.status(404).json({ message: "تورنومنت یافت نشد" });
     if (!(await canManageTournament(req.user, tournament))) {
       return res.status(403).json({ message: "دسترسی ندارید" });
+    }
+    if (tournament.status !== "completed") {
+      return res.status(409).json({ message: "ثبت نتیجه تورنومنت فقط بعد از پایان تورنومنت امکان‌پذیر است" });
     }
 
     if (matchId === "manual") {

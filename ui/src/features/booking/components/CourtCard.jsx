@@ -4,7 +4,7 @@ import { MapPinIcon, ClockIcon, ChevronRightIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const SPORT_ICONS = {
-  padel: "🏓",
+  padel: "🥎",
   tennis: "🎾",
   squash: "🟡",
   badminton: "🏸",

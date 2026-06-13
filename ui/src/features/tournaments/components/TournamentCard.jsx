@@ -12,7 +12,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const SPORT_ICONS = {
-  padel: "🏓",
+  padel: "🥎",
   tennis: "🎾",
   squash: "🟡",
   badminton: "🏸",

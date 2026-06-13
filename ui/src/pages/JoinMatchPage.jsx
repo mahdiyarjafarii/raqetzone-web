@@ -9,7 +9,7 @@ import { useSetAtom } from "jotai";
 import { selectedMatchAtom } from "@/store/matchStore";
 
 const SPORT_ICONS = {
-  padel: "🏓", tennis: "🎾", squash: "🟡", badminton: "🏸", "ping-pong": "🏓",
+  padel: "🥎", tennis: "🎾", squash: "🟡", badminton: "🏸", "ping-pong": "🏓",
 };
 
 function formatDate(dateStr) {

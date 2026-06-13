@@ -7,7 +7,7 @@ import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import {
   PencilIcon, CameraIcon, ChevronRightIcon,
-  SwordsIcon, TrophyIcon, TrendingUpIcon,
+  TrendingUpIcon, TrendingDownIcon, MinusIcon,
   GemIcon, ChevronDownIcon, ChevronUpIcon,
   MessageCircleIcon, WalletIcon, PlusIcon,
 } from "lucide-react";
@@ -17,6 +17,7 @@ import apiClient from "@/lib/apiClient";
 import { showPricingSheetAtom, pricingSheetTriggerSourceAtom, currentUserAtom } from "@/config/state";
 import { useProfileData } from "@/features/profile/hooks/useProfileData";
 import { profileService } from "@/features/profile/services/profileService";
+import { rankingService } from "@/services/rankingService";
 import EditProfileSheet from "@/features/profile/components/EditProfileSheet";
 import RecentMatchesList from "@/features/profile/components/RecentMatchesList";
 import { walletService } from "@/features/wallet/walletService";
@@ -30,7 +31,11 @@ const SKILL_CONFIG = {
   advanced:     { label: "پیشرفته",  color: "bg-violet-500/15 text-violet-600" },
   pro:          { label: "حرفه‌ای",  color: "bg-amber-500/15 text-amber-600" },
 };
-const SPORT_ICON = { padel: "🏓", tennis: "🎾", squash: "🟡", badminton: "🏸" };
+const SPORT_ICON = { padel: "🥎", tennis: "🎾", squash: "🟡", badminton: "🏸" };
+const RANKING_SPORT_OPTIONS = [
+  { value: "padel", label: "پدل", icon: "🥎" },
+  { value: "tennis", label: "تنیس", icon: "🎾" },
+];
 const PLAN_NAMES = { basic: "پلاس", premium: "پریمیوم", pro: "حرفه‌ای" };
 const PERIOD_LABELS = { monthly: "۱ ماهه", quarterly: "۳ ماهه", halfYearly: "۶ ماهه", yearly: "۱۲ ماهه" };
 const STATUS_LABEL = { pending: "در انتظار", completed: "موفق", failed: "ناموفق" };
@@ -49,37 +54,6 @@ const fmtDate = (v) => {
 
 // ─── sub-components ─────────────────────────────────────────────────────────
 
-function StatPill({ icon: Icon, value, label, color }) {
-  return (
-    <div className="flex-1 flex flex-col items-center gap-1.5 py-4">
-      <span className={cn("text-2xl font-black tracking-tight", color)}>{value ?? "—"}</span>
-      <span className="text-[11px] text-muted-foreground font-medium">{label}</span>
-    </div>
-  );
-}
-
-function XpBar({ levelData }) {
-  if (!levelData) return null;
-  const { current, progressPct, rank, progressXp, neededXp } = levelData;
-  return (
-    <div className="space-y-2.5">
-      <div className="flex justify-between items-center text-xs">
-        <span className="font-black text-foreground">سطح {current}</span>
-        <span className="text-muted-foreground font-semibold">{fmt(progressXp)} / {fmt(neededXp)} XP</span>
-      </div>
-      <div className="h-2 bg-black/[0.04] dark:bg-white/10 rounded-full overflow-hidden shadow-inner">
-        <motion.div
-          initial={{ width: 0 }}
-          animate={{ width: `${progressPct}%` }}
-          transition={{ duration: 0.8, delay: 0.3 }}
-          className="h-full rounded-full shadow-sm"
-          style={{ background: `linear-gradient(90deg, ${rank?.gradient?.[0] ?? "#6366f1"}, ${rank?.gradient?.[1] ?? "#8b5cf6"})` }}
-        />
-      </div>
-    </div>
-  );
-}
-
 // ─── main ────────────────────────────────────────────────────────────────────
 
 export default function ProfilePage() {
@@ -92,12 +66,17 @@ export default function ProfilePage() {
   const [editOpen, setEditOpen] = useState(false);
   const [imageVersion, setImageVersion] = useState(Date.now());
   const [showAllPayments, setShowAllPayments] = useState(false);
+  const [ranking, setRanking] = useState(null);
+  const [rankingLoading, setRankingLoading] = useState(false);
+  const [rankingSport, setRankingSport] = useState("padel");
   const [payments, setPayments] = useState([]);
   const [paymentsLoading, setPaymentsLoading] = useState(false);
   const [wallet, setWallet] = useState(null);
   const [walletLoading, setWalletLoading] = useState(false);
   const [topupAmount, setTopupAmount] = useState(300000);
   const [topupLoading, setTopupLoading] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
+  const [imageUploadProgress, setImageUploadProgress] = useState(0);
   const fileRef = useRef(null);
 
   useEffect(() => {
@@ -111,6 +90,30 @@ export default function ProfilePage() {
     });
     return () => { alive = false; };
   }, [currentUser]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    let alive = true;
+    setRankingLoading(true);
+    rankingService
+      .getLeaderboard({ limit: 1, offset: 0, sport: rankingSport })
+      .then((res) => {
+        if (!alive) return;
+        if (res.ok) {
+          setRanking({
+            rank: res.data?.currentUserRank ?? null,
+            ...(res.data?.currentUserSummary ?? {}),
+          });
+        }
+      })
+      .finally(() => {
+        if (alive) setRankingLoading(false);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [currentUser, rankingSport]);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -130,15 +133,26 @@ export default function ProfilePage() {
   const lastCompleted = useMemo(() => payments.find((p) => p.status === "completed"), [payments]);
 
   const handleImageUpload = async (file) => {
-    const res = await profileService.uploadImage(file);
-    if (res.ok) {
-      const updatedUser = res.data.user;
-      setCurrentUser((prev) => ({ ...prev, ...updatedUser }));
-      setData((prev) => prev ? { ...prev, user: { ...prev.user, ...updatedUser } } : prev);
-      setImageVersion(Date.now());
-      toast.success("عکس پروفایل به‌روز شد");
-    } else {
-      toast.error(res.data?.message ?? "خطا در آپلود عکس");
+    setImageUploading(true);
+    setImageUploadProgress(0);
+    try {
+      const res = await profileService.uploadImage(file, {
+        onProgress: (percent) => {
+          setImageUploadProgress(percent);
+        },
+      });
+      if (res.ok && res.data?.user) {
+        const updatedUser = res.data.user;
+        setCurrentUser((prev) => ({ ...prev, ...updatedUser }));
+        setData((prev) => prev ? { ...prev, user: { ...prev.user, ...updatedUser } } : prev);
+        setImageVersion(Date.now());
+        toast.success("عکس پروفایل به‌روز شد");
+      } else {
+        toast.error(res.data?.message ?? "خطا در آپلود عکس");
+      }
+    } finally {
+      setImageUploading(false);
+      setImageUploadProgress(0);
     }
   };
 
@@ -152,9 +166,31 @@ export default function ProfilePage() {
   };
 
   const user = profileData?.user ?? currentUser;
-  const stats = profileData?.stats;
   const skill = SKILL_CONFIG[user?.skillLevel] ?? SKILL_CONFIG.beginner;
   const displayedPayments = showAllPayments ? payments : payments.slice(0, 3);
+  const trendMeta = useMemo(() => {
+    const trend = ranking?.trend;
+    const delta = Number(ranking?.delta ?? 0);
+    if (trend === "up") {
+      return {
+        text: `+${fmt(Math.abs(delta))} نسبت به ۷ روز قبل`,
+        className: "text-emerald-600 dark:text-emerald-400",
+        icon: TrendingUpIcon,
+      };
+    }
+    if (trend === "down") {
+      return {
+        text: `-${fmt(Math.abs(delta))} نسبت به ۷ روز قبل`,
+        className: "text-rose-600 dark:text-rose-400",
+        icon: TrendingDownIcon,
+      };
+    }
+    return {
+      text: "بدون تغییر نسبت به ۷ روز قبل",
+      className: "text-muted-foreground",
+      icon: MinusIcon,
+    };
+  }, [ranking]);
 
   return (
     <div className="min-h-screen bg-[#fbfaf8] dark:bg-background text-foreground pb-28">
@@ -198,11 +234,30 @@ export default function ProfilePage() {
               )}
               <button
                 onClick={() => fileRef.current?.click()}
+                disabled={imageUploading}
                 className="absolute -bottom-1 -right-1 w-9 h-9 rounded-2xl bg-primary text-primary-foreground flex items-center justify-center shadow-lg shadow-primary/25 border-2 border-white dark:border-background"
               >
                 <CameraIcon className="w-4 h-4" />
               </button>
-              <input ref={fileRef} type="file" accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/heic,image/heif,image/avif,image/bmp,image/tiff" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageUpload(f); }} />
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/jpeg,image/jpg,image/png,image/gif,image/webp,image/heic,image/heif,image/avif,image/bmp,image/tiff"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  if (f) handleImageUpload(f);
+                }}
+              />
+              {imageUploading && (
+                <div className="absolute -bottom-7 left-1/2 w-28 -translate-x-1/2 rounded-full bg-muted p-0.5">
+                  <div
+                    className="h-1.5 rounded-full bg-primary transition-all duration-200"
+                    style={{ width: `${imageUploadProgress}%` }}
+                  />
+                </div>
+              )}
             </div>
 
             {loading ? (
@@ -229,35 +284,94 @@ export default function ProfilePage() {
               </div>
             )}
 
-            {profileData?.level && (
-              <motion.div
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="mt-6"
-              >
-                <XpBar levelData={profileData.level} />
-              </motion.div>
-            )}
           </div>
         </motion.div>
       </div>
 
-      {/* ── Stats ─────────────────────────────────────────────────────── */}
-      {stats && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
-          className="mx-4 rounded-[26px] bg-white/90 dark:bg-card border border-black/[0.06] dark:border-border overflow-hidden shadow-lg shadow-slate-200/50 dark:shadow-black/10"
-        >
-          <div className="flex divide-x divide-x-reverse divide-black/[0.06] dark:divide-border">
-            <StatPill icon={SwordsIcon} value={stats.totalMatches} label="کل بازی‌ها" color="text-foreground" />
-            <StatPill icon={TrophyIcon} value={stats.wins} label="برد" color="text-emerald-500" />
-            <StatPill icon={TrendingUpIcon} value={stats.winRate != null ? `${stats.winRate}%` : null} label="نرخ برد" color="text-primary" />
+      {/* ── Ranking & points ─────────────────────────────────────────── */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.18 }}
+        className="mt-5 px-4"
+      >
+        <div className="rounded-[26px] bg-white/90 dark:bg-card border border-black/[0.06] dark:border-border overflow-hidden shadow-lg shadow-slate-200/50 dark:shadow-black/10">
+          <div className="px-4 py-3 border-b border-black/[0.06] dark:border-border space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0 flex items-center gap-2">
+                <h3 className="text-sm font-black text-foreground truncate">رنک و امتیاز شما</h3>
+                <span className="shrink-0 text-[11px] text-muted-foreground font-bold">
+                  {RANKING_SPORT_OPTIONS.find((s) => s.value === rankingSport)?.icon} {RANKING_SPORT_OPTIONS.find((s) => s.value === rankingSport)?.label}
+                </span>
+              </div>
+              <Link to="/leaderboard" className="shrink-0 text-xs text-primary font-bold flex items-center gap-0.5">
+                لیدربورد <ChevronRightIcon className="w-3.5 h-3.5" />
+              </Link>
+            </div>
+
+            <div className="flex items-center justify-center sm:justify-start">
+              <div className="inline-flex max-w-full items-center gap-1 rounded-full border border-border bg-background/70 px-1 py-1 overflow-x-auto no-scrollbar">
+                {RANKING_SPORT_OPTIONS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setRankingSport(option.value)}
+                    className={cn(
+                      "shrink-0 whitespace-nowrap px-3 py-1 rounded-full text-[10px] font-bold transition-colors",
+                      rankingSport === option.value
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground"
+                    )}
+                  >
+                    {option.icon} {option.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
-        </motion.div>
-      )}
+
+          <div className="grid grid-cols-2 gap-2 p-3">
+            <div className="rounded-2xl border border-primary/20 bg-primary/8 px-3 py-3">
+              <p className="text-[11px] text-muted-foreground">رتبه فعلی</p>
+              <p className="text-2xl font-black text-primary mt-1">
+                {rankingLoading ? "..." : ranking?.rank ? `#${fmt(ranking.rank)}` : "—"}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-border bg-background/70 px-3 py-3">
+              <p className="text-[11px] text-muted-foreground">امتیاز کل</p>
+              <p className="text-2xl font-black text-foreground mt-1">
+                {rankingLoading ? "..." : fmt(ranking?.points ?? 0)}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-border bg-background/70 px-3 py-3">
+              <p className="text-[11px] text-muted-foreground">امتیاز مچ</p>
+              <p className="text-lg font-black text-blue-600 dark:text-blue-400 mt-1">
+                {rankingLoading ? "..." : fmt(ranking?.matchPoints ?? 0)}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-border bg-background/70 px-3 py-3">
+              <p className="text-[11px] text-muted-foreground">امتیاز تورنومنت</p>
+              <p className="text-lg font-black text-violet-600 dark:text-violet-400 mt-1">
+                {rankingLoading ? "..." : fmt(ranking?.tournamentPoints ?? 0)}
+              </p>
+            </div>
+          </div>
+
+          <div className="px-3 pb-3">
+            <div className="rounded-2xl border border-border bg-muted/40 px-3 py-2.5 flex items-center justify-between gap-2">
+              <p className="text-[11px] text-muted-foreground">ترند هفتگی امتیاز</p>
+              {rankingLoading ? (
+                <span className="text-[11px] font-bold text-muted-foreground">...</span>
+              ) : (
+                <span className={cn("text-[11px] font-bold inline-flex items-center gap-1", trendMeta.className)}>
+                  <trendMeta.icon className="w-3.5 h-3.5" />
+                  {trendMeta.text}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      </motion.div>
 
       {/* ── Wallet ─────────────────────────────────────────────────────── */}
       <motion.div

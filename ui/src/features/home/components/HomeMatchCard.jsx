@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { addDaysToDateKey, formatDateKeyInTehran, getTodayDateKeyInTehran } from "@/lib/timezone";
 
-const SPORT_ICONS = { padel: "🏓", tennis: "🎾", squash: "🟡", badminton: "🏸" };
+const SPORT_ICONS = { padel: "🥎", tennis: "🎾", squash: "🟡", badminton: "🏸" };
 const SPORT_COLOR = {
   padel: "from-emerald-500 to-teal-600",
   tennis: "from-yellow-500 to-orange-600",

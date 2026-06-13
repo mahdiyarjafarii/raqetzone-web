@@ -13,7 +13,7 @@ import { useHomeData } from "@/features/home/hooks/useHomeData";
 import GreetingHeader from "@/features/home/components/GreetingHeader";
 import QuickActions from "@/features/home/components/QuickActions";
 import PromoBannerCarousel from "@/features/home/components/PromoBannerCarousel";
-import MatchesCarousel from "@/features/home/components/MatchesCarousel";
+import HomeLeaderboardPreview from "@/features/home/components/HomeLeaderboardPreview";
 import DealsSection from "@/features/home/components/DealsSection";
 import HomeCourtsSection from "@/features/home/components/HomeCourtsSection";
 import BookingSummaryBar from "@/features/home/components/BookingSummaryBar";
@@ -46,11 +46,8 @@ export default function HomePage() {
 
       <SectionDivider />
 
-      {/* ── Active Matches ── */}
-      <MatchesCarousel
-        matches={data?.upcomingMatches ?? []}
-        loading={loading}
-      />
+      {/* ── Leaderboard Preview ── */}
+      <HomeLeaderboardPreview />
 
       <SectionDivider />
 

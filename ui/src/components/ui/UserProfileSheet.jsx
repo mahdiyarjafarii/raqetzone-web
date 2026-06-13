@@ -17,7 +17,7 @@ const SKILL_CONFIG = {
 };
 
 const SPORT_EMOJI = {
-  padel: "🏓", tennis: "🎾", squash: "🟡", badminton: "🏸", "ping-pong": "🏓",
+  padel: "🥎", tennis: "🎾", squash: "🟡", badminton: "🏸", "ping-pong": "🏓",
 };
 
 function buildImageUrl(image) {

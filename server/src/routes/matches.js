@@ -15,6 +15,9 @@ import {
   getCompatibilityController,
   getInviteLinkController,
   getMatchByInviteTokenController,
+  getMatchResultController,
+  submitMatchResultController,
+  voteMatchResultController,
 } from "../controllers/matchController.js";
 
 const router = Router();
@@ -26,6 +29,9 @@ router.delete("/matches/:id", authMiddleware, deleteMatchController);
 router.post("/matches/:id/join", authMiddleware, joinMatchController);
 router.delete("/matches/:id/leave", authMiddleware, leaveMatchController);
 router.patch("/matches/:id/finalize", authMiddleware, finalizeMatchController);
+router.get("/matches/:id/result", authMiddleware, getMatchResultController);
+router.post("/matches/:id/result", authMiddleware, submitMatchResultController);
+router.post("/matches/:id/result/vote", authMiddleware, voteMatchResultController);
 
 router.post("/matches/:id/emergency-sub", authMiddleware, emergencySubController);
 router.post("/matches/:id/rate", authMiddleware, rateMatchController);

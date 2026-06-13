@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { formatPersianDateInTehran } from "@/lib/timezone";
 import { walletService } from "@/features/wallet/walletService";
 
-const SPORT_ICONS = { padel: "🏓", tennis: "🎾", squash: "🟡", badminton: "🏸" };
+const SPORT_ICONS = { padel: "🥎", tennis: "🎾", squash: "🟡", badminton: "🏸" };
 
 function formatDateFa(dateStr) {
   return formatPersianDateInTehran(dateStr, {

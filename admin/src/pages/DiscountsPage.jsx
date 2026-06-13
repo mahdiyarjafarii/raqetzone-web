@@ -204,7 +204,7 @@ function CountdownPill({ validUntil }) {
   );
 }
 
-const SPORT_ICONS = { padel:"🏓", tennis:"🎾", squash:"🟡", badminton:"🏸", "ping-pong":"🏓" };
+const SPORT_ICONS = { padel:"🥎", tennis:"🎾", squash:"🟡", badminton:"🏸", "ping-pong":"🏓" };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // TAB 1: Deals (slot discounts)

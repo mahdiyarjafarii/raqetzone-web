@@ -302,9 +302,9 @@ function UserAvatar({ image, name, className, fallbackClassName }) {
   );
 }
 
-const SPORT_ICONS = { padel:"🏓", tennis:"🎾", squash:"🟡", badminton:"🏸", "ping-pong":"🏓" };
+const SPORT_ICONS = { padel:"🥎", tennis:"🎾", squash:"🟡", badminton:"🏸", "ping-pong":"🏓" };
 const SPORTS = [
-  { value:"padel",     label:"پدل",     icon:"🏓" },
+  { value:"padel",     label:"پدل",     icon:"🥎" },
   { value:"tennis",    label:"تنیس",     icon:"🎾" },
   { value:"squash",    label:"اسکواش",   icon:"🟡" },
   { value:"badminton", label:"بدمینتون", icon:"🏸" },

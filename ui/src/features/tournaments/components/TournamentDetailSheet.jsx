@@ -15,7 +15,7 @@ import { selectedTournamentAtom, tournamentDetailOpenAtom, tournamentsAtom } fro
 import { tournamentService } from "../services/tournamentService";
 
 const SPORT_ICONS = {
-  padel:"🏓", tennis:"🎾", squash:"🟡", badminton:"🏸", "ping-pong":"🏓",
+  padel:"🥎", tennis:"🎾", squash:"🟡", badminton:"🏸", "ping-pong":"🏓",
 };
 
 const PHASE_CONFIG = {

@@ -4,6 +4,27 @@ import authStorage from "@/auth/storage";
 const MAX_PROFILE_IMAGE_SIZE_MB = 5;
 const MAX_PROFILE_IMAGE_SIZE_BYTES = MAX_PROFILE_IMAGE_SIZE_MB * 1024 * 1024;
 
+const getImageUploadErrorMessage = (response) => {
+  const serverMessage = response?.data?.message;
+  if (typeof serverMessage === "string" && serverMessage.trim()) {
+    return serverMessage;
+  }
+
+  if (response?.status === 413) {
+    return `حجم عکس نباید بیشتر از ${MAX_PROFILE_IMAGE_SIZE_MB} مگابایت باشد`;
+  }
+
+  if (response?.problem === "TIMEOUT_ERROR") {
+    return "زمان پاسخ‌گویی سرور تمام شد";
+  }
+
+  if (response?.problem === "NETWORK_ERROR" || response?.problem === "CONNECTION_ERROR") {
+    return "خطا در اتصال";
+  }
+
+  return "خطا در آپلود عکس";
+};
+
 const sendUploadDebugLog = async (event, payload = {}) => {
   try {
     const token = authStorage.getToken();
@@ -32,7 +53,7 @@ const sendUploadDebugLog = async (event, payload = {}) => {
 export const profileService = {
   getMyProfile: () => apiClient.get("/profile/me"),
   updateProfile: (data) => apiClient.patch("/profile/me", data),
-  uploadImage: async (file) => {
+  uploadImage: async (file, { onProgress } = {}) => {
     const form = new FormData();
     form.append("image", file);
     try {
@@ -51,38 +72,44 @@ export const profileService = {
           ...startPayload,
           maxSizeMb: MAX_PROFILE_IMAGE_SIZE_MB,
         });
-        return { ok: false, data: { message } };
+        return { ok: false, status: 413, data: { message } };
       }
 
-      const res = await fetch(`${import.meta.env.VITE_WEBSITE_URL}/api/users/upload-image`, {
-        method: "POST",
-        headers: { "x-auth-token": authStorage.getToken() ?? "" },
-        body: form,
+      const res = await apiClient.post("/users/upload-image", form, {
+        headers: { "Content-Type": "multipart/form-data" },
+        onUploadProgress: (event) => {
+          if (!event?.total) return;
+          const percent = Math.min(100, Math.round((event.loaded * 100) / event.total));
+          onProgress?.(percent);
+        },
       });
-      const data = await res.json().catch(() => ({}));
       const responsePayload = {
         status: res.status,
         ok: res.ok,
-        data,
+        problem: res.problem,
+        data: res.data,
       };
       console.log("Profile image upload response:", responsePayload);
       sendUploadDebugLog("upload_response", responsePayload);
 
-      if (res.status === 413 && !data?.message) {
+      if (!res.ok) {
         return {
           ok: false,
-          data: { message: `حجم عکس نباید بیشتر از ${MAX_PROFILE_IMAGE_SIZE_MB} مگابایت باشد` },
+          status: res.status,
+          problem: res.problem,
+          data: { message: getImageUploadErrorMessage(res) },
         };
       }
 
-      return { ok: res.ok, data };
+      onProgress?.(100);
+      return { ok: true, status: res.status, data: res.data };
     } catch (error) {
       console.error("Profile image upload failed:", error);
       sendUploadDebugLog("upload_failed", {
         message: error?.message,
         name: error?.name,
       });
-      return { ok: false, data: { message: "خطا در اتصال" } };
+      return { ok: false, status: 0, problem: "NETWORK_ERROR", data: { message: "خطا در اتصال" } };
     }
   },
 };

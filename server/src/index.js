@@ -27,11 +27,13 @@ import reviewRoutes from "./routes/reviews.js";
 import publicRoutes from "./routes/public.js";
 import tournamentRoutes from "./routes/tournaments.js";
 import directMessagesRoutes from "./routes/directMessages.js";
+import rankingRoutes from "./routes/rankings.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 
 import "./jobs/dailyCreditsReset.js";
 import "./jobs/bookingReminder.js";
 import "./jobs/certifiedMatchFiller.js";
+import "./jobs/matchResultReminder.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -110,6 +112,7 @@ app.use("/api", notificationRoutes);
 app.use("/api", clubPanelRoutes);
 app.use("/api", reviewRoutes);
 app.use("/api", tournamentRoutes);
+app.use("/api", rankingRoutes);
 app.use("/api/dm", directMessagesRoutes);
 app.use("/api", adminRoutes);
 

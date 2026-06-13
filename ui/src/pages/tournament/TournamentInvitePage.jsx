@@ -18,7 +18,7 @@ import { tournamentService } from "@/features/tournaments/services/tournamentSer
 import { cn } from "@/lib/utils";
 
 const SPORT_ICONS = {
-  padel: "🏓",
+  padel: "🥎",
   tennis: "🎾",
   squash: "🟡",
   badminton: "🏸",

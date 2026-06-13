@@ -22,7 +22,7 @@ import ClubBookingSheet from "@/features/clubs/components/ClubBookingSheet";
 import ClubReviews from "@/features/clubs/components/ClubReviews";
 import { Button } from "@/components/ui/button";
 
-const SPORT_ICONS = { padel: "🏓", tennis: "🎾", squash: "🟡", badminton: "🏸" };
+const SPORT_ICONS = { padel: "🥎", tennis: "🎾", squash: "🟡", badminton: "🏸" };
 const SURFACE_LABEL = { artificial: "چمن مصنوعی", clay: "خاک رس", hard: "سخت", grass: "چمن طبیعی" };
 const SURFACE_COLOR = {
   artificial: "bg-emerald-500/10 text-emerald-700",

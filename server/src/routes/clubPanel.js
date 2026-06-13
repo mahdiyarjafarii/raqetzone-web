@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { clubOwnerMiddleware } from "../middleware/clubOwnerAuth.js";
-import { createUpload } from "../config/multer.js";
+import { createUpload, MAX_UPLOAD_SIZE_MB } from "../config/multer.js";
 
 const clubImageUpload = createUpload("clubs");
 import {
@@ -39,8 +39,20 @@ import {
 const router = Router();
 router.use("/club-panel", clubOwnerMiddleware);
 
+const uploadClubImage = (req, res, next) => {
+  clubImageUpload.single("image")(req, res, (error) => {
+    if (error) {
+      const message = error.code === "LIMIT_FILE_SIZE"
+        ? `حجم عکس نباید بیشتر از ${MAX_UPLOAD_SIZE_MB} مگابایت باشد`
+        : error.message || "خطا در آپلود عکس";
+      return res.status(400).json({ message });
+    }
+    next();
+  });
+};
+
 // Image upload (local storage)
-router.post("/club-panel/upload-image", clubImageUpload.single("image"), (req, res) => {
+router.post("/club-panel/upload-image", uploadClubImage, (req, res) => {
   if (!req.file) return res.status(400).json({ message: "فایلی انتخاب نشده" });
   const url = `/uploads/clubs/${req.file.path.split("/clubs/")[1]}`;
   return res.json({ url });

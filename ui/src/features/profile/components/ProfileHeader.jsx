@@ -11,7 +11,7 @@ const SKILL_CONFIG = {
   pro:          { label: "حرفه‌ای",     color: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30" },
 };
 
-const SPORT_ICONS = { padel: "🏓", tennis: "🎾", squash: "🟡", badminton: "🏸" };
+const SPORT_ICONS = { padel: "🥎", tennis: "🎾", squash: "🟡", badminton: "🏸" };
 
 export default function ProfileHeader({ user, rank, onEditClick, onImageUpload }) {
   const { getUserImage } = useAuth();

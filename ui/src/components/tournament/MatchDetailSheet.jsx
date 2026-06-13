@@ -15,9 +15,10 @@ import { matchService } from "@/services/matchService";
 import { cn } from "@/lib/utils";
 import UserAvatar from "@/components/ui/UserAvatar";
 import UserProfileSheet from "@/components/ui/UserProfileSheet";
+import MatchResultValidationCard from "@/components/tournament/MatchResultValidationCard";
 
 const SPORT_ICONS = {
-  padel: "🏓",
+  padel: "🥎",
   tennis: "🎾",
   squash: "🟡",
   badminton: "🏸",
@@ -60,7 +61,15 @@ function hasMatchStarted(match) {
   return new Date(match.scheduledAt).getTime() <= Date.now();
 }
 
-function getStatusMeta(match, awaitingResult) {
+function getStatusMeta(match, awaitingResult, isInProgress) {
+  if (isInProgress) {
+    return {
+      label: "در حال برگزاری",
+      chipClass: "bg-blue-500/15 text-blue-700 border-blue-500/20 dark:text-blue-300",
+      dotClass: "bg-blue-500",
+    };
+  }
+
   if (awaitingResult) {
     return {
       label: "در انتظار اعلام نتیجه",
@@ -129,8 +138,9 @@ export default function MatchDetailSheet() {
     match && [...match.teamA, ...match.teamB].some((p) => p.userId === currentUserId);
   const isCreator = match?.createdBy === currentUserId;
   const matchStarted = hasMatchStarted(match);
-  const awaitingResult = Boolean(match?.awaitingResult ?? (matchStarted && (match?.status === "open" || match?.status === "full")));
-  const statusMeta = getStatusMeta(match, awaitingResult);
+  const isInProgress = Boolean(match?.isInProgress);
+  const awaitingResult = Boolean(match?.awaitingResult);
+  const statusMeta = getStatusMeta(match, awaitingResult, isInProgress);
   const canUseEmergencySub =
     match && new Date(match.scheduledAt).getTime() - Date.now() <= 5 * 3600000;
 
@@ -181,6 +191,15 @@ export default function MatchDetailSheet() {
     } finally {
       setFinalizeLoading(false);
     }
+  };
+
+  const refreshMatch = async () => {
+    if (!match?.id) return;
+    const res = await matchService.getMatch(match.id);
+    if (!res.ok) return;
+    const updated = res.data.match;
+    setSelectedMatch(updated);
+    setMatches((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
   };
 
   const handleEmergencySub = async () => {
@@ -246,7 +265,7 @@ export default function MatchDetailSheet() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setSelectedMatch(null)}
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+            className="fixed inset-0 bg-black/55 z-40"
           />
 
           {/* Sheet */}
@@ -256,28 +275,25 @@ export default function MatchDetailSheet() {
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 28, stiffness: 280 }}
-            className="fixed bottom-0 left-0 right-0 z-50 bg-background rounded-t-[28px] max-h-[88vh] flex flex-col overflow-hidden shadow-2xl shadow-black/30"
+            className="fixed bottom-0 left-0 right-0 z-50 bg-background rounded-t-[26px] max-h-[84vh] flex flex-col overflow-hidden shadow-2xl shadow-black/30 border-t border-border"
           >
             {/* Handle */}
             <div className="absolute top-3 left-1/2 z-20 -translate-x-1/2">
-              <div className="w-10 h-1 rounded-full bg-white/75 shadow-sm" />
+              <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
             </div>
 
             <div className="flex-1 overflow-y-auto">
               {/* Hero section */}
-              <div className="relative overflow-hidden rounded-t-[28px] px-5 pt-11 pb-6">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.34),transparent_36%),radial-gradient(circle_at_bottom_left,rgba(139,92,246,0.28),transparent_34%),linear-gradient(180deg,rgba(248,250,252,1)_0%,rgba(245,243,255,0.92)_100%)] dark:bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.24),transparent_36%),radial-gradient(circle_at_bottom_left,rgba(139,92,246,0.22),transparent_34%),linear-gradient(180deg,rgba(24,24,27,1)_0%,rgba(30,27,75,0.82)_100%)]" />
-                <div className="absolute inset-x-5 bottom-0 h-px bg-gradient-to-r from-transparent via-border to-transparent" />
+              <div className="relative px-5 pt-11 pb-5 border-b border-border/60">
                 <button
                   onClick={() => setSelectedMatch(null)}
-                  className="absolute top-4 left-4 z-10 w-8 h-8 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center shadow-sm hover:bg-white/30 transition-colors"
+                  className="absolute top-4 left-4 z-10 w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center"
                 >
                   <XIcon className="w-4 h-4 text-black" />
                 </button>
                 <div className="relative flex items-start gap-4">
-                  <div className="relative w-20 h-20 rounded-[26px] bg-white/80 dark:bg-white/10 border border-white/80 dark:border-white/15 flex items-center justify-center text-4xl shrink-0 shadow-xl shadow-blue-500/10 backdrop-blur-md">
-                    <div className="absolute inset-2 rounded-[20px] bg-gradient-to-br from-white/70 to-white/20 dark:from-white/10 dark:to-white/5" />
-                    <span className="relative">{SPORT_ICONS[match.sportType] ?? "🏅"}</span>
+                  <div className="w-16 h-16 rounded-2xl bg-muted border border-border flex items-center justify-center text-3xl shrink-0">
+                    <span>{SPORT_ICONS[match.sportType] ?? "🏅"}</span>
                   </div>
                   <div className="relative flex-1 min-w-0 pt-1">
                     <h2 className="text-2xl font-black text-foreground leading-tight tracking-tight">{match.title}</h2>
@@ -328,10 +344,10 @@ export default function MatchDetailSheet() {
                 </div>
 
                 {/* Info grid */}
-                <div className="relative mt-5 grid grid-cols-2 gap-2">
+                <div className="relative mt-4 grid grid-cols-2 gap-2">
 
                   {/* Date — full width */}
-                  <div className="col-span-2 flex items-center gap-2.5 bg-background/70 dark:bg-white/10 rounded-2xl px-3.5 py-3 border border-border/60 dark:border-white/10 shadow-sm backdrop-blur-md">
+                  <div className="col-span-2 flex items-center gap-2.5 bg-muted/35 rounded-2xl px-3.5 py-3 border border-border/60 shadow-sm">
                     <div className="w-8 h-8 rounded-xl bg-blue-500/15 flex items-center justify-center shrink-0">
                       <CalendarIcon className="w-4 h-4 text-blue-500" />
                     </div>
@@ -343,7 +359,7 @@ export default function MatchDetailSheet() {
 
                   {/* Location */}
                   <div className={cn(
-                    "flex items-center gap-2.5 bg-background/70 dark:bg-white/10 rounded-2xl px-3.5 py-3 border border-border/60 dark:border-white/10 shadow-sm backdrop-blur-md",
+                    "flex items-center gap-2.5 bg-muted/35 rounded-2xl px-3.5 py-3 border border-border/60 shadow-sm",
                     countdown ? "col-span-1" : "col-span-2"
                   )}>
                     <div className="w-8 h-8 rounded-xl bg-violet-500/15 flex items-center justify-center shrink-0">
@@ -380,7 +396,7 @@ export default function MatchDetailSheet() {
                       </div>
                       <div className="min-w-0">
                         <p className="text-[10px] text-amber-600/70 dark:text-amber-400/70 font-medium">وضعیت بازی</p>
-                        <p className="text-sm font-black text-amber-600 dark:text-amber-300 truncate">منتظر ثبت نتیجه سازنده</p>
+                        <p className="text-sm font-black text-amber-600 dark:text-amber-300 truncate">نتیجه‌گذاری باز شده</p>
                       </div>
                     </div>
                   )}
@@ -403,9 +419,9 @@ export default function MatchDetailSheet() {
 
                 <div className="grid grid-cols-2 gap-3">
                   {[
-                    { label: "تیم آبی", team: "A", players: match.teamA, color: "blue" },
-                    { label: "تیم بنفش", team: "B", players: match.teamB, color: "violet" },
-                  ].map(({ label, team, players, color }) => {
+                    { team: "A", players: match.teamA },
+                    { team: "B", players: match.teamB },
+                  ].map(({ team, players }, idx) => {
                     const isFull = players.length >= match.teamSize;
                     const isUserHere = players.some((p) => p.userId === currentUserId);
                     const canJoin = match.status === "open" && !awaitingResult && !isUserInMatch && !isFull;
@@ -413,17 +429,29 @@ export default function MatchDetailSheet() {
                     return (
                       <div
                         key={team}
+                        onClick={() => {
+                          if (canJoin) setJoinConfirm({ matchId: match.id, team });
+                        }}
+                        role={canJoin ? "button" : undefined}
+                        tabIndex={canJoin ? 0 : undefined}
+                        onKeyDown={(e) => {
+                          if (!canJoin) return;
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setJoinConfirm({ matchId: match.id, team });
+                          }
+                        }}
                         className={cn(
-                          "rounded-2xl border-2 p-4 flex flex-col gap-3",
-                          color === "blue" ? "border-blue-500/30 bg-blue-500/5" : "border-violet-500/30 bg-violet-500/5"
+                          "rounded-2xl border border-border bg-background/80 p-4 flex flex-col gap-3 shadow-sm transition-all",
+                          canJoin && "cursor-pointer hover:border-primary/40 hover:bg-primary/5 active:scale-[0.99]"
                         )}
                       >
                         <div className="flex items-center justify-between">
-                          <span className={cn(
-                            "text-xs font-bold uppercase tracking-widest",
-                            color === "blue" ? "text-blue-500" : "text-violet-500"
-                          )}>
-                            {label}
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted/60 px-2.5 py-1 text-[11px] font-bold text-foreground">
+                            <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-primary/15 text-primary text-[10px]">
+                              {idx + 1}
+                            </span>
+                            سمت {idx + 1}
                           </span>
                           <span className="text-xs text-muted-foreground font-medium">
                             {players.length}/{match.teamSize}
@@ -437,7 +465,10 @@ export default function MatchDetailSheet() {
                             return (
                               <div
                                 key={i}
-                                onClick={() => player && player.userId !== currentUserId && setViewingUser(player)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (player && player.userId !== currentUserId) setViewingUser(player);
+                                }}
                                 className={cn(
                                   "flex items-center gap-2 rounded-xl px-2.5 py-2 transition-colors",
                                   player
@@ -453,10 +484,7 @@ export default function MatchDetailSheet() {
                                       image={player.image}
                                       name={player.name}
                                       className="w-7 h-7 rounded-full text-xs text-white"
-                                      fallbackClassName={cn(
-                                        "w-7 h-7 rounded-full text-xs text-white",
-                                        color === "blue" ? "bg-blue-500" : "bg-violet-500"
-                                      )}
+                                      fallbackClassName="w-7 h-7 rounded-full text-xs text-white bg-primary"
                                     />
                                     <span className="text-xs font-medium text-foreground truncate">{player.name}</span>
                                     {player.userId === currentUserId
@@ -473,16 +501,7 @@ export default function MatchDetailSheet() {
                         </div>
 
                         {canJoin && (
-                          <button
-                            onClick={() => setJoinConfirm({ matchId: match.id, team })}
-                            disabled={joinLoading}
-                            className={cn(
-                              "w-full py-2.5 rounded-xl text-xs font-bold text-white transition-all active:scale-95",
-                              color === "blue" ? "bg-blue-500 shadow-blue-500/30 shadow-md" : "bg-violet-500 shadow-violet-500/30 shadow-md"
-                            )}
-                          >
-                            {joinLoading ? "..." : `پیوستن به ${label}`}
-                          </button>
+                          <div className="text-center text-[11px] text-primary font-semibold">برای پیوستن روی کارت بزن</div>
                         )}
 
                         {isUserHere && (
@@ -504,19 +523,19 @@ export default function MatchDetailSheet() {
                 </div>
               </div>
 
+              <MatchResultValidationCard
+                match={match}
+                currentUserId={currentUserId}
+                isUserInMatch={isUserInMatch}
+                onMatchUpdated={refreshMatch}
+              />
+
               {isCreator && awaitingResult && (
-                <div className="px-5 pb-3 grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => handleFinalize(true)}
-                    disabled={finalizeLoading}
-                    className="py-2.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-xs font-bold text-emerald-700 dark:text-emerald-400 disabled:opacity-60"
-                  >
-                    {finalizeLoading ? "..." : "بازی انجام شد"}
-                  </button>
+                <div className="px-5 pb-3">
                   <button
                     onClick={() => handleFinalize(false)}
                     disabled={finalizeLoading}
-                    className="py-2.5 rounded-xl border border-border bg-muted/50 text-xs font-bold text-muted-foreground disabled:opacity-60"
+                    className="w-full py-2.5 rounded-xl border border-border bg-muted/50 text-xs font-bold text-muted-foreground disabled:opacity-60"
                   >
                     {finalizeLoading ? "..." : "بازی برگزار نشد"}
                   </button>

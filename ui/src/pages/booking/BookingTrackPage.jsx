@@ -17,7 +17,7 @@ const STATUS = {
   cancelled: { label: "لغو شده",         icon: <XCircleIcon  className="w-5 h-5" />,               color: "text-zinc-400",   bg: "bg-zinc-500/10    border-zinc-500/25"    },
 };
 
-const SPORT_ICONS = { padel:"🏓", tennis:"🎾", squash:"🟡", badminton:"🏸", "ping-pong":"🏓" };
+const SPORT_ICONS = { padel:"🥎", tennis:"🎾", squash:"🟡", badminton:"🏸", "ping-pong":"🏓" };
 
 function CopyButton({ text }) {
   const [copied, setCopied] = useState(false);

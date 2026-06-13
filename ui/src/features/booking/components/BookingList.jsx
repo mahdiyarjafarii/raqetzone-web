@@ -10,7 +10,7 @@ import BookingStatusBadge from "./BookingStatusBadge";
 import { cn } from "@/lib/utils";
 import { formatPersianDateInTehran } from "@/lib/timezone";
 
-const SPORT_ICONS = { padel: "🏓", tennis: "🎾", squash: "🟡", badminton: "🏸" };
+const SPORT_ICONS = { padel: "🥎", tennis: "🎾", squash: "🟡", badminton: "🏸" };
 
 function formatDateFa(dateStr) {
   return formatPersianDateInTehran(dateStr, { weekday: "short", month: "short", day: "numeric" });

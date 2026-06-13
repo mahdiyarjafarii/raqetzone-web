@@ -21,7 +21,7 @@ const API_BASE = import.meta.env.VITE_API_URL?.replace("/api", "") ?? "http://lo
 
 const SPORTS   = ["padel","tennis","squash","badminton","ping-pong"];
 const SURFACES = ["artificial","clay","hard","grass"];
-const SPORT_ICONS = { padel:"🏓", tennis:"🎾", squash:"🟡", badminton:"🏸", "ping-pong":"🏓" };
+const SPORT_ICONS = { padel:"🥎", tennis:"🎾", squash:"🟡", badminton:"🏸", "ping-pong":"🏓" };
 const SPORT_LABELS = { padel:"پدل", tennis:"تنیس", squash:"اسکواش", badminton:"بدمینتون", "ping-pong":"پینگ‌پنگ" };
 const SURFACE_LABELS = { artificial:"چمن مصنوعی", clay:"خاک رس", hard:"سخت", grass:"چمن طبیعی" };
 

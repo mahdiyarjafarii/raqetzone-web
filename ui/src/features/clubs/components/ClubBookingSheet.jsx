@@ -19,7 +19,7 @@ import { walletService } from "@/features/wallet/walletService";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-const SPORT_ICONS = { padel: "🏓", tennis: "🎾", squash: "🟡", badminton: "🏸" };
+const SPORT_ICONS = { padel: "🥎", tennis: "🎾", squash: "🟡", badminton: "🏸" };
 const SURFACE_LABEL = { artificial: "چمن مصنوعی", clay: "خاک رس", hard: "سخت", grass: "چمن طبیعی" };
 const SURFACE_COLOR = {
   artificial: "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400",

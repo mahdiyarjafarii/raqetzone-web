@@ -174,6 +174,7 @@ export const matches = pgTable("matches", {
   teamSize: smallint("team_size").notNull().default(2), // players per team
   status: varchar("status", { length: 20 }).notNull().default("open"), // open | full | cancelled | completed
   isCertified: boolean("is_certified").notNull().default(false),
+  resultReminderSentAt: timestamp("result_reminder_sent_at"),
   inviteToken: varchar("invite_token", { length: 64 }),
   createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -377,6 +378,8 @@ export const tournaments = pgTable("tournaments", {
   endDate: timestamp("end_date").notNull(),
   minLevel: smallint("min_level").notNull().default(1),          // 1–10
   sportType: varchar("sport_type", { length: 50 }).notNull().default("padel"),
+  rankingPoints: integer("ranking_points").notNull().default(10),
+  rankingAwardedAt: timestamp("ranking_awarded_at"),
   prize: text("prize"),
   rules: text("rules"),
   status: varchar("status", { length: 20 }).notNull().default("open"), // open | full | closed | completed
@@ -416,6 +419,68 @@ export const tournamentMatches = pgTable("tournament_matches", {
   index("idx_tournament_matches_tournament_id").on(table.tournamentId),
   index("idx_tournament_matches_round").on(table.tournamentId, table.round),
   uniqueIndex("uq_tournament_matches_round_match").on(table.tournamentId, table.round, table.matchNumber),
+]);
+
+export const matchResults = pgTable("match_results", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  matchId: uuid("match_id").notNull().references(() => matches.id, { onDelete: "cascade" }).unique(),
+  submittedByUserId: uuid("submitted_by_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  winnerTeam: varchar("winner_team", { length: 1 }).notNull(), // A | B
+  scoreSets: jsonb("score_sets").notNull().default(sql`'[]'::jsonb`),
+  status: varchar("status", { length: 20 }).notNull().default("pending"), // pending | disputed | confirmed
+  confirmedAt: timestamp("confirmed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_match_results_match_id").on(table.matchId),
+  index("idx_match_results_status").on(table.status),
+]);
+
+export const matchResultVotes = pgTable("match_result_votes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  matchResultId: uuid("match_result_id").notNull().references(() => matchResults.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  vote: varchar("vote", { length: 10 }).notNull(), // confirm | reject
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_match_result_votes_result_id").on(table.matchResultId),
+  uniqueIndex("uq_match_result_votes_result_user").on(table.matchResultId, table.userId),
+]);
+
+export const userRankings = pgTable("user_rankings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  sportType: varchar("sport_type", { length: 50 }).notNull().default("padel"),
+  points: integer("points").notNull().default(0),
+  matchPoints: integer("match_points").notNull().default(0),
+  tournamentPoints: integer("tournament_points").notNull().default(0),
+  matchesCount: integer("matches_count").notNull().default(0),
+  tournamentsCount: integer("tournaments_count").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_user_rankings_user_id").on(table.userId),
+  index("idx_user_rankings_sport_type").on(table.sportType),
+  index("idx_user_rankings_points").on(table.points),
+  uniqueIndex("uq_user_rankings_user_sport").on(table.userId, table.sportType),
+]);
+
+export const rankingEvents = pgTable("ranking_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  sourceType: varchar("source_type", { length: 20 }).notNull(), // match | tournament
+  sourceId: uuid("source_id").notNull(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  sportType: varchar("sport_type", { length: 50 }).notNull().default("padel"),
+  category: varchar("category", { length: 20 }).notNull(), // match | tournament
+  points: integer("points").notNull(),
+  metadata: jsonb("metadata").default({}),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_ranking_events_user_id").on(table.userId),
+  index("idx_ranking_events_sport_type").on(table.sportType),
+  index("idx_ranking_events_source").on(table.sourceType, table.sourceId),
+  uniqueIndex("uq_ranking_events_source_user").on(table.sourceType, table.sourceId, table.userId),
 ]);
 
 // ─── Discount Codes ───────────────────────────────────────────────────────────
