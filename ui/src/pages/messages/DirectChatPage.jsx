@@ -218,11 +218,11 @@ export default function DirectChatPage() {
                   <div className={cn(
                     "max-w-[78%] rounded-[22px] px-4 py-2.5 text-sm leading-relaxed shadow-sm",
                     isMine
-                      ? "bg-[#ef1871] text-white rounded-br-md shadow-pink-500/20"
-                      : "bg-white dark:bg-card border border-black/[0.06] dark:border-border text-foreground rounded-bl-md"
+                      ? "bg-[#ef1871] text-white rounded-bl-md shadow-pink-500/20"
+                      : "bg-white dark:bg-card border border-black/[0.06] dark:border-border text-foreground rounded-br-md"
                   )}>
                     <p>{msg.content}</p>
-                    <p className={cn("text-[10px] mt-1 text-right", isMine ? "text-white/70" : "text-muted-foreground")}>
+                    <p className={cn("text-[10px] mt-1", isMine ? "text-right text-white/70" : "text-left text-muted-foreground")}>
                       {formatTime(msg.createdAt)}
                     </p>
                   </div>

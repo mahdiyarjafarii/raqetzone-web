@@ -5,8 +5,9 @@ import "react-spring-bottom-sheet/dist/style.css";
 
 import React from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { RefreshCwIcon } from "lucide-react";
+import { RefreshCwIcon, Gamepad2Icon, TrophyIcon, ChevronLeftIcon } from "lucide-react";
 import { useAtomValue } from "jotai";
+import { Link } from "react-router-dom";
 
 import { currentUserAtom } from "@/config/state";
 import { useHomeData } from "@/features/home/hooks/useHomeData";
@@ -35,6 +36,36 @@ export default function HomePage() {
 
       {/* ── Quick Actions ── */}
       <QuickActions />
+
+      <div className="px-4 mb-2">
+        <div className="relative rounded-2xl overflow-hidden p-[2px]">
+          <div className="pointer-events-none absolute left-1/2 top-1/2 h-[240%] w-[240%] -translate-x-1/2 -translate-y-1/2 bg-[conic-gradient(from_0deg,rgba(14,165,233,0.14)_0%,rgba(56,189,248,0.75)_18%,rgba(250,204,21,0.7)_36%,rgba(14,165,233,0.14)_52%,rgba(14,165,233,0.14)_100%)] animate-spin [animation-duration:3.6s]" />
+
+          <Link
+            to="/game/tennis-duel"
+            className="relative z-10 overflow-hidden flex items-center justify-between rounded-2xl bg-sky-500 text-white px-3 py-2.5 shadow-lg shadow-sky-500/25 active:scale-[0.99] transition-transform"
+          >
+            <div className="absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-white/15 to-transparent" />
+
+            <div className="relative h-9 w-9 rounded-xl bg-white/20 border border-white/30 flex items-center justify-center">
+              <Gamepad2Icon className="w-4 h-4" />
+            </div>
+
+            <div className="relative flex-1 text-right pr-2">
+              <p className="text-sm font-black leading-tight">شروع مینی‌گیم</p>
+              <p className="text-[11px] text-white/90 font-semibold mt-0.5">برد = جایزه روزانه</p>
+            </div>
+
+            <div className="relative flex items-center gap-1.5">
+              <div className="h-7 px-2 rounded-full bg-white/20 border border-white/30 flex items-center gap-1 text-[11px] font-bold">
+                <TrophyIcon className="w-3.5 h-3.5" />
+                جایزه
+              </div>
+              <ChevronLeftIcon className="w-4 h-4" />
+            </div>
+          </Link>
+        </div>
+      </div>
 
       <SectionDivider />
 

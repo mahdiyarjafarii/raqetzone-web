@@ -2,6 +2,7 @@ import { eq, or, and, desc, isNull, lt, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { directConversations, directMessages, users } from "../db/schema.js";
 import { io, isUserOnline } from "../index.js";
+import { sendNotification } from "../utils/sendNotification.js";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -218,6 +219,29 @@ export const sendMessageController = async (req, res) => {
     io.to(`user:${recipientId}`).emit("new_message", {
       conversationId,
       message: msg,
+    });
+
+    const [sender] = await db
+      .select({ name: users.name })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1);
+
+    const senderName = sender?.name || "یک کاربر";
+    const preview = (msg.content || "").replace(/\s+/g, " ").trim().slice(0, 90);
+
+    await sendNotification(recipientId, {
+      title: "پیام جدید",
+      message: `${senderName}: ${preview || "یک پیام جدید"}`,
+      type: "DIRECT_MESSAGE",
+      metadata: {
+        conversationId,
+        messageId: msg.id,
+        senderId: userId,
+      },
+      smsText: isUserOnline(recipientId)
+        ? false
+        : `رکت‌زون: پیام جدید از ${senderName} - ${preview || "پیام جدید"}`,
     });
 
     return res.json({ message: msg });

@@ -483,6 +483,38 @@ export const rankingEvents = pgTable("ranking_events", {
   uniqueIndex("uq_ranking_events_source_user").on(table.sourceType, table.sourceId, table.userId),
 ]);
 
+// ─── Mini Game ───────────────────────────────────────────────────────────────
+
+export const tennisDuelSessions = pgTable("tennis_duel_sessions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  score: integer("score").notNull().default(0),
+  won: boolean("won").notNull().default(false),
+  rewardGranted: boolean("reward_granted").notNull().default(false),
+  clientMeta: jsonb("client_meta").default({}),
+  startedAt: timestamp("started_at").defaultNow().notNull(),
+  submittedAt: timestamp("submitted_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_tennis_duel_sessions_user_id").on(table.userId),
+  index("idx_tennis_duel_sessions_created_at").on(table.createdAt),
+]);
+
+export const tennisDuelRewards = pgTable("tennis_duel_rewards", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  sessionId: uuid("session_id").notNull().references(() => tennisDuelSessions.id, { onDelete: "cascade" }),
+  score: integer("score").notNull(),
+  creditsGranted: integer("credits_granted").notNull(),
+  rewardDateKey: varchar("reward_date_key", { length: 10 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_tennis_duel_rewards_user_id").on(table.userId),
+  index("idx_tennis_duel_rewards_date").on(table.rewardDateKey),
+  uniqueIndex("uq_tennis_duel_rewards_session_id").on(table.sessionId),
+  uniqueIndex("uq_tennis_duel_rewards_user_date").on(table.userId, table.rewardDateKey),
+]);
+
 // ─── Discount Codes ───────────────────────────────────────────────────────────
 
 export const discountCodes = pgTable("discount_codes", {

@@ -23,6 +23,7 @@ const MyBookingPage = lazy(() => import("@/pages/mybooking/MyBookingPage"));
 const BookingTrackPage = lazy(() => import("@/pages/booking/BookingTrackPage"));
 const ConversationsPage = lazy(() => import("@/pages/messages/ConversationsPage"));
 const DirectChatPage = lazy(() => import("@/pages/messages/DirectChatPage"));
+const TennisDuelPage = lazy(() => import("@/pages/game/TennisDuelPage"));
 
 const s = (Page) => <SuspensedView><Page /></SuspensedView>;
 
@@ -59,6 +60,7 @@ const router = createBrowserRouter([
       { path: "chat/:id", element: <ChatPage /> },
       { path: "messages", element: s(ConversationsPage) },
       { path: "messages/:conversationId", element: s(DirectChatPage) },
+      { path: "game/tennis-duel", element: s(TennisDuelPage) },
       { path: "*", element: s(NotFoundPage) },
     ],
   },
