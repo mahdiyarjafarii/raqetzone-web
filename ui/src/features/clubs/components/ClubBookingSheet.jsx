@@ -311,8 +311,7 @@ function BookingSummaryStep({ court, date, slot, clubId, onConfirm, onBack, subm
 
   const voucherDiscount = discountState?.valid ? discountState.discountAmount : 0;
   const afterVoucher = Math.max(0, baseTotal - voucherDiscount);
-  const tax = Math.round(afterVoucher * 0.09);
-  const finalTotal = afterVoucher + tax;
+  const finalTotal = afterVoucher;
   const walletBalance = wallet?.balance ?? 0;
   const canPayWithWallet = walletBalance >= finalTotal;
 
@@ -403,7 +402,6 @@ function BookingSummaryStep({ court, date, slot, clubId, onConfirm, onBack, subm
               value: `- ${formatPrice(voucherDiscount)} ت`,
               discount: true,
             } : null,
-            { icon: <BanknoteIcon className="w-4 h-4" />, label: "مالیات (۹٪)", value: `${formatPrice(tax)} ت` },
           ].filter(Boolean).map((row, i) => (
             <div key={i} className="flex items-center justify-between px-4 py-3 gap-3">
               <div className="flex items-center gap-2 text-muted-foreground text-xs">
@@ -422,7 +420,7 @@ function BookingSummaryStep({ court, date, slot, clubId, onConfirm, onBack, subm
           <div className="text-right">
             {voucherDiscount > 0 && (
               <p className="text-xs text-muted-foreground line-through leading-none mb-0.5">
-                {formatPrice(Math.round(baseTotal * 1.09))} ت
+                {formatPrice(baseTotal)} ت
               </p>
             )}
             <span className="text-primary font-black text-2xl">
