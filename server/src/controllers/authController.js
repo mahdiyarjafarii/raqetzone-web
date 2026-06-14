@@ -120,6 +120,12 @@ export const verifyOTPController = async (req, res) => {
         });
       }
 
+      if (!isClubOwner && user.isClubOwner) {
+        return res.status(409).json({
+          message: 'این شماره قبلاً در پنل باشگاه ثبت شده است. لطفاً برای ورود به وب‌اپ با شماره دیگری وارد شوید',
+        });
+      }
+
       const updateData = { updatedAt: new Date() };
       [user] = await db
         .update(users)

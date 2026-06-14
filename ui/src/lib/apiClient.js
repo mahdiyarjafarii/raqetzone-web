@@ -17,6 +17,14 @@ apiClient.addAsyncResponseTransform(async (response, b) => {
     localStorage.removeItem("myket-ai-user");
     window.location.href = "/";
   }
+
+  if (response.status === 403 && response.data?.code === "PROFILE_INCOMPLETE") {
+    window.dispatchEvent(new CustomEvent("raqetzone:profile-incomplete", {
+      detail: {
+        missingFields: response.data?.missingFields ?? [],
+      },
+    }));
+  }
 });
 
 

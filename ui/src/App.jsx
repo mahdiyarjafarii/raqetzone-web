@@ -31,6 +31,14 @@ function App() {
   const setAuthCallbacks = useSetAtom(authCallbacksAtom);
   const setShowOnboarding = useSetAtom(showOnboardingSheetAtom);
 
+  const shouldForceOnboarding = (user) => {
+    if (!user) return false;
+    if (user.isClubOwner) return false;
+    const firstName = typeof user.firstName === "string" ? user.firstName.trim() : "";
+    const lastName = typeof user.lastName === "string" ? user.lastName.trim() : "";
+    return !(firstName && lastName);
+  };
+
   useEffect(() => { preload(); }, []);
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
@@ -39,9 +47,24 @@ function App() {
   const checkOnboarding = async () => {
     try {
       const { ok, data } = await apiClient.get("/users/me");
-      if (ok && data?.user && !data.user.name) setShowOnboarding(true);
+      if (ok && data?.user) {
+        if (shouldForceOnboarding(data.user)) {
+          setShowOnboarding(true);
+        }
+      }
     } catch {}
   };
+
+  useEffect(() => {
+    const handleProfileIncomplete = () => {
+      setShowOnboarding(true);
+    };
+
+    window.addEventListener("raqetzone:profile-incomplete", handleProfileIncomplete);
+    return () => {
+      window.removeEventListener("raqetzone:profile-incomplete", handleProfileIncomplete);
+    };
+  }, [setShowOnboarding]);
 
   const preload = async () => {
     // Let invite/join pages bypass auth
