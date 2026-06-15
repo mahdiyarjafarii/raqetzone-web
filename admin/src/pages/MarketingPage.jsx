@@ -94,7 +94,7 @@ function CampaignModal({ clubId, segment, codes, onClose }) {
   return (
     <Modal open={!!segment} onClose={onClose} title={`کمپین ${segment.label}`} size="lg">
       <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="rounded-2xl bg-primary/5 border border-primary/10 p-4">
             <p className="text-xs text-muted-foreground">گیرندگان هدف</p>
             <p className="text-2xl font-black text-primary">{fmt(segment.count)} نفر</p>
@@ -170,7 +170,7 @@ export default function MarketingPage() {
   return (
     <div dir="rtl">
       <PageHeader title="رشد و مارکتینگ" description="کمپین‌های آماده برای بازگشت مشتری، افزایش رزرو و فعال‌سازی کامیونیتی" />
-      <div className="p-6 space-y-6">
+      <div className="p-3 sm:p-6 space-y-6">
         <div className="rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/10 via-card to-violet-500/10 p-5">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div className="flex items-start gap-4">
@@ -182,16 +182,16 @@ export default function MarketingPage() {
                 <p className="text-sm text-muted-foreground mt-1">باشگاه را انتخاب کن؛ سیستم مشتری‌ها را سگمنت می‌کند و کمپین آماده با متن پیشنهادی می‌دهد.</p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <select value={clubId} onChange={e => setClubId(e.target.value)} className="h-10 min-w-48 rounded-xl border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/30">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full lg:w-auto">
+              <select value={clubId} onChange={e => setClubId(e.target.value)} className="h-10 w-full sm:min-w-48 rounded-xl border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring/30">
                 {clubs.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
-              <Button variant="outline" onClick={fetchMarketingData} disabled={loading} className="gap-2"><RefreshCwIcon className={cn("w-4 h-4", loading && "animate-spin")} />تحلیل مجدد</Button>
+              <Button variant="outline" onClick={fetchMarketingData} disabled={loading} className="gap-2 w-full sm:w-auto"><RefreshCwIcon className={cn("w-4 h-4", loading && "animate-spin")} />تحلیل مجدد</Button>
             </div>
           </div>
         </div>
 
-        <div className="flex gap-2 rounded-2xl border border-border bg-card p-1 w-fit">
+        <div className="inline-flex max-w-full gap-2 rounded-2xl border border-border bg-card p-1 overflow-x-auto no-scrollbar">
           {[
             { key: "campaigns", label: "کمپین‌های مشتریان", icon: MegaphoneIcon },
             { key: "autofill", label: "پرکن هوشمند سانس", icon: BotIcon },
@@ -200,7 +200,7 @@ export default function MarketingPage() {
               key={item.key}
               onClick={() => setTab(item.key)}
               className={cn(
-                "flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all",
+                "flex items-center gap-2 rounded-xl px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold transition-all whitespace-nowrap",
                 tab === item.key ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-muted"
               )}
             >

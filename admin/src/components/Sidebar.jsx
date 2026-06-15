@@ -36,11 +36,12 @@ const ADMIN_EXTRA_NAV = [
 
 const BOOKING_POLL_INTERVAL_MS = 60_000;
 
-function NavItem({ to, icon: Icon, label, badgeCount = 0 }) {
+function NavItem({ to, icon: Icon, label, badgeCount = 0, onClick }) {
   return (
     <NavLink
       to={to}
       end={to === "/"}
+      onClick={onClick}
       className={({ isActive }) =>
         cn(
           "group flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150",
@@ -68,7 +69,7 @@ function NavItem({ to, icon: Icon, label, badgeCount = 0 }) {
   );
 }
 
-export default function Sidebar() {
+export default function Sidebar({ className, onNavigate }) {
   const [, setUser]  = useAtom(adminUserAtom);
   const [, setToken] = useAtom(adminTokenAtom);
   const user         = useAtomValue(adminUserAtom);
@@ -79,6 +80,10 @@ export default function Sidebar() {
   const pollRef = useRef(null);
 
   const isAdmin = user?.isAdmin;
+
+  const handleNavigate = useCallback(() => {
+    onNavigate?.();
+  }, [onNavigate]);
 
   const refreshUnseenBookingsCount = useCallback(async () => {
     const { ok, data } = await apiClient.get("/club-panel/bookings");
@@ -127,11 +132,12 @@ export default function Sidebar() {
     localStorage.removeItem("raqetzone-admin-token");
     localStorage.removeItem("raqetzone-admin-user");
     setUser(null); setToken(null);
+    onNavigate?.();
     navigate("/login");
   };
 
   return (
-    <aside className="flex flex-col w-60 shrink-0 h-screen bg-sidebar border-l border-sidebar-border overflow-hidden">
+    <aside className={cn("flex flex-col w-60 shrink-0 h-screen bg-sidebar border-l border-sidebar-border overflow-hidden", className)}>
       {/* Brand */}
       <div className="px-4 py-4 border-b border-sidebar-border">
         <div className="flex items-center gap-2.5">
@@ -155,6 +161,7 @@ export default function Sidebar() {
             key={item.to}
             {...item}
             badgeCount={item.to === "/bookings" ? unseenBookingsCount : 0}
+            onClick={handleNavigate}
           />
         ))}
 
@@ -163,7 +170,7 @@ export default function Sidebar() {
             <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider px-2 mb-2 mt-4">
               ادمین سیستم
             </p>
-            {ADMIN_EXTRA_NAV.map((item) => <NavItem key={item.to} {...item} />)}
+            {ADMIN_EXTRA_NAV.map((item) => <NavItem key={item.to} {...item} onClick={handleNavigate} />)}
           </>
         )}
       </nav>

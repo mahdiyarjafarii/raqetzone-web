@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useSetAtom } from "jotai";
 import { motion } from "framer-motion";
@@ -14,9 +14,24 @@ export default function LoginPage() {
   const [phone, setPhone]   = useState("");
   const [otp, setOtp]       = useState("");
   const [loading, setLoading] = useState(false);
+  const [resendSeconds, setResendSeconds] = useState(0);
   const setUser  = useSetAtom(adminUserAtom);
   const setToken = useSetAtom(adminTokenAtom);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (step !== "otp" || resendSeconds <= 0) return;
+    const timer = setInterval(() => {
+      setResendSeconds((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [step, resendSeconds]);
+
+  const formatCountdown = (seconds) => {
+    const mins = String(Math.floor(seconds / 60)).padStart(2, "0");
+    const secs = String(seconds % 60).padStart(2, "0");
+    return `${mins}:${secs}`;
+  };
 
   const handleSendOtp = async (e) => {
     e.preventDefault();
@@ -27,6 +42,17 @@ export default function LoginPage() {
     if (!ok) return toast.error(data?.message ?? "خطا در ارسال کد");
     toast.success("کد تأیید ارسال شد");
     setStep("otp");
+    setResendSeconds(120);
+  };
+
+  const handleResendOtp = async () => {
+    if (!phone) return toast.error("شماره تلفن را وارد کنید");
+    setLoading(true);
+    const { ok, data } = await apiClient.post("/auth/send-otp", { phone });
+    setLoading(false);
+    if (!ok) return toast.error(data?.message ?? "خطا در ارسال مجدد کد");
+    toast.success("کد تأیید مجددا ارسال شد");
+    setResendSeconds(120);
   };
 
   const handleVerify = async (e) => {
@@ -63,6 +89,10 @@ export default function LoginPage() {
 
         {/* Form */}
         <div className="rounded-2xl border border-border bg-card p-6 shadow-sm space-y-4">
+          <div className="rounded-xl border border-primary/30 bg-primary/10 px-3 py-2.5 text-sm leading-6 text-foreground font-medium">
+            مدیر عزیز باشگاه، لطفا یک شماره منحصر‌به‌فرد برای این داشبورد اختصاص دهید. این شماره باید فقط برای پنل مدیریت باشد و امکان استفاده همزمان آن در اپلیکیشن رکت‌زون وجود ندارد.
+          </div>
+
           {step === "phone" ? (
             <form onSubmit={handleSendOtp} className="space-y-4">
               <Input
@@ -98,9 +128,22 @@ export default function LoginPage() {
                 <KeyIcon className="w-4 h-4" />
                 {loading ? "در حال بررسی..." : "ورود به پنل"}
               </Button>
-              <button type="button" onClick={() => setStep("phone")} className="w-full text-xs text-muted-foreground text-center">
-                تغییر شماره
-              </button>
+              <div className="space-y-2">
+                <p className="text-xs text-center text-muted-foreground">
+                  {resendSeconds > 0 ? `زمان ارسال مجدد کد: ${formatCountdown(resendSeconds)}` : "کد را دریافت نکردید؟"}
+                </p>
+                <button
+                  type="button"
+                  onClick={handleResendOtp}
+                  disabled={loading || resendSeconds > 0}
+                  className="w-full text-xs text-primary disabled:text-muted-foreground disabled:cursor-not-allowed text-center"
+                >
+                  ارسال مجدد کد
+                </button>
+                <button type="button" onClick={() => setStep("phone")} className="w-full text-xs text-muted-foreground text-center">
+                  تغییر شماره
+                </button>
+              </div>
             </form>
           )}
         </div>

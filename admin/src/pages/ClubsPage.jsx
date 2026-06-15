@@ -610,7 +610,7 @@ export default function ClubsPage() {
 
   if (loading) {
     return (
-      <div className="p-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      <div className="p-3 sm:p-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {[1,2,3].map(i => <div key={i} className="h-56 rounded-2xl bg-muted animate-pulse" />)}
       </div>
     );
@@ -631,7 +631,7 @@ export default function ClubsPage() {
         }
       />
 
-      <div className="p-6">
+      <div className="p-3 sm:p-6">
         {clubs.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <Building2Icon className="w-16 h-16 text-muted-foreground/30 mb-5" />

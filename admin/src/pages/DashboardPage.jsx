@@ -138,7 +138,7 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="p-6 space-y-6 animate-pulse">
+      <div className="p-3 sm:p-6 space-y-6 animate-pulse">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-20 rounded-2xl bg-muted" />)}
         </div>
@@ -267,7 +267,7 @@ export default function DashboardPage() {
             type="button"
             onClick={() => loadDashboard({ silent: true })}
             disabled={refreshing}
-            className="inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground shadow-sm transition-all hover:shadow-md disabled:opacity-60"
+            className="inline-flex w-full sm:w-auto justify-center items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground shadow-sm transition-all hover:shadow-md disabled:opacity-60"
           >
             <RefreshCwIcon className={cn("h-4 w-4", refreshing && "animate-spin")} />
             {refreshing ? "در حال بروزرسانی..." : "بروزرسانی دیتا"}
@@ -275,7 +275,7 @@ export default function DashboardPage() {
         }
       />
 
-      <div className="p-6 space-y-6">
+      <div className="p-3 sm:p-6 space-y-6">
 
         <div className="rounded-3xl border border-primary/15 bg-gradient-to-br from-primary/10 via-violet-500/5 to-transparent p-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -284,10 +284,10 @@ export default function DashboardPage() {
                 <ActivityIcon className="h-3.5 w-3.5" />
                 نمای زنده عملکرد پلتفرم
               </div>
-              <h2 className="text-2xl font-black text-foreground">وضعیت امروز رکت‌زون</h2>
+              <h2 className="text-xl sm:text-2xl font-black text-foreground">وضعیت امروز رکت‌زون</h2>
               <p className="mt-1 text-sm text-muted-foreground">رزروها، درآمد، کاربران و ظرفیت عملیاتی را یکجا ببین.</p>
             </div>
-            <div className="grid grid-cols-2 gap-3 lg:w-[520px]">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 lg:w-[520px]">
               <InsightCard label="نرخ تایید رزرو" value={`${approvalRate}٪`} sub={`${fmt(s.approvedBookings)} از ${fmt(s.totalBookings)} رزرو`} tone="emerald" />
               <InsightCard label="در انتظار اقدام" value={`${fmt(s.pendingBookings)}`} sub={`${pendingRate}٪ از کل رزروها`} tone="amber" />
               <InsightCard label="شلوغ‌ترین ساعت" value={busiestHour?.count ? busiestHour.hour : "—"} sub={busiestHour?.count ? `${fmt(busiestHour.count)} رزرو` : "داده کافی نیست"} tone="blue" />
@@ -297,7 +297,7 @@ export default function DashboardPage() {
         </div>
 
         {/* ── stat cards ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {statCards.map((c, i) => <StatCard key={c.label} {...c} index={i} onClick={c.onClick} />)}
         </div>
 

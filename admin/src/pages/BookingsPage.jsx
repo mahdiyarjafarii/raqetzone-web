@@ -128,26 +128,26 @@ export default function BookingsPage() {
     <div dir="rtl">
       <PageHeader title="مدیریت رزروها" description={`${bookings.length} رزرو`} />
 
-      <div className="p-6 space-y-4">
+      <div className="p-3 sm:p-6 space-y-4">
         {/* Filters */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative">
+        <div className="flex flex-col gap-3">
+          <div className="relative w-full sm:w-56">
             <SearchIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="جستجو کاربر یا زمین..."
-              className="h-9 rounded-xl border border-border bg-card pr-9 pl-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/30 w-56"
+              className="h-9 rounded-xl border border-border bg-card pr-9 pl-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring/30 w-full"
             />
           </div>
 
-          <div className="flex gap-1.5">
+          <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
             {FILTERS.map(f => (
               <button
                 key={f.value}
                 onClick={() => setFilter(f.value)}
                 className={cn(
-                  "px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors",
+                  "px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors whitespace-nowrap",
                   filter === f.value
                     ? "bg-primary text-primary-foreground border-primary"
                     : "bg-card border-border text-muted-foreground hover:bg-muted"
@@ -162,7 +162,7 @@ export default function BookingsPage() {
         {/* Table */}
         <div className="rounded-2xl border border-border bg-card overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full min-w-[860px] text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/30">
                   {["کاربر","زمین","تاریخ","ساعت","مبلغ","وضعیت","عملیات"].map(h => (
