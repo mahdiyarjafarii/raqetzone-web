@@ -43,7 +43,7 @@ export default function HomePage() {
 
           <Link
             to="/game/tennis-duel"
-            className="relative z-10 overflow-hidden flex items-center justify-between rounded-2xl bg-sky-500 text-white px-3 py-2.5 shadow-lg shadow-sky-500/25 active:scale-[0.99] transition-transform"
+            className="relative z-1 overflow-hidden flex items-center justify-between rounded-2xl bg-sky-500 text-white px-3 py-2.5 shadow-lg shadow-sky-500/25 active:scale-[0.99] transition-transform"
           >
             <div className="absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-white/15 to-transparent" />
 
