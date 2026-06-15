@@ -25,6 +25,7 @@ function App() {
   const { setCurrentUser } = useAuth();
 
   const showOverlayLoading = useAtomValue(showOverlayLoadingAtom);
+  const showOnboarding = useAtomValue(showOnboardingSheetAtom);
   const [theme, setTheme] = useAtom(themeAtom);
   const [isReady, setIsReady] = useState(false);
   const setShowAuthSheet = useSetAtom(showAuthSheetAtom);
@@ -46,13 +47,25 @@ function App() {
 
   const checkOnboarding = async () => {
     try {
-      const { ok, data } = await apiClient.get("/users/me");
+      const { ok, data, status } = await apiClient.get("/users/me");
+
+      if (status === 403 && data?.code === "PROFILE_INCOMPLETE") {
+        setShowOnboarding(true);
+        return true;
+      }
+
       if (ok && data?.user) {
+        setCurrentUser(data.user);
         if (shouldForceOnboarding(data.user)) {
           setShowOnboarding(true);
+          return true;
         }
       }
-    } catch {}
+
+      return false;
+    } catch {
+      return false;
+    }
   };
 
   useEffect(() => {
@@ -78,11 +91,12 @@ function App() {
 
     if (!token || !user) {
       setAuthCallbacks({
-        onSuccess: () => {
+        onSuccess: async () => {
           const nextUser = storage.getUser();
           if (nextUser) setCurrentUser(nextUser);
+
+          await checkOnboarding();
           setIsReady(true);
-          checkOnboarding();
         },
         onError: null,
       });
@@ -91,8 +105,8 @@ function App() {
     }
 
     setCurrentUser(user);
+    await checkOnboarding();
     setIsReady(true);
-    checkOnboarding();
   };
 
   const handleError = (error, errorInfo) => {
@@ -118,7 +132,7 @@ function App() {
       onError={handleError}
       onReset={handleReset}
     >
-      <RouterProvider router={router} />
+      {!showOnboarding && <RouterProvider router={router} />}
       <OnboardingSheet />
       <Toaster />
       <LoadingOverlay
