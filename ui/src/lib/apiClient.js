@@ -12,7 +12,6 @@ const SILENT_PATTERNS = [
   /\/wallet/,
   /\/home/,
   /\/ranking/,
-  /socket\.io/,
 ];
 
 function isSilent(url) {
@@ -22,11 +21,14 @@ function isSilent(url) {
 apiClient.addAsyncRequestTransform(async (request) => {
   const token = authStorage.getToken();
   if (token) request.headers['x-auth-token'] = token;
-  if (!isSilent(request.url)) loadingBus.increment();
+  const silent = isSilent(request.url);
+  request.headers['x-silent'] = silent ? '1' : '0';
+  if (!silent) loadingBus.increment();
 });
 
 apiClient.addAsyncResponseTransform(async (response) => {
-  if (!isSilent(response.config?.url)) loadingBus.decrement();
+  const silent = response.config?.headers?.['x-silent'] === '1';
+  if (!silent) loadingBus.decrement();
 });
 
 apiClient.addAsyncResponseTransform(async (response, b) => {
