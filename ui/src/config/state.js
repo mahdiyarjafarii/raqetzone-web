@@ -67,3 +67,6 @@ export const showOnboardingSheetAtom = atom(false);
 
 // Direct messaging unread count
 export const unreadDmCountAtom = atom(0);
+
+// Splash screen visibility
+export const showSplashAtom = atom(true);

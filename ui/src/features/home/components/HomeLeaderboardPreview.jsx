@@ -102,6 +102,7 @@ export default function HomeLeaderboardPreview() {
                     name={getDisplayName(row, row.rank)}
                     className="w-8 h-8 rounded-full text-[10px] text-white"
                     fallbackClassName="w-8 h-8 rounded-full bg-primary text-primary-foreground text-[10px]"
+                    isCoach={row.isCoach}
                   />
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-bold text-foreground truncate">{getDisplayName(row, row.rank)}</p>

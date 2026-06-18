@@ -9,7 +9,7 @@ import {
   PencilIcon, CameraIcon, ChevronRightIcon,
   TrendingUpIcon, TrendingDownIcon, MinusIcon,
   GemIcon, ChevronDownIcon, ChevronUpIcon,
-  MessageCircleIcon, WalletIcon, PlusIcon,
+  MessageCircleIcon, WalletIcon, PlusIcon, ClipboardListIcon,
 } from "lucide-react";
 
 import useAuth from "@/auth/useAuth";
@@ -223,14 +223,30 @@ export default function ProfilePage() {
               {loading ? (
                 <div className="w-28 h-28 rounded-[34px] bg-muted animate-pulse" />
               ) : (
-                <motion.img
-                  initial={{ scale: 0.85, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ type: "spring", stiffness: 200 }}
-                  src={`${getUserImage(user?.image)}?v=${imageVersion}`}
-                  alt={user?.name}
-                  className="w-28 h-28 rounded-[34px] object-cover border-4 border-white dark:border-background shadow-xl shadow-slate-300/60 dark:shadow-black/30"
-                />
+                <>
+                  <div
+                    className="w-28 h-28 rounded-[34px] shadow-xl shadow-slate-300/60 dark:shadow-black/30"
+                    style={user?.isCoach ? {
+                      padding: "3px",
+                      background: "linear-gradient(135deg, #f59e0b, #fde68a, #f59e0b)",
+                      boxShadow: "0 0 18px rgba(251,191,36,0.6)",
+                    } : {}}
+                  >
+                    <motion.img
+                      initial={{ scale: 0.85, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      transition={{ type: "spring", stiffness: 200 }}
+                      src={`${getUserImage(user?.image)}?v=${imageVersion}`}
+                      alt={user?.name}
+                      className="w-full h-full rounded-[32px] object-cover border-4 border-white dark:border-background"
+                    />
+                  </div>
+                  {user?.isCoach && (
+                    <span className="absolute -top-2.5 -right-2.5 px-2.5 py-1 rounded-full bg-amber-400 text-white text-[10px] font-black shadow-lg whitespace-nowrap z-10">
+                      مربی ✦
+                    </span>
+                  )}
+                </>
               )}
               <button
                 onClick={() => fileRef.current?.click()}
@@ -287,6 +303,31 @@ export default function ProfilePage() {
           </div>
         </motion.div>
       </div>
+
+      {user?.isCoach && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.19 }}
+          className="mx-4 mt-3"
+        >
+          <Link
+            to="/coach/management"
+            className="flex items-center justify-between gap-3 rounded-2xl bg-gradient-to-l from-sky-600 to-primary px-4 py-3.5 shadow-lg shadow-primary/20"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+                <ClipboardListIcon className="w-5 h-5 text-white" />
+              </div>
+              <div dir="rtl">
+                <p className="text-sm font-black text-white">پنل مربی</p>
+                <p className="text-[11px] text-white/70">مدیریت کلاس‌ها و جلسات خصوصی</p>
+              </div>
+            </div>
+            <ChevronRightIcon className="w-5 h-5 text-white/70 shrink-0" />
+          </Link>
+        </motion.div>
+      )}
 
       {/* ── Ranking & points ─────────────────────────────────────────── */}
       <motion.div

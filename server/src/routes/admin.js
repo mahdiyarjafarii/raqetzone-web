@@ -11,6 +11,7 @@ import {
   rejectBookingController,
   getAdminMatchesController,
   getAdminUsersController,
+  updateCoachVerificationController,
   getAdminDealsController,
   createAdminDealController,
   deleteAdminDealController,
@@ -38,6 +39,7 @@ router.get("/admin/matches",             getAdminMatchesController);
 
 // Users
 router.get("/admin/users",               getAdminUsersController);
+router.patch("/admin/users/:id/coach-verification", updateCoachVerificationController);
 
 // Discounts / Deals
 router.get("/admin/deals",               getAdminDealsController);

@@ -1,4 +1,4 @@
-import { and, desc, eq, gt, gte, ilike, isNull, lt, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, gte, ilike, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { clubs, rankingEvents, userRankings, users } from "../db/schema.js";
 
@@ -26,6 +26,8 @@ export const getLeaderboardController = async (req, res) => {
 
     const whereConditions = [];
     whereConditions.push(isNull(clubs.ownerId));
+    whereConditions.push(isNotNull(users.firstName));
+    whereConditions.push(isNotNull(users.lastName));
     if (city) whereConditions.push(eq(users.city, city));
     if (search) {
       const pattern = `%${search}%`;
@@ -61,6 +63,7 @@ export const getLeaderboardController = async (req, res) => {
         lastName: users.lastName,
         image: users.image,
         city: users.city,
+        isCoach: users.isCoach,
         points: sql`COALESCE(${userRankings.points}, 0)`,
         matchPoints: sql`COALESCE(${userRankings.matchPoints}, 0)`,
         tournamentPoints: sql`COALESCE(${userRankings.tournamentPoints}, 0)`,

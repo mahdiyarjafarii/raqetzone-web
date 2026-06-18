@@ -241,6 +241,12 @@ body {
   background-color: var(--background);
 }
 
+[data-rsbs-overlay],
+[data-rsbs-backdrop],
+[data-rsbs-root]:after {
+  z-index: 100;
+}
+
 textarea::placeholder {
   color: var(--muted-foreground);
 }

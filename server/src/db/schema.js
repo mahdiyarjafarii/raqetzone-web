@@ -27,6 +27,14 @@ export const users = pgTable("users", {
   lastResetCreditsDate: timestamp("last_reset_credits_date"),
   isAdmin: boolean("is_admin").notNull().default(false),
   isClubOwner: boolean("is_club_owner").notNull().default(false),
+  isCoach: boolean("is_coach").notNull().default(false),
+  coachVerificationStatus: varchar("coach_verification_status", { length: 20 }).notNull().default("none"), // none | pending | approved | rejected
+  coachHeadline: varchar("coach_headline", { length: 255 }),
+  coachExperienceYears: smallint("coach_experience_years"),
+  coachHourlyPrice: integer("coach_hourly_price"),
+  coachSpecialties: text("coach_specialties"),
+  coachCertifications: text("coach_certifications"),
+  coachLanguages: text("coach_languages"),
   // ─── Sports profile fields ───────────────────────────────────────────────
   bio: text("bio"),
   skillLevel: varchar("skill_level", { length: 20 }).default("beginner"), // beginner | intermediate | advanced | pro
@@ -41,6 +49,8 @@ export const users = pgTable("users", {
   index("idx_users_subscription_type").on(table.subscriptionType),
   index("idx_users_last_reset_credits_date").on(table.lastResetCreditsDate),
   index("idx_users_subscription_end_date").on(table.subscriptionEndDate),
+  index("idx_users_is_coach").on(table.isCoach),
+  index("idx_users_coach_verification_status").on(table.coachVerificationStatus),
 ]);
 
 export const otpCodes = pgTable("otp_codes", {
@@ -290,6 +300,81 @@ export const bookings = pgTable("bookings", {
   index("idx_bookings_status").on(table.status),
 ]);
 
+// ─── Coach Classes ────────────────────────────────────────────────────────────
+
+export const coachClasses = pgTable("coach_classes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  coachId: uuid("coach_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  sportType: varchar("sport_type", { length: 50 }).notNull().default("padel"),
+  city: varchar("city", { length: 100 }),
+  level: varchar("level", { length: 20 }).notNull().default("all"), // beginner | intermediate | advanced | all
+  price: integer("price").notNull().default(0),
+  capacity: integer("capacity").notNull().default(10),
+  enrolledCount: integer("enrolled_count").notNull().default(0),
+  sessions: jsonb("sessions").default(sql`'[]'::jsonb`), // [{date,startTime,endTime}]
+  status: varchar("status", { length: 20 }).notNull().default("active"), // active | completed | cancelled
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_coach_classes_coach_id").on(table.coachId),
+  index("idx_coach_classes_sport_type").on(table.sportType),
+  index("idx_coach_classes_status").on(table.status),
+  index("idx_coach_classes_created_at").on(table.createdAt),
+]);
+
+export const coachClassEnrollments = pgTable("coach_class_enrollments", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  classId: uuid("class_id").notNull().references(() => coachClasses.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  status: varchar("status", { length: 20 }).notNull().default("active"), // active | cancelled
+  amountPaid: integer("amount_paid").notNull().default(0),
+  paymentMethod: varchar("payment_method", { length: 20 }).notNull().default("none"), // none | wallet
+  paymentStatus: varchar("payment_status", { length: 20 }).notNull().default("unpaid"), // unpaid | paid
+  trackingCode: varchar("tracking_code", { length: 32 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_coach_class_enrollments_class_id").on(table.classId),
+  index("idx_coach_class_enrollments_user_id").on(table.userId),
+  uniqueIndex("uq_coach_class_enrollments_class_user").on(table.classId, table.userId),
+]);
+
+export const coachPrivateSessions = pgTable("coach_private_sessions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  coachId: uuid("coach_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  date: varchar("date", { length: 10 }).notNull(),
+  startTime: varchar("start_time", { length: 5 }).notNull(),
+  endTime: varchar("end_time", { length: 5 }).notNull(),
+  location: varchar("location", { length: 255 }),
+  notes: text("notes"),
+  status: varchar("status", { length: 20 }).notNull().default("pending"), // pending | confirmed | cancelled | completed
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_coach_private_sessions_coach_id").on(table.coachId),
+  index("idx_coach_private_sessions_user_id").on(table.userId),
+  index("idx_coach_private_sessions_date").on(table.date),
+  index("idx_coach_private_sessions_status").on(table.status),
+]);
+
+export const coachReviews = pgTable("coach_reviews", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  coachId: uuid("coach_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  rating: smallint("rating").notNull(),
+  comment: text("comment"),
+  coachReply: text("coach_reply"),
+  coachRepliedAt: timestamp("coach_replied_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_coach_reviews_coach_id").on(table.coachId),
+  index("idx_coach_reviews_user_id").on(table.userId),
+  uniqueIndex("uq_coach_reviews_coach_user").on(table.coachId, table.userId),
+]);
+
 // ─── Slot Overrides ───────────────────────────────────────────────────────────
 // status: "available" (default) | "blocked" | "booked"
 
@@ -351,7 +436,7 @@ export const notifications = pgTable("notifications", {
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
   title: varchar("title", { length: 255 }).notNull(),
   message: text("message").notNull(),
-  type: varchar("type", { length: 20 }).notNull().default("SYSTEM"),
+  type: varchar("type", { length: 50 }).notNull().default("SYSTEM"),
   // SYSTEM | PROMOTION | MATCH | BOOKING | ADMIN
   isRead: boolean("is_read").notNull().default(false),
   isPinned: boolean("is_pinned").notNull().default(false),

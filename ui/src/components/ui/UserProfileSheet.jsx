@@ -121,20 +121,34 @@ export default function UserProfileSheet({ userId, name, image: initialImage, sp
             <div className="relative flex flex-col items-center gap-3">
               {/* Avatar */}
               <div className="relative">
-                <div className="w-24 h-24 rounded-[28px] overflow-hidden border-4 border-white dark:border-background shadow-xl">
-                  {loading ? (
-                    <div className="w-full h-full bg-muted animate-pulse" />
-                  ) : avatarSrc ? (
-                    <img src={avatarSrc} alt={user?.name ?? name} className="w-full h-full object-cover" />
-                  ) : (
-                    <div
-                      className="w-full h-full flex items-center justify-center text-3xl font-black text-white"
-                      style={{ background: "linear-gradient(135deg, #2563eb, #0ea5e9)" }}
-                    >
-                      {(user?.name ?? name)?.[0]?.toUpperCase() ?? "?"}
-                    </div>
-                  )}
+                <div
+                  className="w-24 h-24 rounded-[28px] shadow-xl"
+                  style={user?.isCoach ? {
+                    padding: "3px",
+                    background: "linear-gradient(135deg, #f59e0b, #fde68a, #f59e0b)",
+                    boxShadow: "0 0 14px rgba(251,191,36,0.55)",
+                  } : {}}
+                >
+                  <div className="w-full h-full rounded-[24px] overflow-hidden border-4 border-white dark:border-background">
+                    {loading ? (
+                      <div className="w-full h-full bg-muted animate-pulse" />
+                    ) : avatarSrc ? (
+                      <img src={avatarSrc} alt={user?.name ?? name} className="w-full h-full object-cover" />
+                    ) : (
+                      <div
+                        className="w-full h-full flex items-center justify-center text-3xl font-black text-white"
+                        style={{ background: "linear-gradient(135deg, #2563eb, #0ea5e9)" }}
+                      >
+                        {(user?.name ?? name)?.[0]?.toUpperCase() ?? "?"}
+                      </div>
+                    )}
+                  </div>
                 </div>
+                {user?.isCoach && (
+                  <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 flex items-center gap-1 rounded-full bg-amber-400 px-2 py-0.5 text-[9px] font-black text-white shadow-md whitespace-nowrap">
+                    مربی
+                  </div>
+                )}
               </div>
 
               {/* Name */}

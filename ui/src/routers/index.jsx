@@ -19,6 +19,9 @@ const LeaderboardPage = lazy(() => import("@/pages/LeaderboardPage"));
 const NotificationsPage = lazy(() => import("@/pages/notifications/NotificationsPage"));
 const ClubsPage = lazy(() => import("@/pages/clubs/ClubsPage"));
 const ClubDetailPage = lazy(() => import("@/pages/clubs/ClubDetailPage"));
+const CoachesPage = lazy(() => import("@/pages/coaches/CoachesPage"));
+const CoachDetailPage = lazy(() => import("@/pages/coaches/CoachDetailPage"));
+const CoachManagementPage = lazy(() => import("@/pages/coaches/CoachManagementPage"));
 const MyBookingPage = lazy(() => import("@/pages/mybooking/MyBookingPage"));
 const BookingTrackPage = lazy(() => import("@/pages/booking/BookingTrackPage"));
 const ConversationsPage = lazy(() => import("@/pages/messages/ConversationsPage"));
@@ -52,6 +55,9 @@ const router = createBrowserRouter([
       { path: "leaderboard", element: s(LeaderboardPage) },
       { path: "clubs", element: s(ClubsPage) },
       { path: "clubs/:clubId", element: s(ClubDetailPage) },
+      { path: "coaches", element: s(CoachesPage) },
+      { path: "coaches/:coachId", element: s(CoachDetailPage) },
+      { path: "coach/management", element: s(CoachManagementPage) },
       { path: "mybooking", element: s(MyBookingPage) },
       { path: "booking/track/:code", element: s(BookingTrackPage) },
       { path: "notifications", element: s(NotificationsPage) },

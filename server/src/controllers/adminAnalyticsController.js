@@ -166,6 +166,40 @@ export const getAdminStatsController = async (req, res) => {
   }
 };
 
+export const updateCoachVerificationController = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body ?? {};
+
+    if (!["pending", "approved", "rejected", "none"].includes(status)) {
+      return res.status(400).json({ message: "وضعیت تایید نامعتبر است" });
+    }
+
+    const [updatedUser] = await db
+      .update(users)
+      .set({
+        isCoach: status === "none" ? false : true,
+        coachVerificationStatus: status,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, id))
+      .returning({
+        id: users.id,
+        isCoach: users.isCoach,
+        coachVerificationStatus: users.coachVerificationStatus,
+      });
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: "کاربر یافت نشد" });
+    }
+
+    return res.status(200).json({ user: updatedUser });
+  } catch (error) {
+    console.error("updateCoachVerification error:", error);
+    return res.status(500).json({ message: "خطای سرور" });
+  }
+};
+
 export const getAdminBookingsController = async (req, res) => {
   try {
     const { status, limit = "50", offset = "0" } = req.query;
@@ -383,6 +417,8 @@ export const getAdminUsersController = async (req, res) => {
         createdAt: users.createdAt,
         subscriptionType: users.subscriptionType,
         isAdmin: users.isAdmin,
+        isCoach: users.isCoach,
+        coachVerificationStatus: users.coachVerificationStatus,
       })
       .from(users)
       .orderBy(desc(users.createdAt))

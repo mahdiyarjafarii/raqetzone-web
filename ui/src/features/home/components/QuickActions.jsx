@@ -1,7 +1,10 @@
 import React from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Building2Icon, SwordsIcon, ClipboardListIcon } from "lucide-react";
+import { useAtomValue } from "jotai";
+import { Building2Icon, SwordsIcon, ClipboardListIcon, UserRoundSearchIcon } from "lucide-react";
+
+import { currentUserAtom } from "@/config/state";
 
 const ACTIONS = [
   {
@@ -28,12 +31,23 @@ const ACTIONS = [
     color: "bg-amber-500 text-white shadow-amber-500/20",
     border: "border-amber-500/15",
   },
+  {
+    icon: UserRoundSearchIcon,
+    label: "مربی‌ها",
+    sub: "کلاس و دوره",
+    href: "/coaches",
+    color: "bg-violet-500 text-white shadow-violet-500/20",
+    border: "border-violet-500/15",
+  },
 ];
 
 export default function QuickActions() {
+  const currentUser = useAtomValue(currentUserAtom);
+  const actions = ACTIONS;
+
   return (
-    <div className="grid grid-cols-3 gap-2.5 px-4 mb-2">
-      {ACTIONS.map((action, i) => (
+    <div className="grid grid-cols-2 gap-2.5 px-4 mb-2">
+      {actions.map((action, i) => (
         <motion.div
           key={action.label}
           initial={{ opacity: 0, y: 12 }}

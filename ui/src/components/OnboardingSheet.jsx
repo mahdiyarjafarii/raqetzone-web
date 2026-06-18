@@ -1,6 +1,6 @@
 import "react-spring-bottom-sheet/dist/style.css";
 
-import React, { useState, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { BottomSheet } from "react-spring-bottom-sheet";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAtom } from "jotai";
@@ -44,8 +44,13 @@ const PROVINCES = [
   "مازندران", "مرکزی", "هرمزگان", "همدان", "یزد",
 ];
 
-// 0=welcome, 1=profile, 2=photo, 3=sport, 4=level, 5=duration
-const TOTAL_STEPS = 6;
+const ROLES = [
+  { value: "player", label: "بازیکن", desc: "برای بازی، رزرو و شرکت در کلاس", emoji: "🎾" },
+  { value: "coach", label: "مربی", desc: "برای برگزاری کلاس و جذب هنرجو", emoji: "🧑‍🏫" },
+];
+
+// 0=welcome, 1=profile, 2=role, 3=photo, 4=sport, 5=level, 6=duration
+const TOTAL_STEPS = 7;
 
 const getOnboardingUserImage = (image) => {
   if (!image) return null;
@@ -79,6 +84,41 @@ const sendOnboardingUploadDebugLog = async (event, payload = {}) => {
     console.error("Onboarding image debug log failed:", error);
   }
 };
+
+function StepRole({ wantsCoach, onChange }) {
+  return (
+    <div className="space-y-6 text-center">
+      <div>
+        <div className="text-5xl mb-4">🧩</div>
+        <h2 className="text-xl font-black text-foreground">نقش شما در رکت‌زون چیه؟</h2>
+        <p className="text-muted-foreground text-sm mt-2">در صورت انتخاب مربی، حساب شما بعد از تایید فعال می‌شود</p>
+      </div>
+
+      <div className="space-y-2.5">
+        {ROLES.map((role) => {
+          const selected = wantsCoach ? role.value === "coach" : role.value === "player";
+          return (
+            <button
+              key={role.value}
+              type="button"
+              onClick={() => onChange(role.value === "coach")}
+              className={cn(
+                "w-full flex items-center gap-4 p-4 rounded-2xl border-2 transition-all text-right",
+                selected ? "border-primary bg-primary/5 shadow-sm shadow-primary/20" : "border-border bg-card"
+              )}
+            >
+              <span className="text-2xl shrink-0">{role.emoji}</span>
+              <div className="flex-1 min-w-0">
+                <p className={cn("font-bold text-sm", selected ? "text-primary" : "text-foreground")}>{role.label}</p>
+                <p className="text-muted-foreground text-xs mt-0.5">{role.desc}</p>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 // ── Steps ─────────────────────────────────────────────────────────────────────
 
@@ -411,7 +451,7 @@ function ProgressDots({ current, total }) {
 
 export default function OnboardingSheet() {
   const [open, setOpen] = useAtom(showOnboardingSheetAtom);
-  const [, setCurrentUser] = useAtom(currentUserAtom);
+  const [currentUser, setCurrentUser] = useAtom(currentUserAtom);
 
   const [step, setStep] = useState(0);
   const [firstName, setFirstName] = useState("");
@@ -419,6 +459,7 @@ export default function OnboardingSheet() {
   const [city, setCity] = useState("");
   const [provincePickerOpen, setProvincePickerOpen] = useState(false);
   const [provinceQuery, setProvinceQuery] = useState("");
+  const [wantsCoach, setWantsCoach] = useState(false);
   const [photoPreview, setPhotoPreview] = useState(null);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoUploadProgress, setPhotoUploadProgress] = useState(0);
@@ -432,10 +473,15 @@ export default function OnboardingSheet() {
     province.includes(provinceQuery.trim())
   );
 
+  useEffect(() => {
+    if (!open) return;
+    setWantsCoach(Boolean(currentUser?.isCoach));
+  }, [open, currentUser?.isCoach]);
+
   const canNext = () => {
     if (step === 1) return firstName.trim().length >= 2 && lastName.trim().length >= 2 && city.trim().length >= 2;
-    if (step === 2) return !photoUploading;
-    if (step === 3) return sports.length > 0;
+    if (step === 3) return !photoUploading;
+    if (step === 4) return sports.length > 0;
     return true;
   };
 
@@ -502,6 +548,7 @@ export default function OnboardingSheet() {
       firstName: trimmedFirstName,
       lastName: trimmedLastName,
       city: city.trim(),
+      isCoach: wantsCoach,
       favoriteSport: sports[0],
       skillLevel: level,
     });
@@ -509,12 +556,16 @@ export default function OnboardingSheet() {
     if (!ok) return toast.error("خطا در ذخیره اطلاعات");
     if (data?.user) setCurrentUser(data.user);
     setOpen(false);
-    toast.success(`خوش اومدی ${trimmedFirstName} 🎉`);
+    toast.success(
+      wantsCoach
+        ? `خوش اومدی ${trimmedFirstName} 🎉 درخواست مربی‌بودن ثبت شد`
+        : `خوش اومدی ${trimmedFirstName} 🎉`
+    );
   };
 
   const btnLabel = () => {
     if (step === 0) return "شروع کن 🚀";
-    if (step === 2) return photoUploading ? "در حال آپلود..." : "ادامه";
+    if (step === 3) return photoUploading ? "در حال آپلود..." : "ادامه";
     if (isLastStep) return saving ? "در حال ذخیره..." : "بزن بریم! 🎉";
     return "بعدی";
   };
@@ -550,7 +601,8 @@ export default function OnboardingSheet() {
                 onOpenProvincePicker={() => setProvincePickerOpen(true)}
               />
             )}
-            {step === 2 && (
+            {step === 2 && <StepRole wantsCoach={wantsCoach} onChange={setWantsCoach} />}
+            {step === 3 && (
               <StepPhoto
                 preview={photoPreview}
                 onSelect={handlePhotoSelect}
@@ -558,9 +610,9 @@ export default function OnboardingSheet() {
                 uploadProgress={photoUploadProgress}
               />
             )}
-            {step === 3 && <StepSport value={sports} onChange={setSports} />}
-            {step === 4 && <StepLevel value={level} onChange={setLevel} />}
-            {step === 5 && <StepWeeklyHours value={weeklyHours} onChange={setWeeklyHours} />}
+            {step === 4 && <StepSport value={sports} onChange={setSports} />}
+            {step === 5 && <StepLevel value={level} onChange={setLevel} />}
+            {step === 6 && <StepWeeklyHours value={weeklyHours} onChange={setWeeklyHours} />}
           </motion.div>
         </AnimatePresence>
 

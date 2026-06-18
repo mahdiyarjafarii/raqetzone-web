@@ -6,6 +6,7 @@ import "react-lazy-load-image-component/src/effects/blur.css";
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { PlusIcon, RefreshCwIcon, SearchIcon, ZapIcon, TrophyIcon } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import { useAtom, useSetAtom } from "jotai";
 import toast from "react-hot-toast";
 
@@ -29,6 +30,14 @@ const MAIN_TABS = [
   { value: "tournaments", label: "تورنومنت", icon: <TrophyIcon className="w-3.5 h-3.5" /> },
   { value: "leaderboard", label: "رنکینگ", icon: <TrophyIcon className="w-3.5 h-3.5" /> },
 ];
+
+const TAB_VALUES = MAIN_TABS.map((tab) => tab.value);
+
+function getTabPillClass(value) {
+  if (value === "tournaments") return "bg-gradient-to-r from-violet-600 to-indigo-600";
+  if (value === "leaderboard") return "bg-gradient-to-r from-amber-500 to-orange-500";
+  return "bg-background";
+}
 
 function MatchmakingSection() {
   const [matches, setMatches] = useAtom(matchesAtom);
@@ -127,7 +136,27 @@ function MatchmakingSection() {
 }
 
 export default function TournamentPage() {
-  const [activeTab, setActiveTab] = useState("matchmaking");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = TAB_VALUES.includes(searchParams.get("tab")) ? searchParams.get("tab") : "matchmaking";
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  const handleTabChange = (nextTab) => {
+    if (nextTab === activeTab) return;
+    setActiveTab(nextTab);
+    const params = new URLSearchParams(searchParams);
+    params.set("tab", nextTab);
+    setSearchParams(params, { replace: true });
+    if (typeof window !== "undefined") {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
+  useEffect(() => {
+    const queryTab = searchParams.get("tab");
+    if (TAB_VALUES.includes(queryTab) && queryTab !== activeTab) {
+      setActiveTab(queryTab);
+    }
+  }, [searchParams]);
 
   const isClubOwner = (() => {
     try {
@@ -171,25 +200,32 @@ export default function TournamentPage() {
           transition={{ delay: 0.12 }}
           className="flex gap-1.5 mt-4 p-1 bg-muted rounded-2xl"
         >
-          {MAIN_TABS.map((tab) => (
-            <button
-              key={tab.value}
-              onClick={() => setActiveTab(tab.value)}
-              className={cn(
-                "flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold transition-all",
-                activeTab === tab.value
-                  ? tab.value === "tournaments"
-                    ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-sm"
-                    : tab.value === "leaderboard"
-                    ? "bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-sm"
-                    : "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {tab.icon}
-              {tab.label}
-            </button>
-          ))}
+          {MAIN_TABS.map((tab) => {
+            const isActive = activeTab === tab.value;
+            const activeTextClass = tab.value === "matchmaking" ? "text-foreground" : "text-white";
+            return (
+              <button
+                key={tab.value}
+                onClick={() => handleTabChange(tab.value)}
+                className={cn(
+                  "relative flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold transition-colors",
+                  isActive ? activeTextClass : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {isActive && (
+                  <motion.span
+                    layoutId="tournament-tab-pill"
+                    className={cn("absolute inset-0 rounded-xl shadow-sm", getTabPillClass(tab.value))}
+                    transition={{ type: "spring", stiffness: 500, damping: 40 }}
+                  />
+                )}
+                <span className="relative z-10 flex items-center gap-1.5">
+                  {tab.icon}
+                  {tab.label}
+                </span>
+              </button>
+            );
+          })}
         </motion.div>
       </div>
 

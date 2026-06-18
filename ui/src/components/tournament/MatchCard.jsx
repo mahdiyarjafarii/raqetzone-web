@@ -161,6 +161,7 @@ export default function MatchCard({ match, onClick, index = 0 }) {
                       name={creator.name}
                       className="h-5 w-5 rounded-full text-[9px] text-white shrink-0"
                       fallbackClassName="h-5 w-5 rounded-full bg-primary text-primary-foreground text-[9px] shrink-0"
+                      isCoach={creator.isCoach}
                     />
                   ) : (
                     <div className="h-5 w-5 rounded-full bg-muted flex items-center justify-center shrink-0">
@@ -202,6 +203,7 @@ export default function MatchCard({ match, onClick, index = 0 }) {
                     name={player.name}
                     className="h-7 w-7 rounded-full border-2 border-background text-[10px] text-white"
                     fallbackClassName="h-7 w-7 rounded-full border-2 border-background bg-blue-500 text-white text-[10px]"
+                    isCoach={player.isCoach}
                   />
                 ) : (
                   <div key={i} className="h-7 w-7 rounded-full border-2 border-background border-dashed bg-muted text-muted-foreground flex items-center justify-center text-[10px] font-bold">
@@ -224,6 +226,7 @@ export default function MatchCard({ match, onClick, index = 0 }) {
                     name={player.name}
                     className="h-7 w-7 rounded-full border-2 border-background text-[10px] text-white"
                     fallbackClassName="h-7 w-7 rounded-full border-2 border-background bg-violet-500 text-white text-[10px]"
+                    isCoach={player.isCoach}
                   />
                 ) : (
                   <div key={i} className="h-7 w-7 rounded-full border-2 border-background border-dashed bg-muted text-muted-foreground flex items-center justify-center text-[10px] font-bold">

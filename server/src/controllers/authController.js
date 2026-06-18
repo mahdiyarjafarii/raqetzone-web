@@ -108,6 +108,8 @@ export const verifyOTPController = async (req, res) => {
         .values({
           phone,
           isClubOwner: !!isClubOwner,
+          isCoach: false,
+          coachVerificationStatus: "none",
           createdAt: new Date(),
           updatedAt: new Date(),
         })
@@ -149,6 +151,14 @@ export const verifyOTPController = async (req, res) => {
         image: user.image,
         isAdmin: user.isAdmin ?? false,
         isClubOwner: user.isClubOwner ?? false,
+        isCoach: user.isCoach ?? false,
+        coachVerificationStatus: user.coachVerificationStatus ?? "none",
+        coachHeadline: user.coachHeadline,
+        coachExperienceYears: user.coachExperienceYears,
+        coachHourlyPrice: user.coachHourlyPrice,
+        coachSpecialties: user.coachSpecialties,
+        coachCertifications: user.coachCertifications,
+        coachLanguages: user.coachLanguages,
       },
     });
   } catch (error) {
@@ -192,7 +202,17 @@ export const checkUserController = async (req, res) => {
 
     return res.status(200).json({
       message: isNewUser ? "کاربر ایجاد شد" : "کاربر یافت شد",
-      user,
+      user: {
+        ...user,
+        isCoach: user.isCoach ?? false,
+        coachVerificationStatus: user.coachVerificationStatus ?? "none",
+        coachHeadline: user.coachHeadline,
+        coachExperienceYears: user.coachExperienceYears,
+        coachHourlyPrice: user.coachHourlyPrice,
+        coachSpecialties: user.coachSpecialties,
+        coachCertifications: user.coachCertifications,
+        coachLanguages: user.coachLanguages,
+      },
       token,
     });
   } catch (error) {

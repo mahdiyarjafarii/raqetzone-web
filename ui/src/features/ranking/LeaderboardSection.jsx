@@ -182,6 +182,7 @@ export default function LeaderboardSection({ mode = "embedded" }) {
                   name={getDisplayName(row, row.rank)}
                   className="w-6 h-6 rounded-full text-[10px] text-white"
                   fallbackClassName="w-6 h-6 rounded-full bg-primary text-primary-foreground text-[10px]"
+                  isCoach={row.isCoach}
                 />
                 <p className="text-xs font-bold text-foreground truncate max-w-[90px]">
                   {getDisplayName(row, row.rank)}
@@ -238,6 +239,7 @@ export default function LeaderboardSection({ mode = "embedded" }) {
                           name={getDisplayName(row, row.rank)}
                           className="w-7 h-7 rounded-full text-[10px] text-white"
                           fallbackClassName="w-7 h-7 rounded-full bg-primary text-primary-foreground text-[10px]"
+                          isCoach={row.isCoach}
                         />
                         <span className="truncate font-semibold">{getDisplayName(row, row.rank)}</span>
                         {currentUser?.id && String(row.userId) === String(currentUser.id) && (

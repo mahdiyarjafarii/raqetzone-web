@@ -2,11 +2,24 @@ import { eq, and, or, ne } from "drizzle-orm";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import sharp from "sharp";
 
 import { db } from "../db/index.js";
 import { users } from "../db/schema.js";
 import { validateIranianPhone } from "../utils/validation.js";
 import { getPlanCredits } from "../utils/credits/getPlanCredits.js";
+
+const NON_WEB_IMAGE_EXTS = new Set([".heic", ".heif", ".tif", ".tiff", ".bmp", ".avif"]);
+
+async function convertToJpegIfNeeded(filePath, originalname) {
+  const ext = path.extname(originalname).toLowerCase();
+  if (!NON_WEB_IMAGE_EXTS.has(ext)) return filePath;
+
+  const jpegPath = filePath.replace(/\.[^.]+$/, ".jpg");
+  await sharp(filePath).jpeg({ quality: 85 }).toFile(jpegPath);
+  fs.unlinkSync(filePath);
+  return jpegPath;
+}
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -32,6 +45,14 @@ export const getCurrentUserController = async (req, res) => {
         city: user.city,
         email: user.email,
         image: user.image,
+        isCoach: user.isCoach ?? false,
+        coachVerificationStatus: user.coachVerificationStatus ?? "none",
+        coachHeadline: user.coachHeadline,
+        coachExperienceYears: user.coachExperienceYears,
+        coachHourlyPrice: user.coachHourlyPrice,
+        coachSpecialties: user.coachSpecialties,
+        coachCertifications: user.coachCertifications,
+        coachLanguages: user.coachLanguages,
         credits: user.credits,
         totalCredits: user.totalCredits,
         subscriptionType: user.subscriptionType,
@@ -51,7 +72,23 @@ export const getCurrentUserController = async (req, res) => {
 export const updateProfileController = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { name, firstName, lastName, city, phone, email, skillLevel, favoriteSport } = req.body;
+    const {
+      name,
+      firstName,
+      lastName,
+      city,
+      phone,
+      email,
+      skillLevel,
+      favoriteSport,
+      isCoach,
+      coachHeadline,
+      coachExperienceYears,
+      coachHourlyPrice,
+      coachSpecialties,
+      coachCertifications,
+      coachLanguages,
+    } = req.body;
 
     // Validate phone if provided
     if (phone && !validateIranianPhone(phone)) {
@@ -98,8 +135,28 @@ export const updateProfileController = async (req, res) => {
         city: city || req.user.city,
         phone: phone || req.user.phone,
         email: email || req.user.email,
+        ...(typeof isCoach === "boolean" && {
+          isCoach,
+          coachVerificationStatus: isCoach
+            ? (req.user.coachVerificationStatus === "approved" ? "approved" : "pending")
+            : "none",
+        }),
         ...(skillLevel && { skillLevel }),
         ...(favoriteSport && { favoriteSport }),
+        ...(typeof coachHeadline === "string" && { coachHeadline: coachHeadline.trim() || null }),
+        ...(coachExperienceYears != null && {
+          coachExperienceYears: Number.isFinite(Number(coachExperienceYears))
+            ? Number.parseInt(coachExperienceYears, 10)
+            : null,
+        }),
+        ...(coachHourlyPrice != null && {
+          coachHourlyPrice: Number.isFinite(Number(coachHourlyPrice))
+            ? Number.parseInt(coachHourlyPrice, 10)
+            : null,
+        }),
+        ...(typeof coachSpecialties === "string" && { coachSpecialties: coachSpecialties.trim() || null }),
+        ...(typeof coachCertifications === "string" && { coachCertifications: coachCertifications.trim() || null }),
+        ...(typeof coachLanguages === "string" && { coachLanguages: coachLanguages.trim() || null }),
         updatedAt: new Date(),
       })
       .where(eq(users.id, userId))
@@ -115,6 +172,14 @@ export const updateProfileController = async (req, res) => {
         city: updatedUser.city,
         email: updatedUser.email,
         image: updatedUser.image,
+        isCoach: updatedUser.isCoach ?? false,
+        coachVerificationStatus: updatedUser.coachVerificationStatus ?? "none",
+        coachHeadline: updatedUser.coachHeadline,
+        coachExperienceYears: updatedUser.coachExperienceYears,
+        coachHourlyPrice: updatedUser.coachHourlyPrice,
+        coachSpecialties: updatedUser.coachSpecialties,
+        coachCertifications: updatedUser.coachCertifications,
+        coachLanguages: updatedUser.coachLanguages,
         skillLevel: updatedUser.skillLevel,
         favoriteSport: updatedUser.favoriteSport,
       },
@@ -201,9 +266,13 @@ export const uploadProfileImageController = async (req, res) => {
       }
     }
 
+    // Convert non-web formats (HEIC, TIFF, BMP, etc.) to JPEG
+    const convertedPath = await convertToJpegIfNeeded(file.path, file.originalname);
+    const convertedFilename = path.basename(convertedPath);
+
     // Build relative image path (user/{date}/filename)
     const currentDate = new Date().toISOString().split("T")[0];
-    const relativeImagePath = `${currentDate}/${file.filename}`;
+    const relativeImagePath = `${currentDate}/${convertedFilename}`;
 
     // Update user image with relative path only
     const [updatedUser] = await db
@@ -236,6 +305,14 @@ export const uploadProfileImageController = async (req, res) => {
         city: updatedUser.city,
         email: updatedUser.email,
         image: updatedUser.image,
+        isCoach: updatedUser.isCoach ?? false,
+        coachVerificationStatus: updatedUser.coachVerificationStatus ?? "none",
+        coachHeadline: updatedUser.coachHeadline,
+        coachExperienceYears: updatedUser.coachExperienceYears,
+        coachHourlyPrice: updatedUser.coachHourlyPrice,
+        coachSpecialties: updatedUser.coachSpecialties,
+        coachCertifications: updatedUser.coachCertifications,
+        coachLanguages: updatedUser.coachLanguages,
       },
     });
   } catch (error) {

@@ -1,7 +1,61 @@
 import React, { useState, useEffect } from "react";
 import { RouterProvider } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
-import { LoadingOverlay } from "@achmadk/react-loading-overlay";
+
+function AppToaster() {
+  return (
+    <Toaster
+      position="top-center"
+      toastOptions={{
+        duration: 3500,
+        style: {
+          direction: "rtl",
+          fontFamily: "inherit",
+          fontSize: "0.875rem",
+          fontWeight: "500",
+          padding: "12px 16px",
+          borderRadius: "14px",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.12)",
+          border: "1px solid rgba(255,255,255,0.08)",
+          maxWidth: "340px",
+          lineHeight: "1.5",
+        },
+        success: {
+          style: {
+            background: "rgba(22, 163, 74, 0.92)",
+            color: "#ffffff",
+          },
+          iconTheme: {
+            primary: "#ffffff",
+            secondary: "rgba(22, 163, 74, 0.92)",
+          },
+        },
+        error: {
+          style: {
+            background: "rgba(220, 38, 38, 0.92)",
+            color: "#ffffff",
+          },
+          iconTheme: {
+            primary: "#ffffff",
+            secondary: "rgba(220, 38, 38, 0.92)",
+          },
+        },
+        loading: {
+          style: {
+            background: "rgba(30, 30, 40, 0.92)",
+            color: "#ffffff",
+          },
+          iconTheme: {
+            primary: "#2B0FD9",
+            secondary: "rgba(30, 30, 40, 0.92)",
+          },
+        },
+      }}
+    />
+  );
+}
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { ErrorBoundary } from "react-error-boundary";
 
@@ -12,6 +66,7 @@ import {
   showAuthSheetAtom,
   authCallbacksAtom,
   showOnboardingSheetAtom,
+  showSplashAtom,
 } from "./config/state";
 import CheckLogin from "./components/CheckLogin";
 import useAuth from "./auth/useAuth";
@@ -20,14 +75,16 @@ import apiClient from "@/lib/apiClient";
 import ErrorFallback from "./components/ErrorFallback";
 import AuthBottomSheet from "./components/AuthBottomSheet";
 import OnboardingSheet from "./components/OnboardingSheet";
+import SplashScreen from "./components/SplashScreen";
+import GlobalLoader from "./components/GlobalLoader";
 
 function App() {
   const { setCurrentUser } = useAuth();
 
-  const showOverlayLoading = useAtomValue(showOverlayLoadingAtom);
   const showOnboarding = useAtomValue(showOnboardingSheetAtom);
   const [theme, setTheme] = useAtom(themeAtom);
   const [isReady, setIsReady] = useState(false);
+  const [showSplash, setShowSplash] = useAtom(showSplashAtom);
   const setShowAuthSheet = useSetAtom(showAuthSheetAtom);
   const setAuthCallbacks = useSetAtom(authCallbacksAtom);
   const setShowOnboarding = useSetAtom(showOnboardingSheetAtom);
@@ -40,7 +97,11 @@ function App() {
     return !(firstName && lastName);
   };
 
-  useEffect(() => { preload(); }, []);
+  useEffect(() => {
+    preload();
+    const timer = setTimeout(() => setShowSplash(false), 5000);
+    return () => clearTimeout(timer);
+  }, []);
   useEffect(() => {
     document.documentElement.classList.toggle("dark", theme === "dark");
   }, [theme]);
@@ -120,9 +181,10 @@ function App() {
   if (!isReady)
     return (
       <>
+        <SplashScreen visible={showSplash} />
         <CheckLogin />
         <AuthBottomSheet />
-        <Toaster />
+        <AppToaster />
       </>
     );
 
@@ -132,27 +194,11 @@ function App() {
       onError={handleError}
       onReset={handleReset}
     >
+      <SplashScreen visible={showSplash} />
       {!showOnboarding && <RouterProvider router={router} />}
       <OnboardingSheet />
-      <Toaster />
-      <LoadingOverlay
-        spinner
-        active={showOverlayLoading}
-        text="لطفا منتظر باشید..."
-        fadeSpeed={200}
-        styles={{
-          overlay: (base) => ({
-            ...base,
-            position: "fixed",
-            backgroundColor: "rgba(0, 0, 0, 0.7)",
-            zIndex: 99999999,
-          }),
-          spinner: (base) => ({
-            ...base,
-            marginBottom: "20px",
-          }),
-        }}
-      />
+      <AppToaster />
+      <GlobalLoader />
     </ErrorBoundary>
   );
 }

@@ -182,6 +182,7 @@ export const getMyProfileController = async (req, res) => {
         xp: users.xp,
         level: users.level,
         createdAt: users.createdAt,
+        isCoach: users.isCoach,
       })
       .from(users)
       .where(eq(users.id, userId))
@@ -277,6 +278,7 @@ export const getPublicProfileController = async (req, res) => {
         level: users.level,
         xp: users.xp,
         createdAt: users.createdAt,
+        isCoach: users.isCoach,
       })
       .from(users)
       .where(eq(users.id, userId))
