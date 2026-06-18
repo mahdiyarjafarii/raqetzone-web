@@ -7,14 +7,26 @@ const apiClient = create({
   baseURL: `${import.meta.env.VITE_WEBSITE_URL}/api`,
 });
 
+const SILENT_PATTERNS = [
+  /\/notifications/,
+  /\/wallet/,
+  /\/home/,
+  /\/ranking/,
+  /socket\.io/,
+];
+
+function isSilent(url) {
+  return SILENT_PATTERNS.some((p) => p.test(url ?? ""));
+}
+
 apiClient.addAsyncRequestTransform(async (request) => {
   const token = authStorage.getToken();
   if (token) request.headers['x-auth-token'] = token;
-  loadingBus.increment();
+  if (!isSilent(request.url)) loadingBus.increment();
 });
 
-apiClient.addAsyncResponseTransform(async () => {
-  loadingBus.decrement();
+apiClient.addAsyncResponseTransform(async (response) => {
+  if (!isSilent(response.config?.url)) loadingBus.decrement();
 });
 
 apiClient.addAsyncResponseTransform(async (response, b) => {
