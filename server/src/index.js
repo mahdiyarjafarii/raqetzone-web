@@ -36,6 +36,7 @@ import "./jobs/dailyCreditsReset.js";
 import "./jobs/bookingReminder.js";
 import "./jobs/certifiedMatchFiller.js";
 import "./jobs/matchResultReminder.js";
+import "./jobs/matchFillReminder.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

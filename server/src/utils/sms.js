@@ -60,6 +60,25 @@ export const sendSMS = async (phone, message) => {
 };
 
 /**
+ * Send SMS to all users with a phone number (fire-and-forget).
+ * @param {string} message
+ */
+export const broadcastSMS = async (message) => {
+  try {
+    const { db } = await import('../db/index.js');
+    const { users } = await import('../db/schema.js');
+    const allUsers = await db.select({ phone: users.phone }).from(users);
+    const phones = allUsers.map(u => normalizePhone(u.phone)).filter(Boolean);
+    for (const phone of phones) {
+      sendSMS(phone, message).catch(err => console.error(`[broadcastSMS] ${phone}:`, err.message));
+    }
+    console.log(`[broadcastSMS] queued ${phones.length} SMS`);
+  } catch (err) {
+    console.error('[broadcastSMS] error:', err.message);
+  }
+};
+
+/**
  * Send OTP code via SMS
  * @param {string} phone - Mobile phone number
  * @param {string} code - 6-digit OTP code

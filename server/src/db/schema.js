@@ -185,6 +185,7 @@ export const matches = pgTable("matches", {
   status: varchar("status", { length: 20 }).notNull().default("open"), // open | full | cancelled | completed
   isCertified: boolean("is_certified").notNull().default(false),
   resultReminderSentAt: timestamp("result_reminder_sent_at"),
+  fillReminderSentAt: timestamp("fill_reminder_sent_at"),
   inviteToken: varchar("invite_token", { length: 64 }),
   createdBy: uuid("created_by").references(() => users.id, { onDelete: "set null" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),

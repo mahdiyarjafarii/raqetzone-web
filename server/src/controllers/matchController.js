@@ -12,7 +12,7 @@ import {
   bookings,
   slotOverrides,
 } from "../db/schema.js";
-import { sendSMS } from "../utils/sms.js";
+import { sendSMS, broadcastSMS } from "../utils/sms.js";
 import { awardRankingPoints, MATCH_WIN_POINTS } from "../utils/ranking.js";
 
 const RATING_TAGS = [
@@ -669,27 +669,43 @@ export const joinMatchController = async (req, res) => {
     const [updated] = await db.select().from(matches).where(eq(matches.id, id)).limit(1);
     const result = await enrichMatch(updated);
 
-    // Send SMS to existing participants (skip if nobody was there — first joiner edge case)
-    if (existingParticipants.length > 0) {
-      const joiner = await db
-        .select({ name: users.name, phone: users.phone })
-        .from(users)
-        .where(eq(users.id, userId))
-        .limit(1)
-        .then((r) => r[0]);
+    // Notify all participants about the new joiner
+    const joiner = await db
+      .select({ name: users.name })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1)
+      .then((r) => r[0]);
 
-      const otherIds = existingParticipants.map((p) => p.userId);
-      const otherUsers = await db
-        .select({ phone: users.phone, name: users.name })
-        .from(users)
-        .where(inArray(users.id, otherIds));
+    const joinerName = joiner?.name ?? "یک بازیکن";
+    const teamName = team === "A" ? "۱" : "۲";
+    const isFull = allParticipants.length >= match.teamSize * 2;
 
-      const smsText =
-        `${joiner?.name ?? "یک بازیکن"} به بازی «${match.title}» پیوست 🎮\n` +
-        `تیم: ${team === "A" ? "آبی" : "بنفش"}\n` +
-        `شماره: ${joiner?.phone ?? "-"}`;
+    const allParticipantIds = allParticipants.map((p) => p.userId);
+    const allParticipantUsers = await db
+      .select({ phone: users.phone })
+      .from(users)
+      .where(inArray(users.id, allParticipantIds));
 
-      await Promise.allSettled(otherUsers.map((u) => sendSMS(u.phone, smsText)));
+    if (isFull) {
+      // Match is now full — send completion message to everyone
+      const fullSmsText =
+        `🎉 مچ «${match.title}» تکمیل شد!\n` +
+        `همه بازیکنا آماده‌ان. میبینمتون تو زمین! 🎾\n` +
+        `📍 ${match.location}${match.courtName ? ` - ${match.courtName}` : ''}\n` +
+        `رکت زون 🏆`;
+
+      await Promise.allSettled(allParticipantUsers.map((u) => u.phone && sendSMS(u.phone, fullSmsText)));
+    } else if (existingParticipants.length > 0) {
+      // Notify existing participants about the new joiner
+      const spotsLeft = match.teamSize * 2 - allParticipants.length;
+      const joinSmsText =
+        `🎮 ${joinerName} به تیم ${teamName} بازی «${match.title}» پیوست!\n` +
+        `هنوز ${spotsLeft} جای خالی داریم، بگو بیان! 🙌\n` +
+        `رکت زون 🎾`;
+
+      const othersPhones = allParticipantUsers.filter((u) => u.phone);
+      await Promise.allSettled(othersPhones.map((u) => sendSMS(u.phone, joinSmsText)));
     }
 
     return res.status(200).json({ match: result });
@@ -876,6 +892,27 @@ export const createMatchController = async (req, res) => {
     await db.insert(matchParticipants).values({ matchId: match.id, userId, team: "A" });
 
     const enriched = await enrichMatch(withToken);
+
+    // Fire-and-forget SMS broadcast to all users
+    const spotsLeft = match.teamSize * 2 - 1; // creator already joined
+    const sportLabels = { padel: "پدل", tennis: "تنیس", squash: "اسکواش", badminton: "بدمینتون", "ping-pong": "پینگ‌پنگ" };
+    const sportLabel = sportLabels[match.sportType] ?? match.sportType;
+    const dateStr = parsedDate.toLocaleDateString("fa-IR-u-ca-persian", { timeZone: "Asia/Tehran", year: "numeric", month: "long", day: "numeric" });
+    const timeStr = parsedDate.toLocaleTimeString("fa-IR", { timeZone: "Asia/Tehran", hour: "2-digit", minute: "2-digit" });
+    const smsText =
+      `سلام ورزشکار عزیز 👋\n` +
+      `🎾 همین الان یک بازی جدید ساخته شد!\n` +
+      `ما می‌خوایم بازی کنیم و بازیکن کم داریم! 😄\n` +
+      `برای تکمیل این بازی به ${spotsLeft} بازیکن دیگر نیاز داریم.\n` +
+      `🏆 مچ: ${match.title}\n` +
+      `🎯 نوع بازی: ${sportLabel}\n` +
+      `📍 باشگاه: ${match.location}${match.courtName ? ` - ${match.courtName}` : ''}\n` +
+      `📅 ${dateStr}\n` +
+      `🕒 ${timeStr}\n` +
+      `اگر آماده بازی هستی، همین حالا وارد اپلیکیشن رکت زون شو، به بخش بازی‌ها برو و درخواست پیوستن به این بازی را ثبت کن.\n` +
+      `رکت زون | جامع‌ترین پلتفرم هوشمند ورزش‌های راکتی 🎾`;
+    broadcastSMS(smsText);
+
     return res.status(201).json({ match: enriched });
   } catch (error) {
     console.error("createMatch error:", error);
