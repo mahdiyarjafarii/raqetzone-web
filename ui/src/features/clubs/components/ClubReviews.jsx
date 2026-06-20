@@ -58,7 +58,7 @@ function Stars({ value, size = "w-3.5 h-3.5" }) {
 function ReviewCard({ review, currentUserId, onDelete }) {
   const initial = review.user?.name?.[0]?.toUpperCase() ?? "?";
   const avatar = review.user?.image
-    ? (review.user.image.startsWith("http") ? review.user.image : `${BASE}/${review.user.image.replace(/^\/+/, "")}`)
+    ? (review.user.image.startsWith("http") ? review.user.image : `${BASE}/uploads/user/${review.user.image.replace(/^\/+/, "")}`)
     : null;
 
   return (
