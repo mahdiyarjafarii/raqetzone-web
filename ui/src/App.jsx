@@ -151,6 +151,7 @@ function App() {
     const user = storage.getUser();
 
     if (!token || !user) {
+      setShowSplash(false);
       setAuthCallbacks({
         onSuccess: async () => {
           const nextUser = storage.getUser();
