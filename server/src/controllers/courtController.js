@@ -10,18 +10,26 @@ function toMinutes(time) {
   return h * 60 + m;
 }
 
+function normalizeEndMin(endMin, startMin) {
+  // "00:00" stored as 0 means midnight; treat as 1440 when it follows a start time
+  return endMin <= startMin ? endMin + 1440 : endMin;
+}
+
 function generateSlots(openTime, closeTime, slotDuration, bookedSlots, pricePerHour = 0, overrides = [], currentUserId = null) {
   const slots = [];
   const [openH, openM] = openTime.split(":").map(Number);
   const [closeH, closeM] = closeTime.split(":").map(Number);
   const openMinutes = openH * 60 + openM;
-  const closeMinutes = closeH * 60 + closeM;
+  let closeMinutes = closeH * 60 + closeM;
+  // Handle midnight close ("00:00") and cross-day schedules
+  if (closeMinutes <= openMinutes) closeMinutes += 1440;
 
   for (let t = openMinutes; t + slotDuration <= closeMinutes; t += slotDuration) {
-    const sh = String(Math.floor(t / 60)).padStart(2, "0");
+    const sh = String(Math.floor(t / 60) % 24).padStart(2, "0");
     const sm = String(t % 60).padStart(2, "0");
-    const eh = String(Math.floor((t + slotDuration) / 60)).padStart(2, "0");
-    const em = String((t + slotDuration) % 60).padStart(2, "0");
+    const endT = t + slotDuration;
+    const eh = String(Math.floor(endT / 60) % 24).padStart(2, "0");
+    const em = String(endT % 60).padStart(2, "0");
     const start = `${sh}:${sm}`;
     const end = `${eh}:${em}`;
 
@@ -29,7 +37,7 @@ function generateSlots(openTime, closeTime, slotDuration, bookedSlots, pricePerH
     const overlapping = bookedSlots.find((b) => {
       if (b.status === "rejected" || b.status === "cancelled") return false;
       const bStart = toMinutes(b.startTime);
-      const bEnd = toMinutes(b.endTime);
+      const bEnd = normalizeEndMin(toMinutes(b.endTime), bStart);
       return t < bEnd && t + slotDuration > bStart;
     });
 

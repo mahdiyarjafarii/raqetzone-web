@@ -67,7 +67,7 @@ export default function TimeSlotGrid({ slots, selectedSlot, onSelect, loading, s
           >
             <span className="font-bold text-sm">{slot.start}</span>
             <span className={cn("text-[10px]", isSelected ? "text-primary-foreground/70" : "text-muted-foreground")}>
-              تا {slot.end}
+              تا {slot.end}{slot.end === "00:00" ? " (+۱)" : ""}
             </span>
             {isBooked && (
               <span className="text-[9px] text-muted-foreground/50 mt-0.5">رزرو شده</span>

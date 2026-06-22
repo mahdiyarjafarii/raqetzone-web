@@ -3,11 +3,23 @@ import { snapshotMonthlyLeaderboard } from "../controllers/rankingController.js"
 
 const SPORTS = ["padel", "tennis"];
 
-async function runSnapshot() {
+function getPreviousPersianYearMonth() {
+  // Called at 00:05 UTC on 1st of UTC month — Tehran is UTC+3:30, so it's already ~03:35 Tehran
+  // We want the Persian month that just ended (i.e., previous Persian month)
   const now = new Date();
-  // Snapshot the month that just ended
-  const month = now.getUTCMonth() === 0 ? 12 : now.getUTCMonth(); // previous month
-  const year = now.getUTCMonth() === 0 ? now.getUTCFullYear() - 1 : now.getUTCFullYear();
+  const parts = new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
+    year: "numeric", month: "numeric", timeZone: "Asia/Tehran",
+  }).formatToParts(now);
+  const toWestern = (s) => String(s ?? "").replace(/[۰-۹]/g, (d) => "0123456789"["۰۱۲۳۴۵۶۷۸۹".indexOf(d)]);
+  const curMonth = parseInt(toWestern(parts.find((p) => p.type === "month")?.value));
+  const curYear = parseInt(toWestern(parts.find((p) => p.type === "year")?.value));
+  return curMonth === 1
+    ? { year: curYear - 1, month: 12 }
+    : { year: curYear, month: curMonth - 1 };
+}
+
+async function runSnapshot() {
+  const { year, month } = getPreviousPersianYearMonth();
 
   console.log(`[leaderboardSnapshot] Snapshotting ${year}-${month} for all sports`);
   for (const sport of SPORTS) {

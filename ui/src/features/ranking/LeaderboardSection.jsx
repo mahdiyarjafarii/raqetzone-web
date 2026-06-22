@@ -38,7 +38,7 @@ function TrendIcon({ trend }) {
 }
 
 /** Top-3 podium — fixed layout: rank2 | rank1 | rank3 */
-function Podium({ top3, topPoints, currentUserId, onSelect }) {
+function Podium({ top3, currentUserId, onSelect }) {
   // order: 2nd place left, 1st center, 3rd right
   const ordered = [top3[1], top3[0], top3[2]].filter(Boolean);
 
@@ -93,7 +93,7 @@ function Podium({ top3, topPoints, currentUserId, onSelect }) {
   );
 }
 
-function MonthPicker({ periods, year, month, onChange }) {
+function MonthPicker({ periods, year, month, currentYear, onChange }) {
   if (!periods.length) return null;
   return (
     <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
@@ -111,7 +111,7 @@ function MonthPicker({ periods, year, month, onChange }) {
             )}
           >
             {PERSIAN_MONTHS[p.month]}
-            {p.year !== new Date().getUTCFullYear() ? ` ${p.year}` : ""}
+            {p.year !== currentYear ? ` ${p.year}` : ""}
           </button>
         );
       })}
@@ -123,21 +123,32 @@ export default function LeaderboardSection({ mode = "embedded" }) {
   const isFullPage = mode === "full";
   const currentUser = useAtomValue(currentUserAtom);
 
-  const now = new Date();
+  function getCurrentPersianYearMonth() {
+    const parts = new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
+      year: "numeric", month: "numeric", timeZone: "Asia/Tehran",
+    }).formatToParts(new Date());
+    const toWestern = (s) => String(s ?? "").replace(/[۰-۹]/g, (d) => "0123456789"["۰۱۲۳۴۵۶۷۸۹".indexOf(d)]);
+    return {
+      year: parseInt(toWestern(parts.find((p) => p.type === "year")?.value)),
+      month: parseInt(toWestern(parts.find((p) => p.type === "month")?.value)),
+    };
+  }
+
+  const { year: initYear, month: initMonth } = getCurrentPersianYearMonth();
+
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [search, setSearch] = useState("");
   const [sport, setSport] = useState("padel");
-  const [topPoints, setTopPoints] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [offset, setOffset] = useState(0);
   const [currentUserRank, setCurrentUserRank] = useState(null);
   const [currentUserSummary, setCurrentUserSummary] = useState(null);
   const [viewingUser, setViewingUser] = useState(null);
   const [periods, setPeriods] = useState([]);
-  const [periodYear, setPeriodYear] = useState(now.getUTCFullYear());
-  const [periodMonth, setPeriodMonth] = useState(now.getUTCMonth() + 1);
+  const [periodYear, setPeriodYear] = useState(initYear);
+  const [periodMonth, setPeriodMonth] = useState(initMonth);
 
   const sentinelRef = useRef(null);
   const pageSize = isFullPage ? 30 : 10;
@@ -178,7 +189,6 @@ export default function LeaderboardSection({ mode = "embedded" }) {
 
     const newRows = res.data.leaderboard ?? [];
     setRows((prev) => reset ? newRows : [...prev, ...newRows]);
-    setTopPoints(Number(res.data.topPoints ?? 0));
     setHasMore(res.data.pagination?.hasMore ?? false);
     setOffset(activeOffset + newRows.length);
     setCurrentUserRank(res.data.currentUserRank ?? null);
@@ -266,7 +276,7 @@ export default function LeaderboardSection({ mode = "embedded" }) {
         </div>
 
         {/* Month picker — only months with data */}
-        <MonthPicker periods={periods} year={periodYear} month={periodMonth} onChange={onChangePeriod} />
+        <MonthPicker periods={periods} year={periodYear} month={periodMonth} currentYear={initYear} onChange={onChangePeriod} />
 
         {/* Search (full page only) */}
         {isFullPage && (
@@ -314,7 +324,6 @@ export default function LeaderboardSection({ mode = "embedded" }) {
       {!loading && top3.length > 0 && (
         <Podium
           top3={top3}
-          topPoints={topPoints}
           currentUserId={currentUser?.id}
           onSelect={handleSelect}
         />
@@ -342,20 +351,24 @@ export default function LeaderboardSection({ mode = "embedded" }) {
           </div>
           {restRows.map((row, idx) => {
             const isMe = currentUser?.id && String(row.userId) === String(currentUser.id);
-            const barWidth = topPoints > 0 ? Math.round((row.points / topPoints) * 100) : 0;
+            const rankStyle =
+              row.rank === 1 ? "text-amber-500" :
+              row.rank === 2 ? "text-slate-400" :
+              row.rank === 3 ? "text-orange-400" :
+              "text-muted-foreground";
             return (
               <motion.div
                 key={row.userId}
                 initial={{ opacity: 0, x: -6 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: idx * 0.015 }}
+                transition={{ delay: Math.min(idx * 0.015, 0.3) }}
                 className={cn(
-                  "flex items-center gap-2.5 px-3 py-2.5 border-b border-border/60 cursor-pointer hover:bg-muted/30 transition-colors",
-                  isMe && "bg-primary/8"
+                  "flex items-center gap-2.5 px-3 py-2.5 border-b border-border/60 cursor-pointer hover:bg-muted/30 transition-colors last:border-b-0",
+                  isMe && "bg-primary/5"
                 )}
                 onClick={() => handleSelect(row)}
               >
-                <div className="w-7 shrink-0 text-center text-xs font-bold text-muted-foreground">
+                <div className={cn("w-7 shrink-0 text-center text-xs font-black", rankStyle)}>
                   {row.rank}
                 </div>
                 <UserAvatar
@@ -372,11 +385,6 @@ export default function LeaderboardSection({ mode = "embedded" }) {
                     </span>
                     {isMe && <span className="text-[10px] font-bold text-primary shrink-0">(شما)</span>}
                   </div>
-                  {topPoints > 0 && row.points > 0 && (
-                    <div className="w-full mt-1 h-1 rounded-full bg-border overflow-hidden">
-                      <div className="h-full rounded-full bg-primary/50" style={{ width: `${barWidth}%` }} />
-                    </div>
-                  )}
                 </div>
                 <div className="text-right shrink-0">
                   <span className="text-sm font-black text-primary">{row.points}</span>
@@ -397,13 +405,26 @@ export default function LeaderboardSection({ mode = "embedded" }) {
         </div>
       )}
 
-      {/* Infinite scroll sentinel */}
-      {isFullPage && <div ref={sentinelRef} className="h-4" />}
-
-      {loadingMore && (
-        <div className="flex justify-center py-3">
-          <RefreshCwIcon className="w-5 h-5 animate-spin text-muted-foreground" />
-        </div>
+      {/* Infinite scroll sentinel + loading indicator */}
+      {isFullPage && (
+        <>
+          <div ref={sentinelRef} className="h-1" />
+          {loadingMore && (
+            <div className="rounded-2xl border border-border bg-card overflow-hidden">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="flex items-center gap-3 px-3 py-3 border-b border-border/60 animate-pulse last:border-b-0">
+                  <div className="w-6 h-4 bg-muted rounded" />
+                  <div className="w-8 h-8 bg-muted rounded-full shrink-0" />
+                  <div className="flex-1 h-4 bg-muted rounded" />
+                  <div className="w-10 h-4 bg-muted rounded" />
+                </div>
+              ))}
+            </div>
+          )}
+          {!hasMore && rows.length > 0 && !loading && (
+            <p className="text-center text-[11px] text-muted-foreground/50 py-2">پایان لیست</p>
+          )}
+        </>
       )}
 
       {/* Distance to top 10 nudge */}

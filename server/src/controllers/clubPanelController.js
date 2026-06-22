@@ -68,7 +68,7 @@ function minutes(time) {
 }
 
 function timeStr(total) {
-  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+  return `${String(Math.floor(total / 60) % 24).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
 }
 
 function parseTehranDateTime(date, time) {
@@ -80,11 +80,13 @@ function parseTehranDateTime(date, time) {
 function buildCourtSlots(court) {
   const slots = [];
   const open = minutes(court.openTime);
-  const close = minutes(court.closeTime);
+  let close = minutes(court.closeTime);
   const duration = Number(court.slotDuration ?? 60);
   if (!Number.isFinite(open) || !Number.isFinite(close) || !Number.isFinite(duration) || duration <= 0) {
     return slots;
   }
+  // Handle midnight close ("00:00") and cross-day schedules
+  if (close <= open) close += 1440;
   for (let t = open; t + duration <= close; t += duration) {
     slots.push({ startTime: timeStr(t), endTime: timeStr(t + duration) });
   }
@@ -101,7 +103,8 @@ function isDealSlotBookedOrPending(bookingRows, deal) {
     if (booking.status !== "pending" && booking.status !== "approved") return false;
 
     const bookingStart = minutes(booking.startTime);
-    const bookingEnd = minutes(booking.endTime);
+    let bookingEnd = minutes(booking.endTime);
+    if (bookingEnd <= bookingStart) bookingEnd += 1440;
     return dealStart < bookingEnd && dealEnd > bookingStart;
   });
 }
@@ -130,15 +133,21 @@ function isDealExpiredByTime(deal, now = new Date()) {
   return Boolean(isValidUntilExpired || isSlotPassed);
 }
 
-function parseBookingEndDateTime(date, endTime) {
+function parseBookingEndDateTime(date, endTime, startTime) {
   if (!date || !endTime) return null;
-  const parsed = new Date(`${date}T${endTime}:00${TEHRAN_OFFSET}`);
+  let effectiveDate = date;
+  if (endTime === "00:00" && startTime && startTime > "00:00") {
+    const d = new Date(`${date}T12:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + 1);
+    effectiveDate = d.toISOString().slice(0, 10);
+  }
+  const parsed = new Date(`${effectiveDate}T${endTime}:00${TEHRAN_OFFSET}`);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 function isPendingBookingExpiredByTime(booking, now = new Date()) {
   if (!booking || booking.status !== "pending") return false;
-  const endDateTime = parseBookingEndDateTime(booking.date, booking.endTime);
+  const endDateTime = parseBookingEndDateTime(booking.date, booking.endTime, booking.startTime);
   return Boolean(endDateTime && endDateTime <= now);
 }
 
@@ -1330,10 +1339,12 @@ export const createClubDealController = async (req, res) => {
       ));
 
     const requestedStartMinutes = minutes(slotStart);
-    const requestedEndMinutes = minutes(slotEnd);
+    let requestedEndMinutes = minutes(slotEnd);
+    if (requestedEndMinutes <= requestedStartMinutes) requestedEndMinutes += 1440;
     const hasOverlappingBookedOrPending = bookingRows.some((booking) => {
       const bookingStart = minutes(booking.startTime);
-      const bookingEnd = minutes(booking.endTime);
+      let bookingEnd = minutes(booking.endTime);
+      if (bookingEnd <= bookingStart) bookingEnd += 1440;
       return requestedStartMinutes < bookingEnd && requestedEndMinutes > bookingStart;
     });
 
@@ -1352,7 +1363,8 @@ export const createClubDealController = async (req, res) => {
 
     const hasOverlappingBlockedOverride = overrideRows.some((override) => {
       const overrideStart = minutes(override.startTime);
-      const overrideEnd = minutes(override.endTime);
+      let overrideEnd = minutes(override.endTime);
+      if (overrideEnd <= overrideStart) overrideEnd += 1440;
       return requestedStartMinutes < overrideEnd && requestedEndMinutes > overrideStart;
     });
 

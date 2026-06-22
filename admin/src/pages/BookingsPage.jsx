@@ -276,7 +276,7 @@ export default function BookingsPage() {
                     const fullName = getUserFullName(b.user);
                     const sb = STATUS_BADGE[b.status] ?? STATUS_BADGE.pending;
                     const registeredAt = b.createdAt
-                      ? new Date(b.createdAt).toLocaleDateString("fa-IR", { timeZone: "Asia/Tehran", month: "short", day: "numeric" })
+                      ? new Intl.DateTimeFormat("fa-IR", { timeZone: "Asia/Tehran", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(b.createdAt))
                       : "—";
                     return (
                       <motion.tr

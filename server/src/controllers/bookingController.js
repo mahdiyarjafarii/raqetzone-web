@@ -48,15 +48,22 @@ function timeToMinutes(t) {
   return h * 60 + m;
 }
 
-function parseBookingEndDateTime(date, endTime) {
+function parseBookingEndDateTime(date, endTime, startTime) {
   if (!date || !endTime) return null;
-  const parsed = new Date(`${date}T${endTime}:00${TEHRAN_OFFSET}`);
+  // If endTime is "00:00" (midnight) and we have a start time, the session crosses into the next day
+  let effectiveDate = date;
+  if (endTime === "00:00" && startTime && startTime > "00:00") {
+    const d = new Date(`${date}T12:00:00Z`);
+    d.setUTCDate(d.getUTCDate() + 1);
+    effectiveDate = d.toISOString().slice(0, 10);
+  }
+  const parsed = new Date(`${effectiveDate}T${endTime}:00${TEHRAN_OFFSET}`);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 function isPendingBookingExpiredByTime(booking, now = new Date()) {
   if (!booking || booking.status !== "pending") return false;
-  const endDateTime = parseBookingEndDateTime(booking.date, booking.endTime);
+  const endDateTime = parseBookingEndDateTime(booking.date, booking.endTime, booking.startTime);
   return Boolean(endDateTime && endDateTime <= now);
 }
 
@@ -185,7 +192,9 @@ export const createBookingController = async (req, res) => {
     }
 
     const startMin = timeToMinutes(startTime);
-    const endMin = timeToMinutes(endTime);
+    let endMin = timeToMinutes(endTime);
+    // "00:00" means midnight (end of day); treat as 1440 when after a start time
+    if (endMin <= startMin) endMin += 1440;
     if (endMin <= startMin) {
       return res.status(400).json({ message: "زمان پایان باید بعد از زمان شروع باشد" });
     }
@@ -215,7 +224,8 @@ export const createBookingController = async (req, res) => {
       if (expiredSameDayIds.includes(booking.id)) return false;
       if (booking.status === "rejected" || booking.status === "cancelled") return false;
       const bookingStartMin = timeToMinutes(booking.startTime);
-      const bookingEndMin = timeToMinutes(booking.endTime);
+      let bookingEndMin = timeToMinutes(booking.endTime);
+      if (bookingEndMin <= bookingStartMin) bookingEndMin += 1440;
       return startMin < bookingEndMin && endMin > bookingStartMin;
     });
 
@@ -251,7 +261,8 @@ export const createBookingController = async (req, res) => {
     const hasOverlap = existing.some((b) => {
       if (b.status === "rejected" || b.status === "cancelled") return false;
       const bStart = timeToMinutes(b.startTime);
-      const bEnd = timeToMinutes(b.endTime);
+      let bEnd = timeToMinutes(b.endTime);
+      if (bEnd <= bStart) bEnd += 1440;
       return startMin < bEnd && endMin > bStart;
     });
 

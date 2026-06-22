@@ -4,7 +4,7 @@ import { ClockIcon, XIcon, CheckIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const persianNumberFormat = new Intl.NumberFormat("fa-IR", { minimumIntegerDigits: 2 });
-const hourOptions = Array.from({ length: 24 }, (_, hour) => String(hour).padStart(2, "0"));
+const hourOptions = Array.from({ length: 25 }, (_, hour) => String(hour).padStart(2, "0"));
 const minuteOptions = Array.from({ length: 12 }, (_, index) => String(index * 5).padStart(2, "0"));
 
 function formatPersianTime(value) {

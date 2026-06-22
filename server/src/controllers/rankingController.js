@@ -11,11 +11,73 @@ const toDate = (value) => {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 };
 
-/** Returns [startISO, endISO) strings for a given year/month (UTC). */
-function monthBounds(year, month) {
-  const start = new Date(Date.UTC(year, month - 1, 1)).toISOString();
-  const end = new Date(Date.UTC(month === 12 ? year + 1 : year, month === 12 ? 0 : month, 1)).toISOString();
-  return [start, end];
+const TEHRAN_TZ = "Asia/Tehran";
+const TEHRAN_OFFSET_MS = 3.5 * 60 * 60 * 1000; // UTC+3:30 in ms
+
+/** Convert Persian/Arabic-Indic digit string to a plain integer */
+function parseIntlNum(str) {
+  return parseInt(
+    String(str).replace(/[۰-۹]/g, (d) => "0123456789"["۰۱۲۳۴۵۶۷۸۹".indexOf(d)])
+  );
+}
+
+/** Get current Persian year and month in Tehran timezone */
+function getCurrentPersianYearMonth() {
+  const parts = new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
+    year: "numeric", month: "numeric", timeZone: TEHRAN_TZ,
+  }).formatToParts(new Date());
+  return {
+    year: parseIntlNum(parts.find((p) => p.type === "year")?.value),
+    month: parseIntlNum(parts.find((p) => p.type === "month")?.value),
+  };
+}
+
+/** Convert any UTC Date to Persian year/month in Tehran */
+function dateToPersianYearMonth(date) {
+  const parts = new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
+    year: "numeric", month: "numeric", timeZone: TEHRAN_TZ,
+  }).formatToParts(date);
+  return {
+    year: parseIntlNum(parts.find((p) => p.type === "year")?.value),
+    month: parseIntlNum(parts.find((p) => p.type === "month")?.value),
+  };
+}
+
+/**
+ * Find the UTC timestamp for 00:00 Tehran on the 1st day of a Persian month.
+ * Strategy: approximate the Gregorian date, then search ±5 days.
+ */
+function findPersianMonthStartUTC(pYear, pMonth) {
+  // Persian year starts ~March 20 of Gregorian year pYear+621
+  const approxBase = new Date(Date.UTC(pYear + 621, 2, 18)); // March 18
+  const monthDays = [0, 31, 31, 31, 31, 31, 31, 30, 30, 30, 30, 30, 29];
+  let daysOffset = 0;
+  for (let m = 1; m < pMonth; m++) daysOffset += monthDays[m];
+  const approx = new Date(approxBase.getTime() + daysOffset * 86400000);
+
+  for (let d = -2; d <= 6; d++) {
+    const candidate = new Date(approx.getTime() + d * 86400000); // UTC midnight
+    const parts = new Intl.DateTimeFormat("fa-IR-u-ca-persian", {
+      year: "numeric", month: "numeric", day: "numeric", timeZone: TEHRAN_TZ,
+    }).formatToParts(candidate);
+    const py = parseIntlNum(parts.find((p) => p.type === "year")?.value);
+    const pm = parseIntlNum(parts.find((p) => p.type === "month")?.value);
+    const pd = parseIntlNum(parts.find((p) => p.type === "day")?.value);
+    if (py === pYear && pm === pMonth && pd === 1) {
+      // candidate UTC midnight = 03:30 Tehran on day 1
+      // 00:00 Tehran on day 1 = candidate - 3.5h
+      return new Date(candidate.getTime() - TEHRAN_OFFSET_MS);
+    }
+  }
+  throw new Error(`Cannot find UTC start for Persian month ${pYear}/${pMonth}`);
+}
+
+/** Returns [startISO, endISO) for a Persian year/month boundary in UTC */
+function persianMonthBounds(pYear, pMonth) {
+  const start = findPersianMonthStartUTC(pYear, pMonth);
+  const [ny, nm] = pMonth === 12 ? [pYear + 1, 1] : [pYear, pMonth + 1];
+  const end = findPersianMonthStartUTC(ny, nm);
+  return [start.toISOString(), end.toISOString()];
 }
 
 // Simple in-process cache keyed by "sport:year:month:limit:offset:search:city"
@@ -50,14 +112,12 @@ export const getLeaderboardController = async (req, res) => {
       ? req.query.sport.trim()
       : "padel";
 
-    // Monthly mode: if month+year provided, compute from ranking_events
-    const now = new Date();
-    const currentYear = now.getUTCFullYear();
-    const currentMonth = now.getUTCMonth() + 1;
+    // Monthly mode: use Persian calendar (Tehran timezone)
+    const { year: currentYear, month: currentMonth } = getCurrentPersianYearMonth();
 
     const yearRaw = Number(req.query.year ?? currentYear);
     const monthRaw = Number(req.query.month ?? currentMonth);
-    const year = Number.isFinite(yearRaw) && yearRaw >= 2020 && yearRaw <= 2100 ? yearRaw : currentYear;
+    const year = Number.isFinite(yearRaw) && yearRaw >= 1380 && yearRaw <= 1500 ? yearRaw : currentYear;
     const month = Number.isFinite(monthRaw) && monthRaw >= 1 && monthRaw <= 12 ? monthRaw : currentMonth;
 
     const isCurrentPeriod = year === currentYear && month === currentMonth;
@@ -68,7 +128,7 @@ export const getLeaderboardController = async (req, res) => {
       return res.status(200).json(cached);
     }
 
-    const [periodStart, periodEnd] = monthBounds(year, month);
+    const [periodStart, periodEnd] = persianMonthBounds(year, month);
 
     const whereConditions = [];
     whereConditions.push(isNull(clubs.ownerId));
@@ -234,7 +294,7 @@ export const getLeaderboardController = async (req, res) => {
         currentUserRank = Number(rankRow?.count ?? 0) + 1;
 
         // Previous month trend
-        const [prevStart, prevEnd] = monthBounds(month === 1 ? year - 1 : year, month === 1 ? 12 : month - 1);
+        const [prevStart, prevEnd] = persianMonthBounds(month === 1 ? year - 1 : year, month === 1 ? 12 : month - 1);
         const [prevWindow] = await db
           .select({ points: sql`COALESCE(SUM(${rankingEvents.points}), 0)` })
           .from(rankingEvents)
@@ -299,7 +359,7 @@ export const getLeaderboardController = async (req, res) => {
 
 /** Snapshot current month leaderboard into leaderboard_monthly_snapshots */
 export const snapshotMonthlyLeaderboard = async (year, month, sport = "padel") => {
-  const [periodStart, periodEnd] = monthBounds(year, month);
+  const [periodStart, periodEnd] = persianMonthBounds(year, month);
 
   const rows = await db
     .select({
@@ -438,12 +498,26 @@ export const getActivePeriodsController = async (req, res) => {
         desc(sql`EXTRACT(MONTH FROM ${rankingEvents.createdAt})`)
       );
 
-    // Always include the current month even if no data yet
-    const now = new Date();
-    const currentYear = now.getUTCFullYear();
-    const currentMonth = now.getUTCMonth() + 1;
-    const hasCurrent = rows.some((r) => r.year === currentYear && r.month === currentMonth);
-    const periods = hasCurrent ? rows : [{ year: currentYear, month: currentMonth }, ...rows];
+    // Convert UTC year/month to Persian year/month (check multiple days per UTC month to catch boundary events)
+    const persianPeriodsMap = new Map();
+    for (const row of rows) {
+      for (const day of [1, 15, 22]) {
+        const d = new Date(Date.UTC(row.year, row.month - 1, day));
+        if (d.getUTCMonth() !== row.month - 1) break; // day past end of month
+        const { year: py, month: pm } = dateToPersianYearMonth(d);
+        const key = `${py}-${pm}`;
+        if (!persianPeriodsMap.has(key)) persianPeriodsMap.set(key, { year: py, month: pm });
+      }
+    }
+
+    // Sort descending
+    const persianPeriods = Array.from(persianPeriodsMap.values())
+      .sort((a, b) => (b.year !== a.year ? b.year - a.year : b.month - a.month));
+
+    // Always include current Persian month even if no data yet
+    const { year: currentYear, month: currentMonth } = getCurrentPersianYearMonth();
+    const hasCurrent = persianPeriods.some((r) => r.year === currentYear && r.month === currentMonth);
+    const periods = hasCurrent ? persianPeriods : [{ year: currentYear, month: currentMonth }, ...persianPeriods];
 
     return res.status(200).json({ periods, sport });
   } catch (error) {

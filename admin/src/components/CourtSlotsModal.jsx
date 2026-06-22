@@ -50,14 +50,17 @@ function generateSlots(openTime, closeTime, slotDuration) {
   const [oh, om] = (openTime ?? "07:00").split(":").map(Number);
   const [ch, cm] = (closeTime ?? "23:00").split(":").map(Number);
   const open = oh * 60 + om;
-  const close = ch * 60 + cm;
+  let close = ch * 60 + cm;
   const dur = parseInt(slotDuration ?? 60, 10);
+  // Handle midnight close ("00:00") and cross-day schedules
+  if (close <= open) close += 1440;
   const slots = [];
   for (let t = open; t + dur <= close; t += dur) {
-    const sh = String(Math.floor(t / 60)).padStart(2, "0");
+    const sh = String(Math.floor(t / 60) % 24).padStart(2, "0");
     const sm = String(t % 60).padStart(2, "0");
-    const eh = String(Math.floor((t + dur) / 60)).padStart(2, "0");
-    const em = String((t + dur) % 60).padStart(2, "0");
+    const endT = t + dur;
+    const eh = String(Math.floor(endT / 60) % 24).padStart(2, "0");
+    const em = String(endT % 60).padStart(2, "0");
     slots.push({ start: `${sh}:${sm}`, end: `${eh}:${em}` });
   }
   return slots;
@@ -66,7 +69,10 @@ function generateSlots(openTime, closeTime, slotDuration) {
 function getSlotDurationHours(slot) {
   const [sh, sm] = slot.start.split(":").map(Number);
   const [eh, em] = slot.end.split(":").map(Number);
-  return ((eh * 60 + em) - (sh * 60 + sm)) / 60;
+  let startMin = sh * 60 + sm;
+  let endMin = eh * 60 + em;
+  if (endMin <= startMin) endMin += 1440;
+  return (endMin - startMin) / 60;
 }
 
 const today = formatDateKeyInTehran(new Date());
