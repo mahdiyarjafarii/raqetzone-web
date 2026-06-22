@@ -431,6 +431,10 @@ export const deleteClubCourtController = async (req, res) => {
 export const getClubBookingsController = async (req, res) => {
   try {
     const { status } = req.query;
+    const page     = Math.max(1, parseInt(req.query.page  ?? "1",  10));
+    const limit    = Math.min(100, Math.max(1, parseInt(req.query.limit ?? "20", 10)));
+    const sortDir  = req.query.sortDir === "asc" ? "asc" : "desc";
+    const offset   = (page - 1) * limit;
     const ownerId = ownerFilter(req);
 
     // Find court IDs belonging to this owner
@@ -438,11 +442,11 @@ export const getClubBookingsController = async (req, res) => {
     if (ownerId) {
       const ownerClubs = await db.select({ id: clubs.id }).from(clubs).where(eq(clubs.ownerId, ownerId));
       const clubIds = ownerClubs.map(c => c.id);
-      if (clubIds.length === 0) return res.json({ bookings: [] });
+      if (clubIds.length === 0) return res.json({ bookings: [], pagination: { page, limit, total: 0, totalPages: 0 } });
 
       const ownerCourts = await db.select({ id: courts.id }).from(courts).where(inArray(courts.clubId, clubIds));
       courtIds = ownerCourts.map(c => c.id);
-      if (courtIds.length === 0) return res.json({ bookings: [] });
+      if (courtIds.length === 0) return res.json({ bookings: [], pagination: { page, limit, total: 0, totalPages: 0 } });
     }
 
     if ((!status || status === "pending") && courtIds.length > 0) {
@@ -464,6 +468,14 @@ export const getClubBookingsController = async (req, res) => {
     const conditions = [];
     if (ownerId && courtIds.length > 0) conditions.push(inArray(bookings.courtId, courtIds));
     if (status) conditions.push(eq(bookings.status, status));
+
+    const whereClause = conditions.length === 1 ? conditions[0] : conditions.length > 1 ? and(...conditions) : undefined;
+
+    const [{ total }] = await db
+      .select({ total: sql`count(*)` })
+      .from(bookings)
+      .innerJoin(courts, eq(bookings.courtId, courts.id))
+      .where(whereClause);
 
     const rows = await db
       .select({
@@ -500,10 +512,21 @@ export const getClubBookingsController = async (req, res) => {
       .from(bookings)
       .innerJoin(courts, eq(bookings.courtId, courts.id))
       .innerJoin(users, eq(bookings.userId, users.id))
-      .where(conditions.length === 1 ? conditions[0] : conditions.length > 1 ? and(...conditions) : undefined)
-      .orderBy(desc(bookings.createdAt));
+      .where(whereClause)
+      .orderBy(sortDir === "asc" ? asc(bookings.createdAt) : desc(bookings.createdAt))
+      .limit(limit)
+      .offset(offset);
 
-    return res.json({ bookings: rows });
+    const totalCount = Number(total);
+    return res.json({
+      bookings: rows,
+      pagination: {
+        page,
+        limit,
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / limit),
+      },
+    });
   } catch (error) {
     console.error("getClubBookings error:", error);
     return res.status(500).json({ message: "خطای سرور" });
@@ -946,10 +969,62 @@ export const upsertSlotOverrideController = async (req, res) => {
   }
 };
 
+export const bulkCloseSlotOverridesController = async (req, res) => {
+  try {
+    const { courtId } = req.params;
+    const { slots } = req.body; // [{ date, startTime, endTime }]
+
+    if (!Array.isArray(slots) || slots.length === 0)
+      return res.status(400).json({ message: "لیست سانس‌ها خالی است" });
+
+    if (!await assertCourtOwnership(req, courtId))
+      return res.status(403).json({ message: "دسترسی ندارید" });
+
+    const results = await db.transaction(async (tx) => {
+      const updated = [];
+      for (const { date, startTime, endTime } of slots) {
+        const [existing] = await tx
+          .select()
+          .from(slotOverrides)
+          .where(and(
+            eq(slotOverrides.courtId, courtId),
+            eq(slotOverrides.date, date),
+            eq(slotOverrides.startTime, startTime),
+          ))
+          .limit(1);
+
+        if (existing) {
+          const [row] = await tx
+            .update(slotOverrides)
+            .set({ status: "blocked", updatedAt: new Date() })
+            .where(eq(slotOverrides.id, existing.id))
+            .returning();
+          updated.push(row);
+        } else {
+          const [row] = await tx
+            .insert(slotOverrides)
+            .values({ courtId, date, startTime, endTime, status: "blocked", price: null, discountPercent: 0 })
+            .returning();
+          updated.push(row);
+        }
+      }
+      return updated;
+    });
+
+    return res.json({ slotOverrides: results });
+  } catch (error) {
+    console.error("bulkCloseSlotOverrides error:", error);
+    return res.status(500).json({ message: "خطای سرور" });
+  }
+};
+
 // ── Club Customers ────────────────────────────────────────────────────────────
 
 export const getClubCustomersController = async (req, res) => {
   try {
+    const page  = Math.max(1, parseInt(req.query.page  ?? "1",  10));
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit ?? "20", 10)));
+    const offset = (page - 1) * limit;
     const ownerId = ownerFilter(req);
 
     const ownerClubs = ownerId
@@ -1023,7 +1098,7 @@ export const getClubCustomersController = async (req, res) => {
       .from(users)
       .where(inArray(users.id, allUserIds));
 
-    const customers = userRows.map(u => ({
+    const allCustomers = userRows.map(u => ({
       id:            u.id,
       name:          u.name,
       firstName:     u.firstName,
@@ -1037,7 +1112,18 @@ export const getClubCustomersController = async (req, res) => {
       fromTournament: userMap[u.id]?.fromTournament ?? false,
     })).sort((a, b) => b.bookCount - a.bookCount);
 
-    return res.json({ customers });
+    const totalCount = allCustomers.length;
+    const customers = allCustomers.slice(offset, offset + limit);
+
+    return res.json({
+      customers,
+      pagination: {
+        page,
+        limit,
+        total: totalCount,
+        totalPages: Math.ceil(totalCount / limit),
+      },
+    });
   } catch (error) {
     console.error("getClubCustomers error:", error);
     return res.status(500).json({ message: "خطای سرور" });

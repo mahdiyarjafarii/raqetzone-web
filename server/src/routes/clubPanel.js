@@ -18,6 +18,7 @@ import {
   getClubStatsController,
   getSlotOverridesController,
   upsertSlotOverrideController,
+  bulkCloseSlotOverridesController,
   getAutoFillOpportunitiesController,
   runAutoFillController,
   getClubCustomersController,
@@ -74,8 +75,9 @@ router.patch("/club-panel/courts/:courtId",                  updateClubCourtCont
 router.delete("/club-panel/courts/:courtId",                 deleteClubCourtController);
 
 // Slot overrides
-router.get("/club-panel/courts/:courtId/slot-overrides",     getSlotOverridesController);
-router.post("/club-panel/courts/:courtId/slot-overrides",    upsertSlotOverrideController);
+router.get("/club-panel/courts/:courtId/slot-overrides",            getSlotOverridesController);
+router.post("/club-panel/courts/:courtId/slot-overrides",           upsertSlotOverrideController);
+router.post("/club-panel/courts/:courtId/slot-overrides/bulk-close", bulkCloseSlotOverridesController);
 
 // AutoFill
 router.get("/club-panel/autofill/opportunities",             getAutoFillOpportunitiesController);

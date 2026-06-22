@@ -9,6 +9,7 @@ import {
 import toast from "react-hot-toast";
 import { useAtomValue } from "jotai";
 import apiClient from "@/lib/apiClient";
+import ErrorState from "@/components/ui/ErrorState";
 import PageHeader from "@/components/PageHeader";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
@@ -539,6 +540,7 @@ export default function ClubsPage() {
   const isAdmin  = user?.isAdmin;
   const [clubs, setClubs]       = useState([]);
   const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
   const [form, setForm]         = useState(emptyClub);
@@ -546,9 +548,10 @@ export default function ClubsPage() {
 
   const fetch = async () => {
     setLoading(true);
+    setError(false);
     const { ok, data } = await apiClient.get("/club-panel/clubs");
     if (ok) setClubs(data.clubs);
-    else toast.error("خطا در بارگذاری باشگاه‌ها");
+    else setError(true);
     setLoading(false);
   };
 
@@ -614,6 +617,10 @@ export default function ClubsPage() {
         {[1,2,3].map(i => <div key={i} className="h-56 rounded-2xl bg-muted animate-pulse" />)}
       </div>
     );
+  }
+
+  if (error) {
+    return <ErrorState message="باشگاه‌ها بارگذاری نشدند" onRetry={fetch} />;
   }
 
   return (

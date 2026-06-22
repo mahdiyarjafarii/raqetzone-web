@@ -13,6 +13,7 @@ import {
 import toast from "react-hot-toast";
 import apiClient from "@/lib/apiClient";
 import PageHeader from "@/components/PageHeader";
+import ErrorState from "@/components/ui/ErrorState";
 import { fmt, cn } from "@/lib/utils";
 
 const TEHRAN_TIME_ZONE = "Asia/Tehran";
@@ -117,18 +118,20 @@ export default function DashboardPage() {
   const [data, setData]     = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError]   = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
 
   async function loadDashboard({ silent = false } = {}) {
     if (silent) setRefreshing(true);
-    else setLoading(true);
+    else { setLoading(true); setError(false); }
     const res = await apiClient.get("/club-panel/stats");
     if (res.ok) {
       setData(res.data);
       setLastUpdated(new Date());
       if (silent) toast.success("دیتای داشبورد بروزرسانی شد");
     } else {
-      toast.error("خطا در بارگذاری آمار");
+      if (silent) toast.error("خطا در بارگذاری آمار");
+      else setError(true);
     }
     setLoading(false);
     setRefreshing(false);
@@ -146,6 +149,15 @@ export default function DashboardPage() {
           {Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-64 rounded-2xl bg-muted" />)}
         </div>
       </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <ErrorState
+        message="آمار داشبورد بارگذاری نشد"
+        onRetry={() => loadDashboard()}
+      />
     );
   }
 

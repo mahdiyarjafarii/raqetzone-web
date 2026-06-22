@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import toast from "react-hot-toast";
 import apiClient from "@/lib/apiClient";
+import ErrorState from "@/components/ui/ErrorState";
 import PageHeader from "@/components/PageHeader";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
@@ -274,6 +275,7 @@ export default function ClubDetailPage() {
   const [club, setClub]       = useState(null);
   const [courts, setCourts]   = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
   const [slotsTarget, setSlotsTarget] = useState(null);
@@ -287,9 +289,10 @@ export default function ClubDetailPage() {
 
   const fetchCourts = async () => {
     setLoading(true);
+    setError(false);
     const { ok, data } = await apiClient.get(`/club-panel/clubs/${clubId}/courts`);
     if (ok) setCourts(data.courts);
-    else toast.error("خطا در بارگذاری زمین‌ها");
+    else setError(true);
     setLoading(false);
   };
 
@@ -458,6 +461,15 @@ export default function ClubDetailPage() {
                     ))}
                   </tr>
                 ))
+              ) : error ? (
+                <tr>
+                  <td colSpan={8}>
+                    <ErrorState
+                      message="زمین‌ها بارگذاری نشدند"
+                      onRetry={fetchCourts}
+                    />
+                  </td>
+                </tr>
               ) : courts.length === 0 ? (
                 <tr><td colSpan={8} className="text-center py-16 text-muted-foreground">
                   <div className="flex flex-col items-center gap-3">

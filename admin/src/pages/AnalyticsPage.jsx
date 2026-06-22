@@ -8,6 +8,7 @@ import { TrendingUpIcon, BanknoteIcon, CalendarCheckIcon, MapPinIcon } from "luc
 import toast from "react-hot-toast";
 import apiClient from "@/lib/apiClient";
 import PageHeader from "@/components/PageHeader";
+import ErrorState from "@/components/ui/ErrorState";
 import { fmt } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 
@@ -43,15 +44,18 @@ function ChartCard({ title, subtitle, children, className="" }) {
 export default function AnalyticsPage() {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      const { ok, data } = await apiClient.get("/admin/stats");
-      if (ok) setStats(data);
-      else toast.error("خطا در بارگذاری آمار");
-      setLoading(false);
-    })();
-  }, []);
+  const loadStats = async () => {
+    setLoading(true);
+    setError(false);
+    const { ok, data } = await apiClient.get("/admin/stats");
+    if (ok) setStats(data);
+    else setError(true);
+    setLoading(false);
+  };
+
+  useEffect(() => { loadStats(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (loading) {
     return (
@@ -59,6 +63,10 @@ export default function AnalyticsPage() {
         {Array.from({length:6}).map((_,i) => <div key={i} className="h-64 rounded-2xl bg-muted" />)}
       </div>
     );
+  }
+
+  if (error) {
+    return <ErrorState message="آمار تحلیلی بارگذاری نشد" onRetry={loadStats} />;
   }
 
   const ov = stats?.overview ?? {};

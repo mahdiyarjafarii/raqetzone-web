@@ -1,10 +1,9 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { XIcon, LockIcon, UserCheckIcon, CheckCircleIcon } from "lucide-react";
+import { XIcon, LockIcon, UserCheckIcon, CheckCircleIcon, CheckSquareIcon, SquareIcon, Trash2Icon } from "lucide-react";
 import toast from "react-hot-toast";
 import Modal from "@/components/ui/Modal";
 import Button from "@/components/ui/Button";
-import Input from "@/components/ui/Input";
 import apiClient from "@/lib/apiClient";
 import { cn, fmt, getUserFullName } from "@/lib/utils";
 
@@ -222,12 +221,70 @@ function SlotEditPanel({ slot, override, booking, courtPrice, slotDurationHours,
   );
 }
 
+// Confirmation modal for bulk close
+function BulkCloseConfirmModal({ open, count, onConfirm, onCancel, loading }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onCancel} />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="relative bg-card rounded-2xl border border-border shadow-xl p-6 w-full max-w-sm z-10"
+      >
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center shrink-0">
+            <LockIcon className="w-5 h-5 text-red-600" />
+          </div>
+          <div>
+            <p className="font-bold text-foreground text-sm">بستن سانس‌های انتخاب‌شده</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {count} سانس انتخاب شده
+            </p>
+          </div>
+        </div>
+        <p className="text-sm text-muted-foreground mb-5">
+          آیا از بستن {count} سانس انتخاب‌شده مطمئن هستید؟ وضعیت همه آن‌ها به «بسته» تغییر می‌کند.
+        </p>
+        <div className="flex gap-3">
+          <button
+            onClick={onCancel}
+            disabled={loading}
+            className="flex-1 h-10 rounded-xl border border-border text-sm font-medium text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50"
+          >
+            انصراف
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={loading}
+            className="flex-1 h-10 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {loading ? (
+              <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              <LockIcon className="w-4 h-4" />
+            )}
+            {loading ? "در حال بستن..." : "بله، ببند"}
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 export default function CourtSlotsModal({ open, onClose, court }) {
   const [selectedDay, setSelectedDay] = useState(today);
   const [overridesMap, setOverridesMap] = useState({}); // "date|startTime" -> override obj
   const [bookingsMap, setBookingsMap] = useState({}); // "date|startTime" -> booking+user obj
   const [loading, setLoading] = useState(false);
   const [activeSlot, setActiveSlot] = useState(null); // slot being edited
+
+  // Multi-select state
+  const [isMultiSelect, setIsMultiSelect] = useState(false);
+  const [selectedKeys, setSelectedKeys] = useState(new Set()); // "date|startTime"
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [bulkClosing, setBulkClosing] = useState(false);
 
   const openTime    = court?.openTime    ?? court?.open_time    ?? "07:00";
   const closeTime   = court?.closeTime   ?? court?.close_time   ?? "23:00";
@@ -256,7 +313,13 @@ export default function CourtSlotsModal({ open, onClose, court }) {
   }, [court]);
 
   useEffect(() => {
-    if (open) { setSelectedDay(today); setActiveSlot(null); fetchOverrides(); }
+    if (open) {
+      setSelectedDay(today);
+      setActiveSlot(null);
+      setIsMultiSelect(false);
+      setSelectedKeys(new Set());
+      fetchOverrides();
+    }
   }, [open, fetchOverrides]);
 
   const handleSave = async (slot, values) => {
@@ -277,119 +340,264 @@ export default function CourtSlotsModal({ open, onClose, court }) {
     toast.success("ذخیره شد");
   };
 
+  const exitMultiSelect = () => {
+    setIsMultiSelect(false);
+    setSelectedKeys(new Set());
+    setActiveSlot(null);
+  };
+
+  const toggleSlotSelection = (slotKey) => {
+    setSelectedKeys(prev => {
+      const next = new Set(prev);
+      if (next.has(slotKey)) next.delete(slotKey);
+      else next.add(slotKey);
+      return next;
+    });
+  };
+
+  const handleBulkClose = async () => {
+    setBulkClosing(true);
+    const slotsToClose = slots
+      .filter(slot => selectedKeys.has(`${selectedDay}|${slot.start}`))
+      .map(slot => ({ date: selectedDay, startTime: slot.start, endTime: slot.end }));
+
+    const { ok, data } = await apiClient.post(
+      `/club-panel/courts/${court.id}/slot-overrides/bulk-close`,
+      { slots: slotsToClose }
+    );
+
+    setBulkClosing(false);
+    setShowConfirm(false);
+
+    if (!ok) return toast.error("خطا در بستن سانس‌ها");
+
+    setOverridesMap(prev => {
+      const next = { ...prev };
+      (data.slotOverrides ?? []).forEach(o => {
+        next[`${o.date}|${o.startTime}`] = o;
+      });
+      return next;
+    });
+    exitMultiSelect();
+    toast.success(`${data.slotOverrides?.length ?? 0} سانس با موفقیت بسته شد`);
+  };
+
   return (
-    <Modal open={open} onClose={() => { setActiveSlot(null); onClose(); }} title={`مدیریت سانس‌ها — ${court?.name ?? ""}`} size="xl">
-      {/* Day tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-2 mb-5">
-        {DAYS.map((day) => (
-          <button
-            key={day}
-            onClick={() => { setSelectedDay(day); setActiveSlot(null); }}
-            className={cn(
-              "shrink-0 px-4 py-2 rounded-xl text-xs font-semibold border transition-all",
-              day === selectedDay
-                ? "bg-primary text-white border-primary"
-                : "bg-muted text-muted-foreground border-border hover:border-primary"
-            )}
-          >
-            {formatDateFa(day)}
-            {day === today && <span className="block text-[10px] opacity-70">امروز</span>}
-          </button>
-        ))}
-      </div>
-
-      {/* Legend */}
-      <div className="flex items-center gap-4 text-xs text-muted-foreground mb-4 flex-wrap">
-        {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
-          <span key={key} className="flex items-center gap-1.5">
-            <span className={cn("h-3 w-3 rounded border inline-block", cfg.bg)} />
-            {cfg.label}
-          </span>
-        ))}
-        <span className="text-[10px] mr-auto">کلیک برای ویرایش</span>
-      </div>
-
-      {/* Slots */}
-      {loading ? (
-        <div className="grid grid-cols-4 gap-2">
-          {Array.from({ length: 12 }).map((_, i) => (
-            <div key={i} className="h-16 rounded-xl bg-muted animate-pulse" />
+    <>
+      <Modal open={open} onClose={() => { setActiveSlot(null); exitMultiSelect(); onClose(); }} title={`مدیریت سانس‌ها — ${court?.name ?? ""}`} size="xl">
+        {/* Day tabs */}
+        <div className="flex gap-2 overflow-x-auto pb-2 mb-5">
+          {DAYS.map((day) => (
+            <button
+              key={day}
+              onClick={() => { setSelectedDay(day); setActiveSlot(null); setSelectedKeys(new Set()); }}
+              className={cn(
+                "shrink-0 px-4 py-2 rounded-xl text-xs font-semibold border transition-all",
+                day === selectedDay
+                  ? "bg-primary text-white border-primary"
+                  : "bg-muted text-muted-foreground border-border hover:border-primary"
+              )}
+            >
+              {formatDateFa(day)}
+              {day === today && <span className="block text-[10px] opacity-70">امروز</span>}
+            </button>
           ))}
         </div>
-      ) : slots.length === 0 ? (
-        <p className="text-center text-muted-foreground py-8 text-sm">
-          اسلاتی برای این زمین تعریف نشده
-          <br />
-          <span className="text-xs">openTime: {openTime} | closeTime: {closeTime} | duration: {slotDuration}min</span>
-        </p>
-      ) : (
-        <>
-          <div className="grid grid-cols-4 gap-2">
-            {slots.map((slot) => {
-              const key = `${selectedDay}|${slot.start}`;
-              const override = overridesMap[key];
-              const booking = bookingsMap[key];
-              const status = override?.status ?? "available";
-              const cfg = STATUS_CONFIG[status];
-              const Icon = cfg.icon;
-              const slotDurationHours = getSlotDurationHours(slot);
-              const displayHourlyPrice = override?.price ?? courtPrice;
-              const displayPrice = Math.round(displayHourlyPrice * slotDurationHours);
-              const discount = override?.discountPercent ?? 0;
-              const finalPrice = discount > 0 ? Math.round(displayPrice * (1 - discount / 100)) : displayPrice;
-              const isActive = activeSlot?.start === slot.start;
-              const isBookedSlot = status === "booked" && booking;
-              const bookingUserName = getUserFullName({
-                firstName: booking?.userFirstName,
-                lastName: booking?.userLastName,
-              });
 
-              return (
-                <motion.button
-                  key={slot.start}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setActiveSlot(isActive ? null : slot)}
-                  className={cn(
-                    "w-full flex flex-col items-center justify-center rounded-xl border text-xs font-medium transition-all overflow-hidden",
-                    isBookedSlot ? "h-auto py-2 px-1 min-h-[4rem]" : "h-16",
-                    cfg.bg,
-                    isActive && "ring-2 ring-primary ring-offset-1 scale-105"
-                  )}
+        {/* Legend + Multi-select toggle */}
+        <div className="flex items-center gap-4 text-xs text-muted-foreground mb-4 flex-wrap">
+          {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
+            <span key={key} className="flex items-center gap-1.5">
+              <span className={cn("h-3 w-3 rounded border inline-block", cfg.bg)} />
+              {cfg.label}
+            </span>
+          ))}
+          <div className="mr-auto flex items-center gap-2">
+            {!isMultiSelect ? (
+              <>
+                <span className="text-[10px]">کلیک برای ویرایش</span>
+                <button
+                  onClick={() => { setIsMultiSelect(true); setActiveSlot(null); }}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-muted border border-border hover:border-primary/50 text-xs font-medium text-foreground transition-all"
                 >
-                  <Icon className="w-3 h-3 mb-0.5 shrink-0" />
-                  <span className="font-bold">{slot.start}</span>
-                  {isBookedSlot ? (
-                    <span className="text-[9px] font-semibold truncate max-w-full px-1 mt-0.5 leading-tight text-center opacity-80">
-                      {bookingUserName}
-                    </span>
-                  ) : discount > 0 ? (
-                    <>
-                      <span className="text-[9px] line-through opacity-50">{fmt(displayPrice)}</span>
-                      <span className="text-[9px] text-primary font-bold">{fmt(finalPrice)}ت</span>
-                    </>
-                  ) : (
-                    <span className="text-[9px] opacity-70">{fmt(finalPrice)}ت</span>
-                  )}
-                </motion.button>
-              );
-            })}
-          </div>
-
-          <AnimatePresence>
-            {activeSlot && (
-              <SlotEditPanel
-                slot={activeSlot}
-                override={overridesMap[`${selectedDay}|${activeSlot.start}`]}
-                booking={bookingsMap[`${selectedDay}|${activeSlot.start}`]}
-                courtPrice={courtPrice}
-                slotDurationHours={getSlotDurationHours(activeSlot)}
-                onSave={(vals) => handleSave(activeSlot, vals)}
-                onClose={() => setActiveSlot(null)}
-              />
+                  <CheckSquareIcon className="w-3.5 h-3.5" />
+                  انتخاب گروهی
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={exitMultiSelect}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/30 text-xs font-medium text-primary transition-all hover:bg-primary/20"
+              >
+                <XIcon className="w-3.5 h-3.5" />
+                خروج از انتخاب گروهی
+              </button>
             )}
-          </AnimatePresence>
-        </>
-      )}
-    </Modal>
+          </div>
+        </div>
+
+        {/* Slots */}
+        {loading ? (
+          <div className="grid grid-cols-4 gap-2">
+            {Array.from({ length: 12 }).map((_, i) => (
+              <div key={i} className="h-16 rounded-xl bg-muted animate-pulse" />
+            ))}
+          </div>
+        ) : slots.length === 0 ? (
+          <p className="text-center text-muted-foreground py-8 text-sm">
+            اسلاتی برای این زمین تعریف نشده
+            <br />
+            <span className="text-xs">openTime: {openTime} | closeTime: {closeTime} | duration: {slotDuration}min</span>
+          </p>
+        ) : (
+          <>
+            <div className="grid grid-cols-4 gap-2">
+              {slots.map((slot) => {
+                const key = `${selectedDay}|${slot.start}`;
+                const override = overridesMap[key];
+                const booking = bookingsMap[key];
+                const status = override?.status ?? "available";
+                const cfg = STATUS_CONFIG[status];
+                const Icon = cfg.icon;
+                const slotDurationHours = getSlotDurationHours(slot);
+                const displayHourlyPrice = override?.price ?? courtPrice;
+                const displayPrice = Math.round(displayHourlyPrice * slotDurationHours);
+                const discount = override?.discountPercent ?? 0;
+                const finalPrice = discount > 0 ? Math.round(displayPrice * (1 - discount / 100)) : displayPrice;
+                const isActive = activeSlot?.start === slot.start;
+                const isBookedSlot = status === "booked" && booking;
+                const bookingUserName = getUserFullName({
+                  firstName: booking?.userFirstName,
+                  lastName: booking?.userLastName,
+                });
+                const isSelected = selectedKeys.has(key);
+                const canSelect = status !== "booked"; // booked slots can't be bulk-closed
+
+                if (isMultiSelect) {
+                  return (
+                    <motion.button
+                      key={slot.start}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => canSelect && toggleSlotSelection(key)}
+                      className={cn(
+                        "w-full flex flex-col items-center justify-center rounded-xl border text-xs font-medium transition-all overflow-hidden relative",
+                        isBookedSlot ? "h-auto py-2 px-1 min-h-[4rem]" : "h-16",
+                        isSelected
+                          ? "bg-red-500/15 border-red-500 text-red-700 ring-2 ring-red-500/50"
+                          : cfg.bg,
+                        !canSelect && "opacity-50 cursor-not-allowed"
+                      )}
+                    >
+                      {/* Selection indicator */}
+                      <div className={cn(
+                        "absolute top-1 right-1 w-4 h-4 rounded flex items-center justify-center",
+                        isSelected ? "text-red-600" : "text-muted-foreground/40"
+                      )}>
+                        {isSelected
+                          ? <CheckSquareIcon className="w-3.5 h-3.5" />
+                          : <SquareIcon className="w-3.5 h-3.5" />
+                        }
+                      </div>
+                      <Icon className="w-3 h-3 mb-0.5 shrink-0" />
+                      <span className="font-bold">{slot.start}</span>
+                      {isBookedSlot ? (
+                        <span className="text-[9px] font-semibold truncate max-w-full px-1 mt-0.5 leading-tight text-center opacity-80">
+                          {bookingUserName}
+                        </span>
+                      ) : (
+                        <span className="text-[9px] opacity-70">{fmt(finalPrice)}ت</span>
+                      )}
+                    </motion.button>
+                  );
+                }
+
+                return (
+                  <motion.button
+                    key={slot.start}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setActiveSlot(isActive ? null : slot)}
+                    className={cn(
+                      "w-full flex flex-col items-center justify-center rounded-xl border text-xs font-medium transition-all overflow-hidden",
+                      isBookedSlot ? "h-auto py-2 px-1 min-h-[4rem]" : "h-16",
+                      cfg.bg,
+                      isActive && "ring-2 ring-primary ring-offset-1 scale-105"
+                    )}
+                  >
+                    <Icon className="w-3 h-3 mb-0.5 shrink-0" />
+                    <span className="font-bold">{slot.start}</span>
+                    {isBookedSlot ? (
+                      <span className="text-[9px] font-semibold truncate max-w-full px-1 mt-0.5 leading-tight text-center opacity-80">
+                        {bookingUserName}
+                      </span>
+                    ) : discount > 0 ? (
+                      <>
+                        <span className="text-[9px] line-through opacity-50">{fmt(displayPrice)}</span>
+                        <span className="text-[9px] text-primary font-bold">{fmt(finalPrice)}ت</span>
+                      </>
+                    ) : (
+                      <span className="text-[9px] opacity-70">{fmt(finalPrice)}ت</span>
+                    )}
+                  </motion.button>
+                );
+              })}
+            </div>
+
+            {/* Bulk action bar */}
+            <AnimatePresence>
+              {isMultiSelect && selectedKeys.size > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-red-500/30 bg-red-500/5 px-4 py-3"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full bg-red-500/15 flex items-center justify-center">
+                      <CheckSquareIcon className="w-4 h-4 text-red-600" />
+                    </div>
+                    <span className="text-sm font-bold text-foreground">
+                      {selectedKeys.size} سانس انتخاب شده
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => setShowConfirm(true)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-500 hover:bg-red-600 text-white text-xs font-bold transition-colors"
+                  >
+                    <LockIcon className="w-3.5 h-3.5" />
+                    بستن سانس‌های انتخاب‌شده
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+              {activeSlot && !isMultiSelect && (
+                <SlotEditPanel
+                  slot={activeSlot}
+                  override={overridesMap[`${selectedDay}|${activeSlot.start}`]}
+                  booking={bookingsMap[`${selectedDay}|${activeSlot.start}`]}
+                  courtPrice={courtPrice}
+                  slotDurationHours={getSlotDurationHours(activeSlot)}
+                  onSave={(vals) => handleSave(activeSlot, vals)}
+                  onClose={() => setActiveSlot(null)}
+                />
+              )}
+            </AnimatePresence>
+          </>
+        )}
+      </Modal>
+
+      <AnimatePresence>
+        {showConfirm && (
+          <BulkCloseConfirmModal
+            open={showConfirm}
+            count={selectedKeys.size}
+            onConfirm={handleBulkClose}
+            onCancel={() => setShowConfirm(false)}
+            loading={bulkClosing}
+          />
+        )}
+      </AnimatePresence>
+    </>
   );
 }

@@ -9,9 +9,13 @@ import {
 import toast from "react-hot-toast";
 import apiClient from "@/lib/apiClient";
 import PageHeader from "@/components/PageHeader";
+import ErrorState from "@/components/ui/ErrorState";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
+import Pagination from "@/components/ui/Pagination";
 import { fmt, cn, getUserFullName } from "@/lib/utils";
+
+const DEFAULT_LIMIT = 20;
 
 const TEHRAN_TIME_ZONE = "Asia/Tehran";
 const API_BASE = import.meta.env.VITE_API_URL?.replace("/api", "") ?? "http://localhost:3000";
@@ -387,23 +391,41 @@ function Badge({ children, className }) {
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState([]);
+  const [pagination, setPagination] = useState({ page: 1, limit: DEFAULT_LIMIT, total: 0, totalPages: 0 });
   const [clubs, setClubs]         = useState([]);
   const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState(false);
   const [search, setSearch]       = useState("");
   const [campaignOpen, setCampaignOpen] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      const [customersRes, clubsRes] = await Promise.all([
-        apiClient.get("/club-panel/customers"),
-        apiClient.get("/club-panel/clubs"),
-      ]);
-      if (customersRes.ok) setCustomers(customersRes.data.customers);
-      else toast.error("خطا در بارگذاری مشتریان");
-      if (clubsRes.ok) setClubs(clubsRes.data.clubs ?? []);
-      setLoading(false);
-    })();
-  }, []);
+  const fetchPage = async ({ page = 1, limit = DEFAULT_LIMIT } = {}) => {
+    setLoading(true);
+    setError(false);
+    const [customersRes, clubsRes] = await Promise.all([
+      apiClient.get("/club-panel/customers", { page, limit }),
+      apiClient.get("/club-panel/clubs"),
+    ]);
+    if (customersRes.ok) {
+      setCustomers(customersRes.data.customers);
+      setPagination(customersRes.data.pagination ?? { page, limit, total: customersRes.data.customers.length, totalPages: 1 });
+    } else {
+      setError(true);
+    }
+    if (clubsRes.ok) setClubs(clubsRes.data.clubs ?? []);
+    setLoading(false);
+  };
+
+  useEffect(() => { fetchPage(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handlePageChange = (newPage) => {
+    setPagination(p => ({ ...p, page: newPage }));
+    fetchPage({ page: newPage, limit: pagination.limit });
+  };
+
+  const handleLimitChange = (newLimit) => {
+    setPagination(p => ({ ...p, limit: newLimit, page: 1 }));
+    fetchPage({ page: 1, limit: newLimit });
+  };
 
   const filtered = customers.filter(c => {
     const q = search.trim().toLowerCase();
@@ -419,7 +441,7 @@ export default function CustomersPage() {
     <div dir="rtl">
       <PageHeader
         title="مشتریان باشگاه"
-        description={`${customers.length} کاربر که رزرو یا ثبت‌نام تورنومنت داشته‌اند`}
+        description={pagination.total > 0 ? `${pagination.total} کاربر که رزرو یا ثبت‌نام تورنومنت داشته‌اند` : ""}
         actions={
           <Button
             onClick={() => setCampaignOpen(true)}
@@ -450,7 +472,7 @@ export default function CustomersPage() {
             {[
               {
                 label: "کل مشتریان",
-                value: customers.length,
+                value: pagination.total,
                 icon: UsersIcon,
                 color: "text-violet-500",
                 bg: "bg-violet-500/10",
@@ -503,6 +525,11 @@ export default function CustomersPage() {
               <div key={i} className="h-16 rounded-2xl bg-muted animate-pulse" />
             ))}
           </div>
+        ) : error ? (
+          <ErrorState
+            message="اطلاعات مشتریان بارگذاری نشد"
+            onRetry={() => fetchPage({ page: pagination.page, limit: pagination.limit })}
+          />
         ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <UserCircle2Icon className="w-14 h-14 text-muted-foreground/25 mb-4" />
@@ -596,6 +623,20 @@ export default function CustomersPage() {
                 );
               })}
             </div>
+
+            {/* Pagination */}
+            {!loading && pagination.total > 0 && (
+              <div className="px-4 py-3 border-t border-border bg-muted/20">
+                <Pagination
+                  page={pagination.page}
+                  limit={pagination.limit}
+                  total={pagination.total}
+                  totalPages={pagination.totalPages}
+                  onPageChange={handlePageChange}
+                  onLimitChange={handleLimitChange}
+                />
+              </div>
+            )}
           </div>
         )}
       </div>

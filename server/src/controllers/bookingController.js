@@ -427,19 +427,22 @@ export const createBookingController = async (req, res) => {
       smsText: `پلتفرم رکت‌زون: درخواست رزرو ${courtFullName} برای ${bookingDateTime} ثبت شد و در انتظار تأیید مدیر زمین است.`,
     }).catch(() => {});
 
-    // Notify court manager
-    const managerPhone = court.managerPhone || court.clubPhone || court.clubOwnerPhone;
-    const managerPhoneSource = court.managerPhone ? "court.managerPhone" : court.clubPhone ? "club.phone" : court.clubOwnerPhone ? "club.owner.phone" : null;
-    if (managerPhone) {
+    // Notify court manager + club owner (all unique phones)
+    const recipientPhones = [...new Set(
+      [court.managerPhone, court.clubPhone, court.clubOwnerPhone].filter(Boolean)
+    )];
+    if (recipientPhones.length > 0) {
       const [requester] = await db.select({ name: users.name, phone: users.phone }).from(users).where(eq(users.id, userId)).limit(1);
       const requesterInfo = requester?.name ? `${requester.name} (${requester.phone})` : requester?.phone ?? "کاربر";
       const managerMsg = `پلتفرم رکت‌زون: درخواست رزرو جدید - ${courtFullName} - ${bookingDateTime} - رزرو کننده: ${requesterInfo} - لطفا از پنل تایید یا رد کنید.`;
-      console.log(`[SMS-Manager] → ${managerPhone} (${managerPhoneSource})`);
-      sendSMS(managerPhone, managerMsg)
-        .then(ok => console.log(`[SMS-Manager] result: ${ok}`))
-        .catch(err => console.error("[SMS-Manager] error:", err.message));
+      console.log(`[SMS-Manager] → ${recipientPhones.join(", ")}`);
+      for (const phone of recipientPhones) {
+        sendSMS(phone, managerMsg)
+          .then(ok => console.log(`[SMS-Manager] ${phone}: ${ok}`))
+          .catch(err => console.error(`[SMS-Manager] ${phone}:`, err.message));
+      }
     } else {
-      console.log(`[SMS-Manager] skipped — no manager phone, club phone, or owner phone for court ${court.id}`);
+      console.log(`[SMS-Manager] skipped — no manager/club/owner phone for court ${court.id}`);
     }
 
     const enriched = { ...booking, court };

@@ -4,6 +4,7 @@ import { StarIcon, MessageSquareIcon, SendIcon, Trash2Icon } from "lucide-react"
 import toast from "react-hot-toast";
 import apiClient from "@/lib/apiClient";
 import PageHeader from "@/components/PageHeader";
+import ErrorState from "@/components/ui/ErrorState";
 import Badge from "@/components/ui/Badge";
 import { cn, getUserFullName } from "@/lib/utils";
 
@@ -111,18 +112,24 @@ export default function ReviewsPage() {
   const [selectedClub, setSelectedClub] = useState(null);
   const [reviews, setReviews] = useState([]);
   const [stats, setStats] = useState({ average: 0, total: 0 });
+  const [clubsLoading, setClubsLoading] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
+    setClubsLoading(true);
     apiClient.get("/club-panel/clubs").then(({ ok, data }) => {
       if (ok) { setClubs(data.clubs ?? []); if (data.clubs?.length) setSelectedClub(data.clubs[0]); }
+      setClubsLoading(false);
     });
   }, []);
 
   const fetchReviews = async (clubId) => {
     setLoading(true);
+    setError(false);
     const { ok, data } = await apiClient.get(`/public/clubs/${clubId}/reviews`);
     if (ok) { setReviews(data.reviews ?? []); setStats(data.stats ?? { average: 0, total: 0 }); }
+    else setError(true);
     setLoading(false);
   };
 
@@ -136,8 +143,14 @@ export default function ReviewsPage() {
       />
 
       <div className="p-6 space-y-5">
-        {/* Club selector */}
-        {clubs.length > 1 && (
+        {/* Club selector skeleton */}
+        {clubsLoading ? (
+          <div className="flex gap-2 animate-pulse">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="h-9 w-24 rounded-xl bg-muted" />
+            ))}
+          </div>
+        ) : clubs.length > 1 && (
           <div className="flex gap-2 flex-wrap">
             {clubs.map(c => (
               <button key={c.id} onClick={() => setSelectedClub(c)}
@@ -172,6 +185,11 @@ export default function ReviewsPage() {
           Array.from({length:3}).map((_,i) => (
             <div key={i} className="h-28 rounded-2xl bg-muted animate-pulse" />
           ))
+        ) : error ? (
+          <ErrorState
+            message="نظرات بارگذاری نشدند"
+            onRetry={() => selectedClub && fetchReviews(selectedClub.id)}
+          />
         ) : reviews.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center text-muted-foreground">
             <StarIcon className="w-12 h-12 mb-3 text-muted-foreground/20" />
