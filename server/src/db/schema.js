@@ -571,6 +571,27 @@ export const rankingEvents = pgTable("ranking_events", {
   uniqueIndex("uq_ranking_events_source_user").on(table.sourceType, table.sourceId, table.userId),
 ]);
 
+// Monthly leaderboard snapshots — archived at end of each period
+export const leaderboardMonthlySnapshots = pgTable("leaderboard_monthly_snapshots", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  sportType: varchar("sport_type", { length: 50 }).notNull().default("padel"),
+  periodYear: integer("period_year").notNull(),
+  periodMonth: integer("period_month").notNull(), // 1-12
+  rank: integer("rank").notNull(),
+  points: integer("points").notNull().default(0),
+  matchPoints: integer("match_points").notNull().default(0),
+  tournamentPoints: integer("tournament_points").notNull().default(0),
+  matchesCount: integer("matches_count").notNull().default(0),
+  tournamentsCount: integer("tournaments_count").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_lms_user_id").on(table.userId),
+  index("idx_lms_period").on(table.periodYear, table.periodMonth),
+  index("idx_lms_sport_period").on(table.sportType, table.periodYear, table.periodMonth),
+  uniqueIndex("uq_lms_user_sport_period").on(table.userId, table.sportType, table.periodYear, table.periodMonth),
+]);
+
 // ─── Mini Game ───────────────────────────────────────────────────────────────
 
 export const tennisDuelSessions = pgTable("tennis_duel_sessions", {

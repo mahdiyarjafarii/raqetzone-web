@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { CrownIcon, MedalIcon, RefreshCwIcon } from "lucide-react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { ArrowDownIcon, ArrowUpIcon, CrownIcon, MinusIcon, RefreshCwIcon, TrophyIcon } from "lucide-react";
 import { motion } from "framer-motion";
 import toast from "react-hot-toast";
 import { rankingService } from "@/services/rankingService";
@@ -9,290 +9,417 @@ import { currentUserAtom } from "@/config/state";
 import UserAvatar from "@/components/ui/UserAvatar";
 import UserProfileSheet from "@/components/ui/UserProfileSheet";
 
-const TOP_BADGES = {
-  1: "bg-amber-500/15 text-amber-600 border-amber-500/25",
-  2: "bg-slate-500/15 text-slate-600 border-slate-500/25",
-  3: "bg-orange-500/15 text-orange-600 border-orange-500/25",
-};
-
 const SPORT_OPTIONS = [
   { value: "padel", label: "پدل" },
   { value: "tennis", label: "تنیس" },
 ];
 
-const RANK_MEDALS = {
-  1: "🥇",
-  2: "🥈",
-  3: "🥉",
+const PERSIAN_MONTHS = [
+  "", "فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور",
+  "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند",
+];
+
+const PODIUM = {
+  1: { medal: "🥇", bar: "bg-amber-400", ring: "ring-amber-400/60", label: "text-amber-500", avatarSize: "w-14 h-14 text-sm" },
+  2: { medal: "🥈", bar: "bg-slate-400", ring: "ring-slate-400/50", label: "text-slate-400", avatarSize: "w-12 h-12 text-xs" },
+  3: { medal: "🥉", bar: "bg-orange-400", ring: "ring-orange-400/50", label: "text-orange-400", avatarSize: "w-12 h-12 text-xs" },
 };
 
-function getDisplayName(row, fallbackRank) {
+function getDisplayName(row) {
   if (row?.name && String(row.name).trim()) return String(row.name).trim();
   const composed = [row?.firstName, row?.lastName].filter(Boolean).join(" ").trim();
-  if (composed) return composed;
-  return `بازیکن ${fallbackRank ?? "-"}`;
+  return composed || `بازیکن ${row?.rank ?? "-"}`;
+}
+
+function TrendIcon({ trend }) {
+  if (trend === "up") return <ArrowUpIcon className="w-3 h-3 text-emerald-500" />;
+  if (trend === "down") return <ArrowDownIcon className="w-3 h-3 text-red-500" />;
+  return <MinusIcon className="w-3 h-3 text-muted-foreground" />;
+}
+
+/** Top-3 podium — fixed layout: rank2 | rank1 | rank3 */
+function Podium({ top3, topPoints, currentUserId, onSelect }) {
+  // order: 2nd place left, 1st center, 3rd right
+  const ordered = [top3[1], top3[0], top3[2]].filter(Boolean);
+
+  return (
+    <div className="rounded-2xl border border-border bg-card overflow-hidden">
+      <div className="px-3 pt-3 pb-0">
+        <span className="text-xs font-black flex items-center gap-1.5">
+          <TrophyIcon className="w-3.5 h-3.5 text-amber-500" />
+          برترین‌های این ماه
+        </span>
+      </div>
+
+      {/* Avatar + name row — all same height */}
+      <div className="grid grid-cols-3 gap-2 px-3 pt-3 pb-5">
+        {ordered.map((row) => {
+          if (!row) return <div key="empty" />;
+          const p = PODIUM[row.rank];
+          const isMe = currentUserId && String(row.userId) === String(currentUserId);
+          return (
+            <button
+              key={row.userId}
+              type="button"
+              onClick={() => onSelect(row)}
+              className={cn(
+                "flex flex-col items-center gap-1.5 focus:outline-none",
+                isMe && "opacity-100"
+              )}
+            >
+              {/* Medal emoji above avatar */}
+              <span className="text-lg leading-none">{p.medal}</span>
+              <div className={cn("rounded-full ring-2 shrink-0", p.ring)}>
+                <UserAvatar
+                  image={row.image}
+                  name={getDisplayName(row)}
+                  className={cn("rounded-full text-white", p.avatarSize)}
+                  fallbackClassName={cn("rounded-full bg-primary text-primary-foreground", p.avatarSize)}
+                  isCoach={row.isCoach}
+                />
+              </div>
+              <p className="text-[11px] font-bold text-foreground truncate w-full text-center leading-tight px-1">
+                {getDisplayName(row)}
+                {isMe && <span className="text-primary"> (شما)</span>}
+              </p>
+              <p className={cn("text-sm font-black leading-none", p.label)}>{row.points}</p>
+              <p className="text-[10px] text-muted-foreground -mt-0.5">امتیاز</p>
+            </button>
+          );
+        })}
+      </div>
+
+    </div>
+  );
+}
+
+function MonthPicker({ periods, year, month, onChange }) {
+  if (!periods.length) return null;
+  return (
+    <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+      {periods.map((p) => {
+        const isActive = p.year === year && p.month === month;
+        return (
+          <button
+            key={`${p.year}-${p.month}`}
+            onClick={() => onChange(p.year, p.month)}
+            className={cn(
+              "shrink-0 px-3 py-1.5 rounded-full text-[11px] font-bold border transition-colors whitespace-nowrap",
+              isActive
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-muted/40 text-muted-foreground border-border"
+            )}
+          >
+            {PERSIAN_MONTHS[p.month]}
+            {p.year !== new Date().getUTCFullYear() ? ` ${p.year}` : ""}
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 export default function LeaderboardSection({ mode = "embedded" }) {
   const isFullPage = mode === "full";
   const currentUser = useAtomValue(currentUserAtom);
+
+  const now = new Date();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [search, setSearch] = useState("");
   const [sport, setSport] = useState("padel");
-  const [page, setPage] = useState(1);
-  const [pagination, setPagination] = useState({ total: 0, totalPages: 1, limit: 100, offset: 0 });
+  const [topPoints, setTopPoints] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [offset, setOffset] = useState(0);
   const [currentUserRank, setCurrentUserRank] = useState(null);
+  const [currentUserSummary, setCurrentUserSummary] = useState(null);
   const [viewingUser, setViewingUser] = useState(null);
+  const [periods, setPeriods] = useState([]);
+  const [periodYear, setPeriodYear] = useState(now.getUTCFullYear());
+  const [periodMonth, setPeriodMonth] = useState(now.getUTCMonth() + 1);
 
-  const pageSize = isFullPage ? 50 : 100;
+  const sentinelRef = useRef(null);
+  const pageSize = isFullPage ? 30 : 10;
+  const top3 = rows.slice(0, 3);
+  const restRows = isFullPage ? rows : rows.slice(3);
 
-  const topThree = useMemo(() => rows.slice(0, 3), [rows]);
+  const loadPeriods = useCallback(async (s) => {
+    const res = await rankingService.getActivePeriods({ sport: s });
+    if (res.ok) setPeriods(res.data.periods ?? []);
+  }, []);
 
-  const load = async (targetPage = page, override = {}) => {
-    const activeSport = override.sport ?? sport;
-    setLoading(true);
+  const load = useCallback(async ({ sport: s, year, month, searchVal, reset = true } = {}) => {
+    const activeSport = s ?? sport;
+    const activeYear = year ?? periodYear;
+    const activeMonth = month ?? periodMonth;
+    const activeSearch = searchVal ?? search;
+    const activeOffset = reset ? 0 : offset;
+
+    reset ? setLoading(true) : setLoadingMore(true);
+
     const params = {
       limit: pageSize,
-      offset: (targetPage - 1) * pageSize,
+      offset: activeOffset,
       sport: activeSport,
+      year: activeYear,
+      month: activeMonth,
     };
-    if (isFullPage && search.trim()) params.search = search.trim();
+    if (isFullPage && activeSearch.trim()) params.search = activeSearch.trim();
 
     const res = await rankingService.getLeaderboard(params);
     setLoading(false);
+    setLoadingMore(false);
 
     if (!res.ok) {
       toast.error(res.data?.message ?? "خطا در دریافت جدول رده‌بندی");
       return;
     }
 
-    setRows(res.data.leaderboard ?? []);
-    setPagination(res.data.pagination ?? { total: 0, totalPages: 1, limit: pageSize, offset: 0 });
+    const newRows = res.data.leaderboard ?? [];
+    setRows((prev) => reset ? newRows : [...prev, ...newRows]);
+    setTopPoints(Number(res.data.topPoints ?? 0));
+    setHasMore(res.data.pagination?.hasMore ?? false);
+    setOffset(activeOffset + newRows.length);
     setCurrentUserRank(res.data.currentUserRank ?? null);
-    setSport(activeSport);
-    setPage(targetPage);
-  };
+    setCurrentUserSummary(res.data.currentUserSummary ?? null);
+  }, [sport, periodYear, periodMonth, search, offset, isFullPage, pageSize]);
 
   useEffect(() => {
-    load(1);
+    loadPeriods("padel");
+    load({ reset: true });
   }, []);
 
-  const applyFilters = () => {
-    load(1);
+  // Infinite scroll
+  useEffect(() => {
+    if (!isFullPage) return;
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loading && !loadingMore) {
+          load({ reset: false });
+        }
+      },
+      { rootMargin: "200px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [hasMore, loading, loadingMore, load, isFullPage]);
+
+  const onChangeSport = (s) => {
+    setSport(s);
+    setOffset(0);
+    loadPeriods(s);
+    load({ sport: s, reset: true });
   };
 
-  const goPrev = () => {
-    if (page <= 1 || loading) return;
-    load(page - 1);
+  const onChangePeriod = (y, m) => {
+    setPeriodYear(y);
+    setPeriodMonth(m);
+    setOffset(0);
+    load({ year: y, month: m, reset: true });
   };
 
-  const goNext = () => {
-    const totalPages = Number(pagination.totalPages ?? 1);
-    if (page >= totalPages || loading) return;
-    load(page + 1);
+  const onApplySearch = () => {
+    setOffset(0);
+    load({ searchVal: search, reset: true });
+  };
+
+  const handleSelect = (row) => {
+    setViewingUser({ userId: row.userId, name: getDisplayName(row), image: row.image, sport });
   };
 
   return (
     <div className="space-y-3">
+      {/* Header card */}
       <div className="rounded-2xl border border-border bg-card p-3 space-y-3">
-        <div className="space-y-2.5">
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <CrownIcon className="w-4 h-4 text-amber-500 shrink-0" />
-            <h3 className="text-sm font-black text-foreground truncate">رنکینگ بازیکنان رکت‌زون</h3>
+            <h3 className="text-sm font-black text-foreground">رنکینگ ماهانه رکت‌زون</h3>
           </div>
-
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <div className="inline-flex max-w-full items-center gap-1.5 overflow-x-auto no-scrollbar">
-              {SPORT_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => load(1, { sport: option.value })}
-                  className={cn(
-                    "shrink-0 whitespace-nowrap px-3 py-1.5 rounded-full text-[11px] font-bold border transition-colors",
-                    sport === option.value
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-muted/40 text-muted-foreground border-border"
-                  )}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-
-            <button
-              onClick={() => load(page)}
-              className="shrink-0 inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-            >
-              <RefreshCwIcon className={cn("w-3.5 h-3.5", loading && "animate-spin")} />
-              بروزرسانی
-            </button>
-          </div>
-        </div>
-
-        <div className={cn("flex gap-2", isFullPage ? "flex-wrap" : "") }>
-          {isFullPage && (
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") applyFilters();
-              }}
-              placeholder="جستجو نام بازیکن"
-              className="flex-1 basis-[140px] min-w-0 rounded-xl border border-border bg-muted/40 px-3 py-2 text-sm"
-            />
-          )}
           <button
-            onClick={applyFilters}
-            className={cn(
-              "px-3 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold",
-              isFullPage ? "w-full sm:w-auto" : ""
-            )}
+            onClick={() => load({ reset: true })}
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
           >
-            اعمال
+            <RefreshCwIcon className={cn("w-3.5 h-3.5", loading && "animate-spin")} />
           </button>
         </div>
 
-        {isFullPage && currentUserRank && (
-          <div className="rounded-xl border border-primary/25 bg-primary/10 px-3 py-2 text-xs text-primary font-bold">
-            رتبه فعلی شما: #{currentUserRank}
+        {/* Sport tabs */}
+        <div className="flex gap-1.5">
+          {SPORT_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => onChangeSport(opt.value)}
+              className={cn(
+                "px-3 py-1.5 rounded-full text-[11px] font-bold border transition-colors",
+                sport === opt.value
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-muted/40 text-muted-foreground border-border"
+              )}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Month picker — only months with data */}
+        <MonthPicker periods={periods} year={periodYear} month={periodMonth} onChange={onChangePeriod} />
+
+        {/* Search (full page only) */}
+        {isFullPage && (
+          <div className="flex gap-2">
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && onApplySearch()}
+              placeholder="جستجو نام بازیکن..."
+              className="flex-1 min-w-0 rounded-xl border border-border bg-muted/40 px-3 py-2 text-sm"
+            />
+            <button
+              onClick={onApplySearch}
+              className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold shrink-0"
+            >
+              جستجو
+            </button>
           </div>
         )}
       </div>
 
-      {!isFullPage && topThree.length > 0 && (
-        <div className="grid grid-cols-3 gap-2">
-          {topThree.map((row) => (
-            <motion.div
-              key={row.userId}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="rounded-2xl border border-border bg-card p-3 text-center"
-            >
-              <span className={cn("inline-flex items-center justify-center rounded-full border px-2 py-0.5 text-[10px] font-bold", TOP_BADGES[row.rank])}>
-                #{row.rank}
-              </span>
-              <button
-                type="button"
-                onClick={() => setViewingUser({ userId: row.userId, name: getDisplayName(row, row.rank), image: row.image, sport })}
-                className="mt-2 w-full flex items-center justify-center gap-1.5 min-w-0"
-              >
-                <UserAvatar
-                  image={row.image}
-                  name={getDisplayName(row, row.rank)}
-                  className="w-6 h-6 rounded-full text-[10px] text-white"
-                  fallbackClassName="w-6 h-6 rounded-full bg-primary text-primary-foreground text-[10px]"
-                  isCoach={row.isCoach}
-                />
-                <p className="text-xs font-bold text-foreground truncate max-w-[90px]">
-                  {getDisplayName(row, row.rank)}
-                </p>
-              </button>
-              <p className="mt-1 text-sm font-black text-primary inline-flex items-center justify-center gap-1">
-                {row.points}
-                {RANK_MEDALS[row.rank] ? <span>{RANK_MEDALS[row.rank]}</span> : null}
-              </p>
-              <p className="text-[10px] text-muted-foreground">امتیاز</p>
-            </motion.div>
+      {/* Current user banner */}
+      {currentUserSummary && (
+        <div className="rounded-2xl border border-primary/25 bg-primary/5 px-3 py-2.5 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-xs font-black text-primary shrink-0">رتبه شما #{currentUserRank}</span>
+            <div className="flex items-center gap-0.5 text-[11px] text-muted-foreground shrink-0">
+              <TrendIcon trend={currentUserSummary.trend} />
+              {currentUserSummary.delta !== 0 && (
+                <span className={cn(currentUserSummary.trend === "up" ? "text-emerald-500" : "text-red-500")}>
+                  {Math.abs(currentUserSummary.delta)}
+                </span>
+              )}
+              <span className="mr-1">نسبت به ماه قبل</span>
+            </div>
+          </div>
+          <div className="text-right shrink-0">
+            <span className="text-sm font-black text-primary">{currentUserSummary.points}</span>
+            <span className="text-[10px] text-muted-foreground mr-0.5">امتیاز</span>
+          </div>
+        </div>
+      )}
+
+      {/* Top 3 Podium */}
+      {!loading && top3.length > 0 && (
+        <Podium
+          top3={top3}
+          topPoints={topPoints}
+          currentUserId={currentUser?.id}
+          onSelect={handleSelect}
+        />
+      )}
+
+      {/* Loading skeleton */}
+      {loading && (
+        <div className="rounded-2xl border border-border bg-card overflow-hidden">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="flex items-center gap-3 px-3 py-3 border-b border-border/60 animate-pulse">
+              <div className="w-6 h-4 bg-muted rounded" />
+              <div className="w-8 h-8 bg-muted rounded-full shrink-0" />
+              <div className="flex-1 h-4 bg-muted rounded" />
+              <div className="w-10 h-4 bg-muted rounded" />
+            </div>
           ))}
         </div>
       )}
 
-      <div className="rounded-2xl border border-border overflow-hidden bg-card">
-        <div className="px-3 py-2 bg-muted/60 border-b border-border text-xs font-bold text-foreground">جدول کامل</div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="bg-muted/35 text-muted-foreground border-b border-border">
-                <th className="px-2 py-2 text-right">#</th>
-                <th className="px-2 py-2 text-right">بازیکن</th>
-                <th className="px-2 py-2 text-right">امتیاز</th>
-                <th className="px-2 py-2 text-right">مچ</th>
-                <th className="px-2 py-2 text-right">تورنومنت</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-3 py-5 text-center text-muted-foreground">
-                    {loading ? "در حال بارگذاری..." : "داده‌ای برای نمایش وجود ندارد"}
-                  </td>
-                </tr>
-              ) : (
-                rows.map((row) => (
-                  <tr
-                    key={row.userId}
-                    className={cn(
-                      "border-b border-border/60",
-                      currentUser?.id && String(row.userId) === String(currentUser.id) && "bg-primary/10"
-                    )}
-                  >
-                    <td className="px-2 py-2 font-bold">{row.rank}</td>
-                    <td className="px-2 py-2 max-w-[180px]">
-                      <button
-                        type="button"
-                        onClick={() => setViewingUser({ userId: row.userId, name: getDisplayName(row, row.rank), image: row.image, sport })}
-                        className="w-full flex items-center gap-2 min-w-0 text-right"
-                      >
-                        <UserAvatar
-                          image={row.image}
-                          name={getDisplayName(row, row.rank)}
-                          className="w-7 h-7 rounded-full text-[10px] text-white"
-                          fallbackClassName="w-7 h-7 rounded-full bg-primary text-primary-foreground text-[10px]"
-                          isCoach={row.isCoach}
-                        />
-                        <span className="truncate font-semibold">{getDisplayName(row, row.rank)}</span>
-                        {currentUser?.id && String(row.userId) === String(currentUser.id) && (
-                          <span className="text-[10px] font-bold text-primary shrink-0">(شما)</span>
-                        )}
-                      </button>
-                    </td>
-                    <td className="px-2 py-2 font-bold">
-                      <span className="inline-flex items-center gap-1">
-                        {row.points}
-                        {RANK_MEDALS[row.rank] ? <span>{RANK_MEDALS[row.rank]}</span> : null}
-                      </span>
-                    </td>
-                    <td className="px-2 py-2">{row.matchPoints}</td>
-                    <td className="px-2 py-2">{row.tournamentPoints}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {isFullPage && (
-        <div className="rounded-2xl border border-border bg-card px-3 py-2.5 flex items-center justify-between text-xs">
-          <span className="text-muted-foreground">
-            صفحه {page} از {Number(pagination.totalPages ?? 1)} · {Number(pagination.total ?? 0)} بازیکن
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={goPrev}
-              disabled={loading || page <= 1}
-              className="px-3 py-1.5 rounded-lg border border-border bg-muted/40 disabled:opacity-50"
-            >
-              قبلی
-            </button>
-            <button
-              onClick={goNext}
-              disabled={loading || page >= Number(pagination.totalPages ?? 1)}
-              className="px-3 py-1.5 rounded-lg border border-border bg-muted/40 disabled:opacity-50"
-            >
-              بعدی
-            </button>
+      {/* Table */}
+      {!loading && restRows.length > 0 && (
+        <div className="rounded-2xl border border-border overflow-hidden bg-card">
+          <div className="px-3 py-2 bg-muted/60 border-b border-border text-xs font-bold">
+            {isFullPage ? "جدول کامل" : "سایر بازیکنان"}
           </div>
+          {restRows.map((row, idx) => {
+            const isMe = currentUser?.id && String(row.userId) === String(currentUser.id);
+            const barWidth = topPoints > 0 ? Math.round((row.points / topPoints) * 100) : 0;
+            return (
+              <motion.div
+                key={row.userId}
+                initial={{ opacity: 0, x: -6 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: idx * 0.015 }}
+                className={cn(
+                  "flex items-center gap-2.5 px-3 py-2.5 border-b border-border/60 cursor-pointer hover:bg-muted/30 transition-colors",
+                  isMe && "bg-primary/8"
+                )}
+                onClick={() => handleSelect(row)}
+              >
+                <div className="w-7 shrink-0 text-center text-xs font-bold text-muted-foreground">
+                  {row.rank}
+                </div>
+                <UserAvatar
+                  image={row.image}
+                  name={getDisplayName(row)}
+                  className="w-8 h-8 rounded-full text-[11px] text-white shrink-0"
+                  fallbackClassName="w-8 h-8 rounded-full bg-primary text-primary-foreground text-[11px]"
+                  isCoach={row.isCoach}
+                />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs font-semibold text-foreground truncate">
+                      {getDisplayName(row)}
+                    </span>
+                    {isMe && <span className="text-[10px] font-bold text-primary shrink-0">(شما)</span>}
+                  </div>
+                  {topPoints > 0 && row.points > 0 && (
+                    <div className="w-full mt-1 h-1 rounded-full bg-border overflow-hidden">
+                      <div className="h-full rounded-full bg-primary/50" style={{ width: `${barWidth}%` }} />
+                    </div>
+                  )}
+                </div>
+                <div className="text-right shrink-0">
+                  <span className="text-sm font-black text-primary">{row.points}</span>
+                  <p className="text-[10px] text-muted-foreground leading-none">امتیاز</p>
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!loading && rows.length === 0 && (
+        <div className="rounded-2xl border border-border bg-card flex flex-col items-center justify-center py-10 gap-3">
+          <TrophyIcon className="w-10 h-10 text-muted-foreground/30" />
+          <p className="text-sm font-bold text-muted-foreground">هنوز کسی در این ماه بازی نکرده</p>
+          <p className="text-xs text-muted-foreground/60">اولین نفر باش!</p>
+        </div>
+      )}
+
+      {/* Infinite scroll sentinel */}
+      {isFullPage && <div ref={sentinelRef} className="h-4" />}
+
+      {loadingMore && (
+        <div className="flex justify-center py-3">
+          <RefreshCwIcon className="w-5 h-5 animate-spin text-muted-foreground" />
+        </div>
+      )}
+
+      {/* Distance to top 10 nudge */}
+      {currentUserSummary?.distanceToTop10 > 0 && (
+        <div className="rounded-2xl border border-border bg-muted/30 px-3 py-2.5 text-xs text-muted-foreground text-center">
+          تا ورود به <span className="font-bold text-foreground">Top 10</span> فقط{" "}
+          <span className="font-bold text-primary">{currentUserSummary.distanceToTop10} رتبه</span> فاصله داری!
         </div>
       )}
 
       <div className="rounded-2xl border border-border bg-muted/30 p-3 text-[11px] text-muted-foreground leading-6">
         <div className="flex items-center gap-1.5 font-bold text-foreground mb-1">
-          <MedalIcon className="w-3.5 h-3.5 text-primary" />
-          قوانین فعلی امتیاز
+          <CrownIcon className="w-3.5 h-3.5 text-primary" />
+          قوانین امتیازدهی
         </div>
-        برد در هر مچ تاییدشده: ۳ امتیاز · تورنومنت: بر اساس جدول نهایی و امتیاز پایه تورنومنت
+        برد در هر مچ تاییدشده: ۳ امتیاز · تورنومنت: بر اساس جایگاه نهایی · لیدربرد هر ماه ریست می‌شود
       </div>
 
       {viewingUser && (

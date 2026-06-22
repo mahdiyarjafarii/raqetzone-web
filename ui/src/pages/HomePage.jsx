@@ -18,6 +18,7 @@ import HomeLeaderboardPreview from "@/features/home/components/HomeLeaderboardPr
 import DealsSection from "@/features/home/components/DealsSection";
 import HomeCourtsSection from "@/features/home/components/HomeCourtsSection";
 import BookingSummaryBar from "@/features/home/components/BookingSummaryBar";
+import HomeMatchSections from "@/features/home/components/HomeMatchSections";
 
 function SectionDivider() {
   return <div className="h-5" />;
@@ -66,6 +67,11 @@ export default function HomePage() {
           </Link>
         </div>
       </div>
+
+      <SectionDivider />
+
+      {/* ── Match Sections ── */}
+      <HomeMatchSections data={data} loading={loading} />
 
       <SectionDivider />
 

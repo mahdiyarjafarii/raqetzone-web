@@ -371,7 +371,7 @@ function Layout() {
 
       {!isChatPage && !isImageGeneratePage && !isVideoGeneratePage && (
         <>
-          <footer className="fixed bottom-0 left-0 right-0 flex justify-center z-1 bg-background">
+          <footer className="fixed bottom-0 left-0 right-0 flex justify-center z-50 bg-background overflow-visible">
             <LimelightNav />
           </footer>
 
