@@ -6,7 +6,7 @@ import {
   Building2Icon, UserCircle2Icon,
   TrophyIcon, BarChart3Icon, UsersIcon,
   LogOutIcon, TagIcon, ShieldCheckIcon, StarIcon,
-  MegaphoneIcon, ScanLineIcon,
+  MegaphoneIcon, ScanLineIcon, KeyRoundIcon,
 } from "lucide-react";
 import { cn, getUserFullName } from "@/lib/utils";
 import { adminUserAtom, adminTokenAtom } from "@/store/authStore";
@@ -26,7 +26,8 @@ const CLUB_OWNER_NAV = [
   { to: "/discounts",   icon: TagIcon,              label: "تخفیف‌ها"     },
   { to: "/customers",   icon: UserCircle2Icon,      label: "مشتریان"       },
   { to: "/reviews",     icon: StarIcon,             label: "نظرات"         },
-  { to: "/verify",      icon: ScanLineIcon,         label: "تأیید رزرو"    },
+  { to: "/verify",        icon: ScanLineIcon,   label: "تأیید رزرو"    },
+  { to: "/set-password",  icon: KeyRoundIcon,   label: "تنظیم رمز عبور" },
 ];
 
 const ADMIN_EXTRA_NAV = [

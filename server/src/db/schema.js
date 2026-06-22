@@ -25,6 +25,8 @@ export const users = pgTable("users", {
   subscriptionType: varchar("subscription_type", { length: 256 }),
   subscriptionEndDate: timestamp("subscription_end_date"),
   lastResetCreditsDate: timestamp("last_reset_credits_date"),
+  passwordHash: varchar("password_hash", { length: 255 }),
+  isDefaultPassword: boolean("is_default_password").notNull().default(false),
   isAdmin: boolean("is_admin").notNull().default(false),
   isClubOwner: boolean("is_club_owner").notNull().default(false),
   isCoach: boolean("is_coach").notNull().default(false),

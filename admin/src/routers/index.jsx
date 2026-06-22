@@ -16,6 +16,7 @@ const ClubDetailPage  = lazy(() => import("@/pages/ClubDetailPage"));
 const ReviewsPage        = lazy(() => import("@/pages/ReviewsPage"));
 const VerifyBookingPage  = lazy(() => import("@/pages/VerifyBookingPage"));
 const CustomersPage   = lazy(() => import("@/pages/CustomersPage"));
+const SetPasswordPage = lazy(() => import("@/pages/SetPasswordPage"));
 
 const S = (Page) => (
   <Suspense fallback={<div className="p-8 animate-pulse text-muted-foreground text-sm">بارگذاری...</div>}>
@@ -40,7 +41,8 @@ const router = createBrowserRouter(
         <Route path="marketing" element={S(MarketingPage)} />
         <Route path="tournaments" element={S(TournamentsPage)} />
         <Route path="analytics" element={S(AnalyticsPage)} />
-        <Route path="users"     element={S(UsersPage)} />
+        <Route path="users"        element={S(UsersPage)} />
+        <Route path="set-password" element={S(SetPasswordPage)} />
       </Route>
     </>
   )

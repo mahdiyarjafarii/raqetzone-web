@@ -12,7 +12,8 @@
     "db:push": "bunx drizzle-kit push:pg",
     "db:studio": "drizzle-kit studio",
     "seed:clubs": "node src/db/seed-clubs.js",
-    "migrate:preferences": "node src/scripts/migrateUserPreferences.js"
+    "migrate:preferences": "node src/scripts/migrateUserPreferences.js",
+    "set-default-passwords": "node src/scripts/setDefaultClubPasswords.js"
   },
   "keywords": [],
   "author": "",
