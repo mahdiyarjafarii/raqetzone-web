@@ -17,8 +17,8 @@ export default function HomeMatchSections({ data, loading }) {
 
   return (
     <div className="space-y-5">
-      {/* Almost full — highest urgency */}
-      {(loading || hasAlmostFull) && (
+      {/* Almost full — highest urgency — disabled until match count grows */}
+      {/* {(loading || hasAlmostFull) && (
         <MatchesCarousel
           matches={almostFull}
           loading={loading && almostFull.length === 0}
@@ -26,7 +26,7 @@ export default function HomeMatchSections({ data, loading }) {
           emoji="🔥"
           hideIfEmpty={!loading}
         />
-      )}
+      )} */}
 
       {/* Today's matches */}
       {(loading || hasToday) && (

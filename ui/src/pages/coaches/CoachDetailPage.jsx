@@ -405,7 +405,6 @@ export default function CoachDetailPage() {
             <div className="min-w-0 flex-1 pb-1">
               <div className="flex items-center gap-1.5">
                 <h1 className="text-xl font-black text-foreground truncate">{coachName}</h1>
-                <BadgeCheckIcon className="w-5 h-5 text-emerald-500 shrink-0" />
               </div>
               <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
                 {coach.coachHeadline || coach.bio || "مربی حرفه‌ای رکت‌زون"}

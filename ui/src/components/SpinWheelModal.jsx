@@ -1,6 +1,6 @@
 import "@mertercelik/react-prize-wheel/style.css";
 
-import React, { useRef, useState, useCallback } from "react";
+import React, { useRef, useState, useCallback, useEffect } from "react";
 import confetti from "canvas-confetti";
 import { motion, AnimatePresence } from "framer-motion";
 import { PrizeWheel } from "@mertercelik/react-prize-wheel";
@@ -23,6 +23,17 @@ export default function SpinWheelModal({ open, onClose, reason }) {
   const [expiresAt, setExpiresAt] = useState(null);
   const [error, setError] = useState(null);
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setSpinning(false);
+      setPrize(null);
+      setCode(null);
+      setExpiresAt(null);
+      setError(null);
+      setCopied(false);
+    }
+  }, [open]);
 
   const handleSpin = useCallback(() => {
     if (spinning || prize) return;

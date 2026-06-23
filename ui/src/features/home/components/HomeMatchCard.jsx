@@ -30,7 +30,7 @@ function useCountdown(targetDate) {
       if (diff <= 0) { setParts({ label: "شروع شد", urgent: false }); return; }
       const h = Math.floor(diff / 3600000);
       const m = Math.floor((diff % 3600000) / 60000);
-      if (h >= 24) setParts({ label: `${Math.floor(h / 24)} روز`, urgent: false });
+      if (h >= 24) setParts({ label: `${Math.floor(h / 24)} روز مانده`, urgent: false });
       else if (h > 0) setParts({ label: `${h}:${String(m).padStart(2, "0")}`, urgent: h < 3 });
       else setParts({ label: `${m} دقیقه`, urgent: true });
     }
