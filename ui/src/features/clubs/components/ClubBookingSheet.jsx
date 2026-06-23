@@ -45,7 +45,10 @@ function addDays(dateStr, n) {
 function getSlotDurationHours(slot) {
   const [sh, sm] = slot.start.split(":").map(Number);
   const [eh, em] = slot.end.split(":").map(Number);
-  return ((eh * 60 + em) - (sh * 60 + sm)) / 60;
+  const startMin = sh * 60 + sm;
+  const rawEnd = eh * 60 + em;
+  const endMin = rawEnd <= startMin ? rawEnd + 1440 : rawEnd;
+  return (endMin - startMin) / 60;
 }
 
 function formatDayShort(dateStr) {
@@ -302,9 +305,7 @@ function BookingSummaryStep({ court, date, slot, clubId, onConfirm, onBack, subm
   const [wallet, setWallet] = useState(null);
   const [walletLoading, setWalletLoading] = useState(true);
 
-  const startMin = slot.start.split(":").reduce((acc, v, i) => acc + (i === 0 ? +v * 60 : +v), 0);
-  const endMin = slot.end.split(":").reduce((acc, v, i) => acc + (i === 0 ? +v * 60 : +v), 0);
-  const durationHours = (endMin - startMin) / 60;
+  const durationHours = getSlotDurationHours(slot);
   const pricePerHour = slot.price ?? court.pricePerHour;
   const baseTotal = Math.round(pricePerHour * durationHours);
   const originalTotal = slot.originalPrice ? Math.round(slot.originalPrice * durationHours) : null;
@@ -537,6 +538,22 @@ function BookingSummaryStep({ court, date, slot, clubId, onConfirm, onBack, subm
             {paymentMethod === "wallet" && <CheckCircleIcon className="w-5 h-5 text-primary" />}
           </div>
         </button>
+        <div className="w-full rounded-2xl border-2 border-border bg-muted/20 p-3 text-right opacity-50 cursor-not-allowed select-none">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center shrink-0">
+              <span className="text-lg">⚡</span>
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-black text-foreground">اسنپ‌پی</p>
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+                  به زودی
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">پرداخت از طریق اسنپ‌پی در آینده اضافه می‌شود</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div>
