@@ -26,8 +26,10 @@ export default function BookingSummary({ court, date, slot, onConfirm, onBack, s
   const [paymentMethod, setPaymentMethod] = useState("none");
   const [wallet, setWallet] = useState(null);
 
-  const startMin = slot.start.split(":").reduce((h, m, i) => h + (i === 0 ? +m * 60 : +m), 0);
-  const endMin = slot.end.split(":").reduce((h, m, i) => h + (i === 0 ? +m * 60 : +m), 0);
+  const toMin = (t) => { const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+  const startMin = toMin(slot.start);
+  const rawEndMin = toMin(slot.end);
+  const endMin = rawEndMin <= startMin ? rawEndMin + 1440 : rawEndMin;
   const durationHours = (endMin - startMin) / 60;
   const totalPrice = Math.round(court.pricePerHour * durationHours);
   const canPayWithWallet = (wallet?.balance ?? 0) >= totalPrice;
