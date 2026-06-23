@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAtom, useSetAtom } from "jotai";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRightIcon,
   GemIcon,
@@ -14,6 +14,7 @@ import {
   CalendarCheckIcon,
   WalletIcon,
   SparklesIcon,
+  GiftIcon,
 } from "lucide-react";
 
 import NotificationBell from "@/features/notifications/components/NotificationBell";
@@ -21,6 +22,9 @@ import NotificationBell from "@/features/notifications/components/NotificationBe
 import OneTimeCheck from "./OneTimeCheck";
 import PricingSheet from "./PricingSheet";
 import ReachLimitPricingSheet from "./ReachLimitPricingSheet";
+import SpinWheelModal from "./SpinWheelModal";
+import SpinWheelSection from "./SpinWheelSection";
+import { spinWheelService } from "@/services/spinWheelService";
 import { LimelightNav } from "@/components/ui/shadcn-io/limelight-nav";
 import {
   showPricingSheetAtom,
@@ -69,6 +73,10 @@ function Layout() {
     pricingSheetTriggerSourceAtom
   );
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [showSpinWheel, setShowSpinWheel] = useState(false);
+  const [showPrizesSheet, setShowPrizesSheet] = useState(false);
+  const [spinMilestones, setSpinMilestones] = useState([]);
+  const [spinReason, setSpinReason] = useState(null);
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
   const [wallet, setWallet] = useState(null);
 
@@ -152,6 +160,34 @@ function Layout() {
       window.removeEventListener("wallet:updated", handleWalletUpdated);
     };
   }, [currentUser]);
+  const loadSpinMilestones = () => {
+    if (!currentUser) return;
+    spinWheelService.getEligibility().then((res) => {
+      if (res.ok) setSpinMilestones(res.data.milestones ?? []);
+    });
+  };
+
+  const handleOpenPrizes = () => {
+    loadSpinMilestones();
+    setShowPrizesSheet(true);
+    setIsDropdownOpen(false);
+  };
+
+  const handleOpenSpin = () => {
+    const eligible = spinMilestones.find((m) => m.canSpin);
+    if (eligible) {
+      setSpinReason(eligible.key);
+      setShowPrizesSheet(false);
+      setShowSpinWheel(true);
+    }
+  };
+
+  const handleSpinClose = () => {
+    setShowSpinWheel(false);
+    loadSpinMilestones();
+    setShowPrizesSheet(true);
+  };
+
   const handleBack = () => {
     setShowOverlayLoading(true);
     navigate(-1);
@@ -339,11 +375,19 @@ function Layout() {
                     </motion.span>
                   </div>
                 </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={handleOpenPrizes}
+                  className="rounded-2xl px-3 py-2.5 min-h-[44px] cursor-pointer"
+                >
+                  <div className="w-8 h-8 rounded-xl bg-purple-500/10 text-purple-500 flex items-center justify-center">
+                    <GiftIcon size={16} />
+                  </div>
+                  <span className="text-sm font-bold">جایزه‌ها</span>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator className="my-1" />
                 <DropdownMenuItem
                   onClick={(e) => {
                     e.preventDefault();
-
                     logOut();
                   }}
                   className="rounded-2xl px-3 py-3 min-h-[50px] cursor-pointer flex items-center gap-2.5 text-destructive focus:text-destructive"
@@ -379,6 +423,36 @@ function Layout() {
       <ReachLimitPricingSheet />
       <HintAlertModal />
       <FeatureTour />
+
+      {/* ── Spin Wheel ── */}
+      <SpinWheelModal open={showSpinWheel} onClose={handleSpinClose} reason={spinReason} />
+      <AnimatePresence>
+        {showPrizesSheet && (
+          <motion.div
+            key="prizes-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowPrizesSheet(false)}
+          >
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 28, stiffness: 300 }}
+              className="w-full max-w-sm bg-background rounded-t-3xl p-5 pb-10"
+              dir="rtl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="w-10 h-1 bg-border rounded-full mx-auto mb-4" />
+              <h3 className="text-base font-black mb-4">جایزه‌های من : </h3>
+              <SpinWheelSection milestones={spinMilestones} onOpenSpin={handleOpenSpin} />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {!isChatPage && !isImageGeneratePage && !isVideoGeneratePage && (
         <>

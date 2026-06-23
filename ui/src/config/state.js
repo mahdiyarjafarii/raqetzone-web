@@ -76,3 +76,6 @@ export const showFeatureTourAtom = atom(false);
 export const featureTourStepAtom = atomWithStorage("raqetzone-feature-tour-step", 0);
 // Elevates UserProfileSheet z-index above the tour overlay during demo steps
 export const tourElevateSheetAtom = atom(false);
+
+// Spin wheel gamification
+export const showSpinWheelAtom = atom(false);

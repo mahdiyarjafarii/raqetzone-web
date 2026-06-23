@@ -625,11 +625,27 @@ export const tennisDuelRewards = pgTable("tennis_duel_rewards", {
   uniqueIndex("uq_tennis_duel_rewards_user_date").on(table.userId, table.rewardDateKey),
 ]);
 
+// ─── Spin Wheel ───────────────────────────────────────────────────────────────
+
+export const spinWheelSpins = pgTable("spin_wheel_spins", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  reason: varchar("reason", { length: 50 }).notNull(), // 'first_match' | 'first_booking' | 'ten_bookings_month'
+  prizeLabel: varchar("prize_label", { length: 100 }).notNull(),
+  prizeType: varchar("prize_type", { length: 20 }).notNull(), // 'fixed' | 'percent' | 'gift'
+  prizeValue: integer("prize_value").notNull(),
+  discountCodeId: uuid("discount_code_id").references(() => discountCodes.id, { onDelete: "set null" }),
+  spunAt: timestamp("spun_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_spin_wheel_spins_user_id").on(table.userId),
+  uniqueIndex("uq_spin_wheel_spins_user_reason").on(table.userId, table.reason), // one spin per milestone
+]);
+
 // ─── Discount Codes ───────────────────────────────────────────────────────────
 
 export const discountCodes = pgTable("discount_codes", {
   id: uuid("id").primaryKey().defaultRandom(),
-  clubId: uuid("club_id").notNull().references(() => clubs.id, { onDelete: "cascade" }),
+  clubId: uuid("club_id").references(() => clubs.id, { onDelete: "cascade" }), // null = platform-level discount
   code: varchar("code", { length: 50 }).notNull().unique(),
   discountType: varchar("discount_type", { length: 10 }).notNull().default("percent"), // percent | fixed
   discountValue: integer("discount_value").notNull(), // percent: 1-100, fixed: Tomans

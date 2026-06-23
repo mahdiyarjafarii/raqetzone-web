@@ -499,7 +499,7 @@ export const validateDiscountCodeController = async (req, res) => {
     const normalizedCode = code?.toUpperCase().trim();
     const isPlatformCode = isPlatformPublicDiscountCode(normalizedCode);
 
-    if (!normalizedCode || (!clubId && !isPlatformCode)) {
+    if (!normalizedCode) {
       return res.status(400).json({ message: "اطلاعات ناقص است" });
     }
 
@@ -510,9 +510,16 @@ export const validateDiscountCodeController = async (req, res) => {
           .from(discountCodes)
           .where(eq(discountCodes.code, normalizedCode))
           .limit(1);
+
+    const isPlatformNullClub = regularDiscountCode && regularDiscountCode.clubId === null;
+
+    if (!clubId && !isPlatformCode && !isPlatformNullClub) {
+      return res.status(400).json({ message: "اطلاعات ناقص است" });
+    }
+
     const discountCode = normalizedCode === WELCOME_DISCOUNT_CODE
       ? await findOrCreateWelcomeDiscount(clubId)
-      : (regularDiscountCode && (isPlatformCode || regularDiscountCode.clubId === clubId) ? regularDiscountCode : null);
+      : (regularDiscountCode && (isPlatformCode || isPlatformNullClub || regularDiscountCode.clubId === clubId) ? regularDiscountCode : null);
 
     if (!discountCode) {
       return res.status(404).json({ message: "کد تخفیف معتبر نیست" });
