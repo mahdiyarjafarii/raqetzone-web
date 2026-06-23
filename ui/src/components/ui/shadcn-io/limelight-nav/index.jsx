@@ -18,6 +18,7 @@ function TournamentItem({ active, href, onClick }) {
       to={href}
       onClick={onClick}
       aria-label="مسابقات"
+      id="tour-nav-tournament"
       className="relative z-20 flex flex-1 h-full cursor-pointer items-center justify-center mb-[10px]"
     >
       <div className="flex flex-col items-center justify-center" style={{ marginTop: -24 }}>
@@ -100,6 +101,7 @@ export const LimelightNav = ({
         return (
           <Link
             key={id}
+            id={`tour-nav-${id}`}
             to={href}
             className={cn(
               "relative z-20 flex flex-1 h-full cursor-pointer items-center justify-center p-2",

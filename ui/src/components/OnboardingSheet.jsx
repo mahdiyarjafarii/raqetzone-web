@@ -5,6 +5,7 @@ import { BottomSheet } from "react-spring-bottom-sheet";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAtom } from "jotai";
 import toast from "react-hot-toast";
+import confetti from "canvas-confetti";
 import { CameraIcon, MapPinIcon, UserCircleIcon } from "lucide-react";
 
 import { showOnboardingSheetAtom, currentUserAtom } from "@/config/state";
@@ -555,7 +556,17 @@ export default function OnboardingSheet() {
     setSaving(false);
     if (!ok) return toast.error("خطا در ذخیره اطلاعات");
     if (data?.user) setCurrentUser(data.user);
-    setOpen(false);
+
+    const fireConfetti = () => {
+      const colors = ["#2B0FD9", "#ef1871", "#22c55e", "#f59e0b", "#ec4899", "#3b82f6"];
+      confetti({ particleCount: 80, spread: 100, origin: { y: 0.5 }, colors });
+      confetti({ particleCount: 60, spread: 80, origin: { y: 0.5, x: 0.3 }, angle: 60, colors });
+      confetti({ particleCount: 60, spread: 80, origin: { y: 0.5, x: 0.7 }, angle: 120, colors });
+    };
+    fireConfetti();
+    setTimeout(fireConfetti, 400);
+
+    setTimeout(() => setOpen(false), 2200);
     toast.success(
       wantsCoach
         ? `خوش اومدی ${trimmedFirstName} 🎉 درخواست مربی‌بودن ثبت شد`

@@ -8,9 +8,11 @@ import {
   XIcon,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { useAtomValue } from "jotai";
 import { cn } from "@/lib/utils";
 import apiClient from "@/lib/apiClient";
 import useAuth from "@/auth/useAuth";
+import { tourElevateSheetAtom } from "@/config/state";
 
 const SPORT_EMOJI = {
   padel: "🥎", tennis: "🎾", squash: "🟡", badminton: "🏸", "ping-pong": "🏓",
@@ -62,6 +64,9 @@ export default function UserProfileSheet({ userId, name, image: initialImage, sp
   const navigate = useNavigate();
   const { currentUser } = useAuth();
   const isSelf = currentUser?.id === userId;
+  const tourElevate = useAtomValue(tourElevateSheetAtom);
+  const sheetZ = tourElevate ? "z-[10005]" : "z-[71]";
+  const backdropZ = tourElevate ? "z-[10004]" : "z-[70]";
 
   useEffect(() => {
     if (!userId) return;
@@ -91,7 +96,7 @@ export default function UserProfileSheet({ userId, name, image: initialImage, sp
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
-        className="fixed inset-0 bg-black/60 z-[70] backdrop-blur-sm"
+        className={`fixed inset-0 bg-black/60 ${backdropZ} backdrop-blur-sm`}
       />
 
       <motion.div
@@ -100,7 +105,7 @@ export default function UserProfileSheet({ userId, name, image: initialImage, sp
         animate={{ y: 0 }}
         exit={{ y: "100%" }}
         transition={{ type: "spring", damping: 30, stiffness: 300 }}
-        className="fixed bottom-0 left-0 right-0 z-[71] bg-background rounded-t-[28px] max-h-[85vh] flex flex-col overflow-hidden"
+        className={`fixed bottom-0 left-0 right-0 ${sheetZ} bg-background rounded-t-[28px] max-h-[85vh] flex flex-col overflow-hidden`}
       >
         {/* Drag pill */}
         <div className="flex justify-center pt-3 shrink-0">
@@ -282,6 +287,7 @@ export default function UserProfileSheet({ userId, name, image: initialImage, sp
           {!loading && !isSelf && currentUser && (
             <div className="px-5 pb-8">
               <button
+                id="tour-send-message-btn"
                 onClick={async () => {
                   const { ok, data } = await apiClient.post("/dm/conversations", { targetUserId: userId });
                   if (ok) {

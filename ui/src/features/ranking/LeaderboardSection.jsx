@@ -60,6 +60,7 @@ function Podium({ top3, currentUserId, onSelect }) {
           return (
             <button
               key={row.userId}
+              id={row.rank === 1 ? "tour-first-player" : undefined}
               type="button"
               onClick={() => onSelect(row)}
               className={cn(

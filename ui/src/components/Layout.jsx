@@ -29,6 +29,8 @@ import {
   gemHintAtom,
   usageHintAtom,
   themeAtom,
+  showFeatureTourAtom,
+  featureTourStepAtom,
 } from "@/config/state";
 import { cn } from "@/lib/utils";
 import {
@@ -41,6 +43,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import useAuth from "@/auth/useAuth";
 import HintAlertModal from "./HintAlertModal";
+import FeatureTour from "./FeatureTour";
 import { fetchBatchPreferences } from "@/hooks/useUserPreference";
 import apiClient from "@/lib/apiClient";
 import PREFERENCE_KEYS from "@/config/preferenceKeys";
@@ -58,6 +61,8 @@ function Layout() {
   const [gemHint, setGemHintAtom] = useAtom(gemHintAtom);
   const [theme, setTheme] = useAtom(themeAtom);
   const setUsageHintAtom = useSetAtom(usageHintAtom);
+  const setShowFeatureTour = useSetAtom(showFeatureTourAtom);
+  const [, setFeatureTourStep] = useAtom(featureTourStepAtom);
   const setShowOverlayLoading = useSetAtom(showOverlayLoadingAtom);
   const [, setShowPricingSheet] = useAtom(showPricingSheetAtom);
   const [, setPricingSheetTriggerSource] = useAtom(
@@ -84,6 +89,11 @@ function Layout() {
 
         setUsageHintAtom(prefs[PREFERENCE_KEYS.USAGE_HINT] ?? true);
         setGemHintAtom(prefs[PREFERENCE_KEYS.GEM_HINT] ?? true);
+
+        if (!currentUser.hasSeenTour) {
+          setFeatureTourStep(0);
+          setShowFeatureTour(true);
+        }
       } catch (error) {
         console.error("Error loading preferences:", error);
       } finally {
@@ -368,6 +378,7 @@ function Layout() {
       <PricingSheet />
       <ReachLimitPricingSheet />
       <HintAlertModal />
+      <FeatureTour />
 
       {!isChatPage && !isImageGeneratePage && !isVideoGeneratePage && (
         <>

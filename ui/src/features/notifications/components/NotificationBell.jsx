@@ -34,6 +34,7 @@ export default function NotificationBell() {
     <div className="relative" ref={panelRef}>
       {/* Bell button */}
       <button
+        id="tour-notification-bell"
         onClick={() => setOpen((v) => !v)}
         className={cn(
           "relative h-10 w-10 rounded-2xl flex items-center justify-center transition-all",

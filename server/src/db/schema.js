@@ -44,6 +44,7 @@ export const users = pgTable("users", {
   xp: integer("xp").notNull().default(0),
   level: smallint("level").notNull().default(1),
   // ─────────────────────────────────────────────────────────────────────────
+  hasSeenTour: boolean("has_seen_tour").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [

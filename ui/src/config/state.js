@@ -70,3 +70,9 @@ export const unreadDmCountAtom = atom(0);
 
 // Splash screen visibility
 export const showSplashAtom = atom(true);
+
+// Feature tour — shown once to new users
+export const showFeatureTourAtom = atom(false);
+export const featureTourStepAtom = atomWithStorage("raqetzone-feature-tour-step", 0);
+// Elevates UserProfileSheet z-index above the tour overlay during demo steps
+export const tourElevateSheetAtom = atom(false);

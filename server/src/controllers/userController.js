@@ -57,6 +57,7 @@ export const getCurrentUserController = async (req, res) => {
         totalCredits: user.totalCredits,
         subscriptionType: user.subscriptionType,
         subscriptionEndDate: user.subscriptionEndDate,
+        hasSeenTour: user.hasSeenTour ?? false,
         createdAt: user.createdAt,
       },
     });
@@ -88,6 +89,7 @@ export const updateProfileController = async (req, res) => {
       coachSpecialties,
       coachCertifications,
       coachLanguages,
+      hasSeenTour,
     } = req.body;
 
     // Validate phone if provided
@@ -143,6 +145,7 @@ export const updateProfileController = async (req, res) => {
         }),
         ...(skillLevel && { skillLevel }),
         ...(favoriteSport && { favoriteSport }),
+        ...(typeof hasSeenTour === "boolean" && { hasSeenTour }),
         ...(typeof coachHeadline === "string" && { coachHeadline: coachHeadline.trim() || null }),
         ...(coachExperienceYears != null && {
           coachExperienceYears: Number.isFinite(Number(coachExperienceYears))
@@ -182,6 +185,7 @@ export const updateProfileController = async (req, res) => {
         coachLanguages: updatedUser.coachLanguages,
         skillLevel: updatedUser.skillLevel,
         favoriteSport: updatedUser.favoriteSport,
+        hasSeenTour: updatedUser.hasSeenTour ?? false,
       },
     });
   } catch (error) {
