@@ -56,7 +56,7 @@ function MatchResultBadge({ isWin }) {
   return <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">نامشخص</span>;
 }
 
-export default function UserProfileSheet({ userId, name, image: initialImage, sportType = "padel", onClose }) {
+export default function UserProfileSheet({ userId, name, image: initialImage, sportType = "padel", open = true, onClose }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
@@ -83,13 +83,15 @@ export default function UserProfileSheet({ userId, name, image: initialImage, sp
 
   return (
     <AnimatePresence>
+      {open && (
+      <>
       <motion.div
         key="bd"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={onClose}
-        className="fixed inset-0 bg-black/60 z-50 backdrop-blur-sm"
+        className="fixed inset-0 bg-black/60 z-[70] backdrop-blur-sm"
       />
 
       <motion.div
@@ -98,7 +100,7 @@ export default function UserProfileSheet({ userId, name, image: initialImage, sp
         animate={{ y: 0 }}
         exit={{ y: "100%" }}
         transition={{ type: "spring", damping: 30, stiffness: 300 }}
-        className="fixed bottom-0 left-0 right-0 z-50 bg-background rounded-t-[28px] max-h-[85vh] flex flex-col overflow-hidden"
+        className="fixed bottom-0 left-0 right-0 z-[71] bg-background rounded-t-[28px] max-h-[85vh] flex flex-col overflow-hidden"
       >
         {/* Drag pill */}
         <div className="flex justify-center pt-3 shrink-0">
@@ -296,6 +298,8 @@ export default function UserProfileSheet({ userId, name, image: initialImage, sp
           )}
         </div>
       </motion.div>
+      </>
+      )}
     </AnimatePresence>
   );
 }

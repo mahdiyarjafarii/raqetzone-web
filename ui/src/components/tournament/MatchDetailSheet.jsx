@@ -265,7 +265,7 @@ export default function MatchDetailSheet() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setSelectedMatch(null)}
-            className="fixed inset-0 bg-black/55 z-40"
+            className="fixed inset-0 bg-black/55 z-[60]"
           />
 
           {/* Sheet */}
@@ -275,7 +275,7 @@ export default function MatchDetailSheet() {
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 28, stiffness: 280 }}
-            className="fixed bottom-0 left-0 right-0 z-50 bg-background rounded-t-[26px] max-h-[84vh] flex flex-col overflow-hidden shadow-2xl shadow-black/30 border-t border-border"
+            className="fixed bottom-0 left-0 right-0 z-[61] bg-background rounded-t-[26px] max-h-[84vh] flex flex-col overflow-hidden shadow-2xl shadow-black/30 border-t border-border"
           >
             {/* Handle */}
             <div className="absolute top-3 left-1/2 z-20 -translate-x-1/2">
@@ -597,19 +597,19 @@ export default function MatchDetailSheet() {
             </div>
           </motion.div>
 
-          {viewingUser && (
-            <UserProfileSheet
-              userId={viewingUser.userId}
-              name={viewingUser.name}
-              image={viewingUser.image}
-              onClose={() => setViewingUser(null)}
-            />
-          )}
+          <UserProfileSheet
+            userId={viewingUser?.userId}
+            name={viewingUser?.name}
+            image={viewingUser?.image}
+            open={!!viewingUser}
+            onClose={() => setViewingUser(null)}
+          />
 
-          {showRating && match && (
+          {match && (
             <RatingSheet
               match={match}
               currentUserId={currentUserId}
+              open={showRating}
               onClose={() => setShowRating(false)}
             />
           )}
@@ -731,7 +731,7 @@ const RATING_TAGS = [
   "حرفه‌ای", "شاد", "منضبط",
 ];
 
-function RatingSheet({ match, currentUserId, onClose }) {
+function RatingSheet({ match, currentUserId, open, onClose }) {
   const teammates = [...match.teamA, ...match.teamB].filter((p) => p.userId !== currentUserId);
   const [ratings, setRatings] = useState(() =>
     Object.fromEntries(teammates.map((p) => [p.userId, []]))
@@ -765,72 +765,78 @@ function RatingSheet({ match, currentUserId, onClose }) {
   };
 
   return (
-    <>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
-        onClick={onClose}
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60]"
-      />
-      <motion.div
-        initial={{ y: "100%" }}
-        animate={{ y: 0 }}
-        exit={{ y: "100%" }}
-        transition={{ type: "spring", damping: 28, stiffness: 280 }}
-        className="fixed bottom-0 left-0 right-0 z-[70] bg-background rounded-t-3xl max-h-[85vh] flex flex-col"
-      >
-        <div className="flex justify-center pt-3 pb-1 shrink-0">
-          <div className="w-10 h-1 bg-muted rounded-full" />
-        </div>
-        <div className="px-5 pt-2 pb-4 border-b border-border shrink-0">
-          <h2 className="font-black text-lg">امتیاز به هم‌بازی‌ها</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">برچسب‌هایی که بهشون می‌خوری انتخاب کن</p>
-        </div>
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-6">
-          {teammates.map((player) => (
-            <div key={player.userId}>
-              <div className="flex items-center gap-3 mb-3">
-                <UserAvatar
-                  image={player.image}
-                  name={player.name}
-                  className="w-9 h-9 rounded-full text-sm text-white"
-                  fallbackClassName="w-9 h-9 rounded-full bg-primary text-white text-sm"
-                />
-                <span className="font-semibold text-sm">{player.name}</span>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {RATING_TAGS.map((tag) => {
-                  const selected = (ratings[player.userId] ?? []).includes(tag);
-                  return (
-                    <button
-                      key={tag}
-                      onClick={() => toggleTag(player.userId, tag)}
-                      className={cn(
-                        "px-3 py-1.5 rounded-full text-xs font-semibold border transition-all",
-                        selected
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "bg-muted text-muted-foreground border-border"
-                      )}
-                    >
-                      {tag}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-        <div className="px-5 pb-8 pt-3 border-t border-border bg-background shrink-0">
-          <button
-            onClick={handleSubmit}
-            disabled={loading}
-            className="w-full py-4 rounded-2xl font-bold text-base bg-primary text-primary-foreground shadow-lg shadow-primary/25 active:scale-[0.98] transition-all disabled:opacity-60"
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div
+            key="bd"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60]"
+          />
+          <motion.div
+            key="sheet"
+            initial={{ y: "100%" }}
+            animate={{ y: 0 }}
+            exit={{ y: "100%" }}
+            transition={{ type: "spring", damping: 28, stiffness: 280 }}
+            className="fixed bottom-0 left-0 right-0 z-[70] bg-background rounded-t-3xl max-h-[85vh] flex flex-col"
           >
-            {loading ? "در حال ثبت..." : "ثبت امتیازها ✨"}
-          </button>
-        </div>
-      </motion.div>
-    </>
+            <div className="flex justify-center pt-3 pb-1 shrink-0">
+              <div className="w-10 h-1 bg-muted rounded-full" />
+            </div>
+            <div className="px-5 pt-2 pb-4 border-b border-border shrink-0">
+              <h2 className="font-black text-lg">امتیاز به هم‌بازی‌ها</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">برچسب‌هایی که بهشون می‌خوری انتخاب کن</p>
+            </div>
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-6">
+              {teammates.map((player) => (
+                <div key={player.userId}>
+                  <div className="flex items-center gap-3 mb-3">
+                    <UserAvatar
+                      image={player.image}
+                      name={player.name}
+                      className="w-9 h-9 rounded-full text-sm text-white"
+                      fallbackClassName="w-9 h-9 rounded-full bg-primary text-white text-sm"
+                    />
+                    <span className="font-semibold text-sm">{player.name}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {RATING_TAGS.map((tag) => {
+                      const selected = (ratings[player.userId] ?? []).includes(tag);
+                      return (
+                        <button
+                          key={tag}
+                          onClick={() => toggleTag(player.userId, tag)}
+                          className={cn(
+                            "px-3 py-1.5 rounded-full text-xs font-semibold border transition-all",
+                            selected
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "bg-muted text-muted-foreground border-border"
+                          )}
+                        >
+                          {tag}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="px-5 pb-8 pt-3 border-t border-border bg-background shrink-0">
+              <button
+                onClick={handleSubmit}
+                disabled={loading}
+                className="w-full py-4 rounded-2xl font-bold text-base bg-primary text-primary-foreground shadow-lg shadow-primary/25 active:scale-[0.98] transition-all disabled:opacity-60"
+              >
+                {loading ? "در حال ثبت..." : "ثبت امتیازها ✨"}
+              </button>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
   );
 }

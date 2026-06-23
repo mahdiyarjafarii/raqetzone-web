@@ -175,16 +175,16 @@ export default function CreateMatchSheet() {
     }
   };
 
-  if (!open) return null;
-
   return (
+    <AnimatePresence>
+    {open && (
     <>
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         onClick={() => setOpen(false)}
-        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60]"
       />
 
       <motion.div
@@ -192,7 +192,7 @@ export default function CreateMatchSheet() {
         animate={{ y: 0 }}
         exit={{ y: "100%" }}
         transition={{ type: "spring", damping: 28, stiffness: 280 }}
-        className="fixed bottom-0 left-0 right-0 z-50 bg-background rounded-t-3xl max-h-[92vh] flex flex-col"
+        className="fixed bottom-0 left-0 right-0 z-[61] bg-background rounded-t-3xl max-h-[92vh] flex flex-col"
       >
         {/* Handle */}
         <div className="flex justify-center pt-3 pb-1 shrink-0">
@@ -264,7 +264,7 @@ export default function CreateMatchSheet() {
         </div>
 
         {/* Footer */}
-        <div className="px-5 pb-8 pt-3 border-t border-border bg-background shrink-0">
+        <div className="px-5 pb-6 pt-3 border-t border-border bg-background shrink-0">
           <button
             onClick={handleNext}
             disabled={loading || (step < 2 && !canNext())}
@@ -280,6 +280,8 @@ export default function CreateMatchSheet() {
         </div>
       </motion.div>
     </>
+    )}
+    </AnimatePresence>
   );
 }
 
