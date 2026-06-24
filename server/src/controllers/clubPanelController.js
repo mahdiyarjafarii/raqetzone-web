@@ -645,6 +645,46 @@ export const approveClubBookingController = async (req, res) => {
   }
 };
 
+export const cancelClubBookingController = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { adminNote } = req.body;
+
+    const [booking] = await db.select().from(bookings).where(eq(bookings.id, id)).limit(1);
+    if (!booking) return res.status(404).json({ message: "رزرو یافت نشد" });
+    if (booking.status !== "approved") return res.status(400).json({ message: "فقط رزروهای تأیید شده قابل لغو است" });
+
+    if (!(await assertCourtOwnership(req, booking.courtId))) {
+      return res.status(403).json({ message: "دسترسی غیر مجاز" });
+    }
+
+    const [updated] = await db
+      .update(bookings)
+      .set({ status: "cancelled", adminNote: adminNote || null, updatedAt: new Date() })
+      .where(eq(bookings.id, id))
+      .returning();
+
+    // Remove the booked slot override so the slot becomes available again
+    await db.delete(slotOverrides).where(
+      and(eq(slotOverrides.courtId, booking.courtId), eq(slotOverrides.date, booking.date), eq(slotOverrides.startTime, booking.startTime), eq(slotOverrides.status, "booked"))
+    );
+
+    const bookingDateTime = formatBookingDateTimeFa(booking);
+    sendNotification(booking.userId, {
+      title: "رزرو شما لغو شد 🚫",
+      message: `متأسفانه رزرو شما برای ${bookingDateTime} توسط باشگاه لغو شد.${adminNote ? ` دلیل: ${adminNote}` : ""}`,
+      type: "BOOKING",
+      metadata: { bookingId: id, ctaHref: "/mybooking", ctaLabel: "مشاهده رزروها" },
+      smsText: `پلتفرم رکت‌زون: رزرو شما برای ${bookingDateTime} توسط باشگاه لغو شد.${adminNote ? ` دلیل: ${adminNote}` : ""}`,
+    }).catch(() => {});
+
+    return res.json({ booking: updated });
+  } catch (error) {
+    console.error("cancelClubBooking error:", error);
+    return res.status(500).json({ message: "خطای سرور" });
+  }
+};
+
 export const rejectClubBookingController = async (req, res) => {
   try {
     const { id } = req.params;

@@ -1,5 +1,5 @@
 import React, { cloneElement } from "react";
-import { Sparkles, Trophy, Home, User, CalendarCheck } from "lucide-react";
+import { Trophy, Home, User, CalendarCheck, GraduationCap } from "lucide-react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { Link, useLocation } from "react-router-dom";
@@ -8,7 +8,7 @@ const defaultNavItems = [
   { id: "home", icon: <Home />, label: "خانه", href: "/" },
   { id: "clubs", icon: <CalendarCheck />, label: "رزرو", href: "/clubs" },
   { id: "tournament", icon: <Trophy />, label: "مسابقات", href: "/tournament" },
-  { id: "chat", icon: <Sparkles />, label: "دستیار", href: "/ai" },
+  { id: "classes", icon: <GraduationCap />, label: "کلاس‌ها", href: "/classes" },
   { id: "profile", icon: <User />, label: "پروفایل", href: "/profile" },
 ];
 

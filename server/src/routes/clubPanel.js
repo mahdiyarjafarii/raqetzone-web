@@ -15,6 +15,7 @@ import {
   getClubBookingsController,
   approveClubBookingController,
   rejectClubBookingController,
+  cancelClubBookingController,
   getClubStatsController,
   getSlotOverridesController,
   upsertSlotOverrideController,
@@ -119,5 +120,6 @@ router.delete("/club-panel/clubs/:clubId/assets/:assetId",   deleteAssetControll
 router.get("/club-panel/bookings",                           getClubBookingsController);
 router.patch("/club-panel/bookings/:id/approve",             approveClubBookingController);
 router.patch("/club-panel/bookings/:id/reject",              rejectClubBookingController);
+router.patch("/club-panel/bookings/:id/cancel",              cancelClubBookingController);
 
 export default router;

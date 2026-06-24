@@ -9,27 +9,23 @@ import {
   BanknoteIcon,
   BriefcaseBusinessIcon,
   CalendarDaysIcon,
-  CheckCircle2Icon,
   Clock3Icon,
   Globe2Icon,
   GraduationCapIcon,
-  Loader2Icon,
   MapPinIcon,
   MessageCircleIcon,
   SendIcon,
   Settings2Icon,
   SparklesIcon,
   StarIcon,
-  TicketIcon,
   UsersIcon,
-  WalletIcon,
-  XIcon,
+  ChevronLeftIcon,
 } from "lucide-react";
 
 import { currentUserAtom } from "@/config/state";
 import { coachService } from "@/services/coachService";
-import { walletService } from "@/features/wallet/walletService";
 import PersianDateTimeInput from "@/components/ui/PersianDateTimeInput";
+import ClassDetailSheet from "@/features/coaches/components/ClassDetailSheet";
 
 import "react-spring-bottom-sheet/dist/style.css";
 
@@ -185,7 +181,6 @@ export default function CoachDetailPage() {
   const [coach, setCoach] = useState(null);
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [enrollingClassId, setEnrollingClassId] = useState("");
   const [bookingSheetOpen, setBookingSheetOpen] = useState(false);
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingForm, setBookingForm] = useState({
@@ -201,11 +196,8 @@ export default function CoachDetailPage() {
   const initialTab = TAB_KEYS.includes(searchParams.get("tab")) ? searchParams.get("tab") : "about";
   const [activeTab, setActiveTab] = useState(initialTab);
 
-  const [enrollSheetOpen, setEnrollSheetOpen] = useState(false);
-  const [enrollTarget, setEnrollTarget] = useState(null);
-  const [wallet, setWallet] = useState(null);
-  const [walletLoading, setWalletLoading] = useState(false);
-  const [enrollReceipt, setEnrollReceipt] = useState(null);
+  const [selectedClass, setSelectedClass] = useState(null);
+  const [classSheetOpen, setClassSheetOpen] = useState(false);
 
   const handleTabChange = (nextTab) => {
     if (nextTab === activeTab) return;
@@ -268,43 +260,9 @@ export default function CoachDetailPage() {
     load();
   }, [coachId]);
 
-  const openEnrollSheet = async (cls) => {
-    setEnrollTarget(cls);
-    setEnrollReceipt(null);
-    setEnrollSheetOpen(true);
-    if (Number(cls.price ?? 0) > 0) {
-      setWalletLoading(true);
-      const { ok, data } = await walletService.getWallet();
-      setWallet(ok ? data?.wallet ?? null : null);
-      setWalletLoading(false);
-    }
-  };
-
-  const handleConfirmEnroll = async () => {
-    if (!enrollTarget) return;
-    const price = Number(enrollTarget.price ?? 0);
-    const balance = Number(wallet?.balance ?? 0);
-
-    if (price > 0 && balance < price) {
-      toast.error("موجودی کیف پول کافی نیست");
-      return;
-    }
-
-    setEnrollingClassId(enrollTarget.id);
-    const { ok, data } = await coachService.enrollClass(enrollTarget.id, {
-      paymentMethod: price > 0 ? "wallet" : "none",
-    });
-    setEnrollingClassId("");
-
-    if (!ok) {
-      toast.error(data?.message ?? "ثبت‌نام انجام نشد");
-      return;
-    }
-
-    if (data?.wallet) setWallet(data.wallet);
-    setEnrollReceipt(data?.receipt ?? { trackingCode: "—", amountPaid: price, title: enrollTarget.title });
-    toast.success("ثبت‌نام کلاس انجام شد");
-    load();
+  const openClassSheet = (cls) => {
+    setSelectedClass(cls);
+    setClassSheetOpen(true);
   };
 
   const handleStartConversation = async () => {
@@ -549,17 +507,26 @@ export default function CoachDetailPage() {
           ) : (
             classes.map((cls) => {
               const isFull = Number(cls.enrolledCount) >= Number(cls.capacity);
+              const sessionsCount = cls.sessionsCount ?? (Array.isArray(cls.sessions) ? cls.sessions.length : 0);
               return (
-                <div key={cls.id} className="rounded-3xl border border-border bg-card p-4 space-y-2.5">
+                <button
+                  key={cls.id}
+                  type="button"
+                  onClick={() => openClassSheet(cls)}
+                  className="w-full text-right rounded-3xl border border-border bg-card p-4 space-y-2.5 active:scale-[0.99] transition-transform hover:border-primary/30 hover:shadow-md"
+                >
                   <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-bold text-foreground">{cls.title}</p>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold text-foreground truncate">{cls.title}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">{getSportLabel(cls.sportType)} • {cls.city || "نامشخص"}</p>
                     </div>
-                    <span className="text-xs font-bold text-primary">{Number(cls.price || 0) > 0 ? `${formatToman(cls.price)} ت` : "رایگان"}</span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="text-xs font-bold text-primary">{Number(cls.price || 0) > 0 ? `${formatToman(cls.price)} ت` : "رایگان"}</span>
+                      <ChevronLeftIcon className="w-3.5 h-3.5 text-muted-foreground" />
+                    </div>
                   </div>
 
-                  {cls.description && <p className="text-xs text-muted-foreground leading-5">{cls.description}</p>}
+                  {cls.description && <p className="text-xs text-muted-foreground leading-5 line-clamp-2 text-right">{cls.description}</p>}
 
                   <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
                     <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 text-primary px-2.5 py-1 font-bold">
@@ -571,8 +538,13 @@ export default function CoachDetailPage() {
                     </span>
                     <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1">
                       <CalendarDaysIcon className="w-3 h-3" />
-                      {cls.sessionsCount ?? (Array.isArray(cls.sessions) ? cls.sessions.length : 0)} جلسه
+                      {sessionsCount} جلسه
                     </span>
+                    {isFull && (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/10 text-rose-500 px-2.5 py-1 font-bold">
+                        ظرفیت تکمیل
+                      </span>
+                    )}
                   </div>
 
                   {(cls.startDate || cls.endDate) && (
@@ -581,29 +553,7 @@ export default function CoachDetailPage() {
                       از {formatClassDate(cls.startDate)} تا {formatClassDate(cls.endDate)}
                     </div>
                   )}
-
-                  {Array.isArray(cls.sessions) && cls.sessions.length > 0 && (
-                    <div className="rounded-xl bg-muted/60 p-2 text-[11px] space-y-1">
-                      {cls.sessions.slice(0, 3).map((s, idx) => (
-                        <p key={idx}>{formatClassDate(s.date)} • {s.startTime} تا {s.endTime}</p>
-                      ))}
-                      {cls.sessions.length > 3 && (
-                        <p className="text-muted-foreground">+ {cls.sessions.length - 3} جلسه دیگر</p>
-                      )}
-                    </div>
-                  )}
-
-                  {!isOwnCoachProfile && (
-                    <button
-                      type="button"
-                      onClick={() => openEnrollSheet(cls)}
-                      disabled={isFull}
-                      className="h-9 w-full rounded-xl bg-primary text-primary-foreground text-xs font-bold disabled:opacity-50"
-                    >
-                      {isFull ? "ظرفیت تکمیل شده" : "شرکت در کلاس"}
-                    </button>
-                  )}
-                </div>
+                </button>
               );
             })
           )}
@@ -763,126 +713,14 @@ export default function CoachDetailPage() {
         </div>
       </BottomSheet>
 
-      <BottomSheet
-        open={enrollSheetOpen}
-        onDismiss={() => setEnrollSheetOpen(false)}
-        snapPoints={({ maxHeight }) => [Math.min(maxHeight * 0.86, 660)]}
-      >
-        <div className="bg-[#fbfaf8] dark:bg-background text-foreground px-4 pt-4 pb-6" dir="rtl">
-          {enrollTarget && (() => {
-            const price = Number(enrollTarget.price ?? 0);
-            const balance = Number(wallet?.balance ?? 0);
-            const insufficient = price > 0 && balance < price;
-            const sessionsCount = enrollTarget.sessionsCount ?? (Array.isArray(enrollTarget.sessions) ? enrollTarget.sessions.length : 0);
-
-            if (enrollReceipt) {
-              return (
-                <div className="rounded-3xl border border-border bg-card p-5 space-y-4 text-center">
-                  <div className="mx-auto h-14 w-14 rounded-full bg-emerald-500/15 flex items-center justify-center">
-                    <CheckCircle2Icon className="w-8 h-8 text-emerald-500" />
-                  </div>
-                  <div>
-                    <p className="text-base font-black text-foreground">ثبت‌نام با موفقیت انجام شد</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{enrollReceipt.title || enrollTarget.title}</p>
-                  </div>
-
-                  <div className="rounded-2xl border border-dashed border-border bg-background p-3 space-y-2 text-right">
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground inline-flex items-center gap-1"><TicketIcon className="w-3.5 h-3.5" /> کد پیگیری</span>
-                      <span className="font-black text-foreground tracking-wide">{enrollReceipt.trackingCode}</span>
-                    </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">مبلغ پرداختی</span>
-                      <span className="font-bold text-foreground">{Number(enrollReceipt.amountPaid ?? 0) > 0 ? `${formatToman(enrollReceipt.amountPaid)} تومان` : "رایگان"}</span>
-                    </div>
-                    {Number(enrollReceipt.amountPaid ?? 0) > 0 && (
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">روش پرداخت</span>
-                        <span className="font-bold text-foreground">کیف پول</span>
-                      </div>
-                    )}
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">تعداد جلسات</span>
-                      <span className="font-bold text-foreground">{sessionsCount} جلسه</span>
-                    </div>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setEnrollSheetOpen(false)}
-                    className="h-11 w-full rounded-xl bg-primary text-primary-foreground text-sm font-black"
-                  >
-                    باشه، فهمیدم
-                  </button>
-                </div>
-              );
-            }
-
-            return (
-              <div className="rounded-3xl border border-border bg-card p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-black text-foreground">رسید ثبت‌نام کلاس</p>
-                  <button type="button" onClick={() => setEnrollSheetOpen(false)} className="h-8 w-8 rounded-lg border border-border flex items-center justify-center">
-                    <XIcon className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <div className="rounded-2xl border border-border bg-background p-3 space-y-2">
-                  <p className="text-sm font-bold text-foreground">{enrollTarget.title}</p>
-                  <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-                    <span className="rounded-full bg-primary/10 text-primary px-2.5 py-1 font-bold">{getLevelLabel(enrollTarget.level)}</span>
-                    <span className="rounded-full bg-muted px-2.5 py-1 text-muted-foreground">{getSportLabel(enrollTarget.sportType)}</span>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-muted-foreground"><CalendarDaysIcon className="w-3 h-3" />{sessionsCount} جلسه</span>
-                  </div>
-                  {(enrollTarget.startDate || enrollTarget.endDate) && (
-                    <p className="text-[11px] text-muted-foreground inline-flex items-center gap-1.5">
-                      <Clock3Icon className="w-3.5 h-3.5 text-primary" />
-                      از {formatClassDate(enrollTarget.startDate)} تا {formatClassDate(enrollTarget.endDate)}
-                    </p>
-                  )}
-                </div>
-
-                <div className="rounded-2xl border border-border bg-background p-3 space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">هزینه کلاس</span>
-                    <span className="font-black text-foreground">{price > 0 ? `${formatToman(price)} تومان` : "رایگان"}</span>
-                  </div>
-                  {price > 0 && (
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground inline-flex items-center gap-1"><WalletIcon className="w-3.5 h-3.5" /> موجودی کیف پول</span>
-                      <span className={`font-bold ${insufficient ? "text-rose-500" : "text-foreground"}`}>
-                        {walletLoading ? "..." : `${formatToman(balance)} تومان`}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {insufficient && (
-                  <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-600 dark:text-rose-400 flex items-center justify-between gap-2">
-                    <span>موجودی کیف پول کافی نیست.</span>
-                    <Link to="/profile" className="font-black underline">شارژ کیف پول</Link>
-                  </div>
-                )}
-
-                <button
-                  type="button"
-                  onClick={handleConfirmEnroll}
-                  disabled={enrollingClassId === enrollTarget.id || (price > 0 && (walletLoading || insufficient))}
-                  className="h-11 w-full rounded-xl bg-primary text-primary-foreground text-sm font-black inline-flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  {enrollingClassId === enrollTarget.id ? (
-                    <><Loader2Icon className="w-4 h-4 animate-spin" /> در حال ثبت...</>
-                  ) : price > 0 ? (
-                    <><WalletIcon className="w-4 h-4" /> پرداخت و ثبت‌نام</>
-                  ) : (
-                    "ثبت‌نام رایگان"
-                  )}
-                </button>
-              </div>
-            );
-          })()}
-        </div>
-      </BottomSheet>
+      <ClassDetailSheet
+        cls={selectedClass}
+        coachName={coachName}
+        coachImage={coach?.image}
+        open={classSheetOpen}
+        onClose={() => setClassSheetOpen(false)}
+        isOwnCoach={isOwnCoachProfile}
+      />
     </div>
   );
 }

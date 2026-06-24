@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MapPinIcon, CalendarIcon, ClockIcon, XCircleIcon } from "lucide-react";
 import { useAtom } from "jotai";
@@ -23,6 +23,8 @@ function formatPrice(p) {
 export default function BookingList() {
   const [bookings, setBookings] = useAtom(myBookingsAtom);
   const [loading, setLoading] = useAtom(myBookingsLoadingAtom);
+  const [confirmCancelId, setConfirmCancelId] = useState(null);
+  const [cancelling, setCancelling] = useState(false);
 
   const fetchMyBookings = async () => {
     setLoading(true);
@@ -39,7 +41,10 @@ export default function BookingList() {
   }, []);
 
   const handleCancel = async (id) => {
+    setCancelling(true);
     const res = await bookingService.cancelBooking(id);
+    setCancelling(false);
+    setConfirmCancelId(null);
     if (res.ok) {
       setBookings((prev) =>
         prev.map((b) => (b.id === id ? { ...b, status: "cancelled" } : b))
@@ -132,13 +137,40 @@ export default function BookingList() {
 
               {/* Cancel button */}
               {booking.status === "pending" && (
-                <button
-                  onClick={() => handleCancel(booking.id)}
-                  className="mt-3 flex items-center gap-1 text-xs text-destructive hover:text-destructive/80 transition-colors"
-                >
-                  <XCircleIcon className="w-3.5 h-3.5" />
-                  لغو درخواست
-                </button>
+                confirmCancelId === booking.id ? (
+                  <div className="mt-3 rounded-xl bg-destructive/8 border border-destructive/30 p-3 space-y-2">
+                    <p className="text-xs font-bold text-destructive text-center">آیا از لغو درخواست مطمئنید؟</p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setConfirmCancelId(null)}
+                        disabled={cancelling}
+                        className="flex-1 h-8 rounded-lg border border-border text-xs font-medium text-muted-foreground hover:bg-muted transition-colors disabled:opacity-50"
+                      >
+                        انصراف
+                      </button>
+                      <button
+                        onClick={() => handleCancel(booking.id)}
+                        disabled={cancelling}
+                        className="flex-1 h-8 rounded-lg bg-destructive hover:bg-destructive/90 text-white text-xs font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5"
+                      >
+                        {cancelling ? (
+                          <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        ) : (
+                          <XCircleIcon className="w-3.5 h-3.5" />
+                        )}
+                        {cancelling ? "..." : "بله، لغو کن"}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setConfirmCancelId(booking.id)}
+                    className="mt-3 flex items-center gap-1 text-xs text-destructive hover:text-destructive/80 transition-colors"
+                  >
+                    <XCircleIcon className="w-3.5 h-3.5" />
+                    لغو درخواست
+                  </button>
+                )
               )}
             </div>
           </motion.div>

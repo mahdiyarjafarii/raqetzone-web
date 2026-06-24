@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAtomValue } from "jotai";
 import { motion } from "framer-motion";
 import {
@@ -11,6 +11,7 @@ import {
   SparklesIcon,
   ArrowLeftIcon,
   StarIcon,
+  ChevronLeftIcon,
 } from "lucide-react";
 
 import { currentUserAtom } from "@/config/state";
@@ -59,6 +60,7 @@ function getProfileImage(image) {
 }
 
 export default function CoachesPage() {
+  const navigate = useNavigate();
   const currentUser = useAtomValue(currentUserAtom);
   const [coaches, setCoaches] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -216,6 +218,45 @@ export default function CoachesPage() {
                             {Number(coach.coachHourlyPrice).toLocaleString("fa-IR")} ت / جلسه
                           </span>
                         ) : null}
+                      </div>
+                    )}
+
+                    {(coach.activeClassesCount ?? 0) > 0 && (
+                      <div className="mt-3">
+                        <p className="text-[10px] text-muted-foreground mb-1.5 font-medium">کلاس‌های فعال</p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {Array.isArray(coach.classes) && coach.classes.length > 0 ? (
+                            coach.classes.slice(0, 3).map((cls) => (
+                              <button
+                                key={cls.id}
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  navigate(`/coaches/${coach.id}?tab=classes`);
+                                }}
+                                className="inline-flex items-center gap-1 rounded-full border border-primary/25 bg-primary/8 px-2.5 py-1 text-[11px] font-bold text-primary hover:bg-primary hover:text-primary-foreground transition-colors"
+                              >
+                                <SparklesIcon className="w-2.5 h-2.5" />
+                                {cls.title}
+                              </button>
+                            ))
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                navigate(`/coaches/${coach.id}?tab=classes`);
+                              }}
+                              className="inline-flex items-center gap-1 rounded-full border border-primary/25 bg-primary/8 px-2.5 py-1 text-[11px] font-bold text-primary"
+                            >
+                              <SparklesIcon className="w-2.5 h-2.5" />
+                              {coach.activeClassesCount} کلاس فعال
+                              <ChevronLeftIcon className="w-2.5 h-2.5" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                     )}
 
