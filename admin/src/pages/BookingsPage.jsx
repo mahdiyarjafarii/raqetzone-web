@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import {
   CheckCircleIcon, XCircleIcon, SearchIcon,
   ArrowUpDownIcon, ArrowUpIcon, ArrowDownIcon,
-  CalendarIcon, ClockIcon,
+  CalendarIcon, ClockIcon, ShoppingBagIcon,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import apiClient from "@/lib/apiClient";
@@ -331,6 +331,17 @@ export default function BookingsPage() {
                             </div>
                           ) : (
                             <span className="font-semibold text-foreground text-sm">{fmt(b.totalPrice)} ت</span>
+                          )}
+                          {b.assets?.length > 0 && (
+                            <div className="mt-1.5 space-y-0.5">
+                              {b.assets.map((a) => (
+                                <div key={a.assetId} className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                                  <ShoppingBagIcon className="w-3 h-3 shrink-0 text-amber-500" />
+                                  <span>{a.name} ×{a.quantity}</span>
+                                  <span className="text-amber-600 font-semibold mr-auto">{fmt(a.totalPrice)} ت</span>
+                                </div>
+                              ))}
+                            </div>
                           )}
                         </td>
                         <td className="px-4 py-3.5">

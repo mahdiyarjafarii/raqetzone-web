@@ -705,6 +705,35 @@ export const directMessages = pgTable("direct_messages", {
   index("idx_direct_msg_created_at").on(table.createdAt),
 ]);
 
+// ─── Club Assets (Rental Items) ──────────────────────────────────────────────
+
+export const clubAssets = pgTable("club_assets", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  clubId: uuid("club_id").notNull().references(() => clubs.id, { onDelete: "cascade" }),
+  name: varchar("name", { length: 255 }).notNull(),
+  pricePerUnit: integer("price_per_unit").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  quantity: integer("quantity"), // null = unlimited
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_club_assets_club_id").on(table.clubId),
+  index("idx_club_assets_is_active").on(table.isActive),
+]);
+
+export const bookingAssets = pgTable("booking_assets", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  bookingId: uuid("booking_id").notNull().references(() => bookings.id, { onDelete: "cascade" }),
+  assetId: uuid("asset_id").notNull().references(() => clubAssets.id),
+  quantity: integer("quantity").notNull(),
+  unitPrice: integer("unit_price").notNull(),   // snapshot at booking time
+  totalPrice: integer("total_price").notNull(), // quantity * unitPrice
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  index("idx_booking_assets_booking_id").on(table.bookingId),
+  index("idx_booking_assets_asset_id").on(table.assetId),
+]);
+
 // ─── Club Reviews ─────────────────────────────────────────────────────────────
 
 export const clubReviews = pgTable("club_reviews", {

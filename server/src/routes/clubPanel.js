@@ -28,6 +28,12 @@ import {
   deleteClubDealController,
 } from "../controllers/clubPanelController.js";
 import {
+  listAssetsController,
+  createAssetController,
+  updateAssetController,
+  deleteAssetController,
+} from "../controllers/assetController.js";
+import {
   getDiscountCodesController,
   createDiscountCodeController,
   updateDiscountCodeController,
@@ -102,6 +108,12 @@ router.delete("/club-panel/clubs/:clubId/discount-codes/:codeId",          delet
 router.get("/club-panel/clubs/:clubId/discount-codes/:codeId/usages",      getDiscountCodeUsagesController);
 router.post("/club-panel/clubs/:clubId/sms-campaign",                      sendSmsCampaignController);
 router.get("/club-panel/clubs/:clubId/marketing-segments",                 getMarketingSegmentsController);
+
+// Assets (rental items)
+router.get("/club-panel/clubs/:clubId/assets",               listAssetsController);
+router.post("/club-panel/clubs/:clubId/assets",              createAssetController);
+router.patch("/club-panel/clubs/:clubId/assets/:assetId",    updateAssetController);
+router.delete("/club-panel/clubs/:clubId/assets/:assetId",   deleteAssetController);
 
 // Bookings
 router.get("/club-panel/bookings",                           getClubBookingsController);

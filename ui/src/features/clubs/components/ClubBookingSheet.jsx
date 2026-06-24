@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { BottomSheet } from "react-spring-bottom-sheet";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRightIcon, CalendarIcon, ClockIcon, BanknoteIcon, CheckCircle2Icon, ClipboardListIcon, TicketIcon, XCircleIcon, CheckCircleIcon, LoaderIcon, SparklesIcon, WalletIcon, CreditCardIcon } from "lucide-react";
+import { ArrowRightIcon, CalendarIcon, ClockIcon, BanknoteIcon, CheckCircle2Icon, ClipboardListIcon, TicketIcon, XCircleIcon, CheckCircleIcon, LoaderIcon, SparklesIcon, WalletIcon, CreditCardIcon, MinusIcon, PlusIcon, ShoppingBagIcon } from "lucide-react";
 import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
 import {
@@ -294,9 +294,147 @@ function DateSlotsStep({ court, selectedDate, onDateChange, slots, slotsLoading,
   );
 }
 
+// ── Asset Selection ───────────────────────────────────────────────────────────
+
+const ASSET_EMOJI_MAP = [
+  { keys: ["پدل", "padel racket", "padel"],              emoji: "🏓" },
+  { keys: ["راکت تنیس", "tennis racket", "tennis"],      emoji: "🎾" },
+  { keys: ["راکت بدمینتون", "badminton"],                emoji: "🏸" },
+  { keys: ["اسکواش", "squash"],                          emoji: "🟡" },
+  { keys: ["توپ تنیس", "tennis ball"],                   emoji: "🎾" },
+  { keys: ["ست توپ", "توپ", "ball"],                    emoji: "🟢" },
+  { keys: ["حوله", "towel"],                             emoji: "🏊" },
+  { keys: ["کفش", "shoe"],                               emoji: "👟" },
+  { keys: ["ساک", "bag"],                                emoji: "🎒" },
+  { keys: ["دستکش", "glove"],                            emoji: "🧤" },
+  { keys: ["مچ‌بند", "wristband"],                       emoji: "💪" },
+];
+
+function getAssetEmoji(name) {
+  const lower = name.toLowerCase();
+  for (const { keys, emoji } of ASSET_EMOJI_MAP) {
+    if (keys.some((k) => lower.includes(k.toLowerCase()))) return emoji;
+  }
+  return "🎽";
+}
+
+function AssetSelectionStep({ quantities, onQuantitiesChange, assets, onContinue, onBack }) {
+  if (assets.length === 0) return null;
+
+  const total = assets.reduce((sum, a) => sum + a.pricePerUnit * (quantities[a.id] ?? 0), 0);
+  const selectedCount = assets.filter((a) => (quantities[a.id] ?? 0) > 0).length;
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="relative overflow-hidden rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/8 via-background to-background p-5">
+        <div className="absolute -left-8 -top-8 h-24 w-24 rounded-full bg-primary/10 blur-2xl" />
+        <div className="relative">
+          <p className="text-[11px] font-bold text-primary uppercase tracking-widest mb-1">تجهیزات اجاره‌ای</p>
+          <h3 className="text-lg font-black text-foreground leading-snug">
+            برای بازی به اینا<br />احتیاج نداری؟ 🤔
+          </h3>
+          <p className="text-xs text-muted-foreground mt-1.5">اجاره اختیاریه — هر چی نخوای صفر بذار</p>
+        </div>
+      </div>
+
+      {/* Asset list */}
+      <div className="space-y-2.5">
+        {assets.map((asset) => {
+          const qty = quantities[asset.id] ?? 0;
+          const emoji = getAssetEmoji(asset.name);
+          const isSelected = qty > 0;
+          return (
+            <motion.div
+              key={asset.id}
+              animate={{ scale: isSelected ? 1.01 : 1 }}
+              transition={{ type: "spring", stiffness: 400, damping: 25 }}
+              className={cn(
+                "flex items-center gap-3 rounded-2xl border-2 px-4 py-3.5 transition-colors",
+                isSelected
+                  ? "border-primary bg-primary/5"
+                  : "border-border bg-card"
+              )}
+            >
+              <div className={cn(
+                "h-11 w-11 rounded-2xl flex items-center justify-center text-2xl shrink-0 transition-colors",
+                isSelected ? "bg-primary/10" : "bg-muted"
+              )}>
+                {emoji}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className={cn("text-sm font-bold", isSelected ? "text-foreground" : "text-foreground")}>{asset.name}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {formatPrice(asset.pricePerUnit)} تومان / واحد
+                  {isSelected && (
+                    <span className="text-primary font-bold mr-1.5">
+                      · جمع: {formatPrice(asset.pricePerUnit * qty)} ت
+                    </span>
+                  )}
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => onQuantitiesChange({ ...quantities, [asset.id]: Math.max(0, qty - 1) })}
+                  disabled={qty === 0}
+                  className="w-8 h-8 rounded-xl bg-muted flex items-center justify-center text-foreground disabled:opacity-25 active:scale-90 transition-all"
+                >
+                  <MinusIcon className="w-3.5 h-3.5" />
+                </button>
+                <span className={cn(
+                  "text-sm font-black w-6 text-center tabular-nums",
+                  isSelected ? "text-primary" : "text-foreground"
+                )}>{qty}</span>
+                <button
+                  type="button"
+                  onClick={() => onQuantitiesChange({ ...quantities, [asset.id]: qty + 1 })}
+                  className={cn(
+                    "w-8 h-8 rounded-xl flex items-center justify-center active:scale-90 transition-all",
+                    isSelected ? "bg-primary text-primary-foreground" : "bg-primary/15 text-primary"
+                  )}
+                >
+                  <PlusIcon className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </motion.div>
+          );
+        })}
+      </div>
+
+      {/* Total */}
+      {total > 0 ? (
+        <div className="flex items-center justify-between rounded-2xl bg-primary/8 border border-primary/20 px-4 py-3">
+          <span className="text-sm text-muted-foreground">
+            {selectedCount} آیتم انتخاب شده
+          </span>
+          <span className="text-primary font-black">{formatPrice(total)} تومان</span>
+        </div>
+      ) : (
+        <p className="text-center text-xs text-muted-foreground py-1">
+          هیچ تجهیزی انتخاب نشده — می‌تونی بدون تجهیزات هم ادامه بدی
+        </p>
+      )}
+
+      <div className="flex gap-3">
+        <button
+          type="button"
+          onClick={onBack}
+          className="h-12 px-4 rounded-xl border border-border text-sm font-bold text-foreground bg-background"
+        >
+          بازگشت
+        </button>
+        <Button onClick={onContinue} className="flex-1 rounded-xl font-bold text-sm h-12">
+          {total > 0 ? "ادامه با تجهیزات" : "ادامه بدون تجهیزات"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 // ── Booking Summary ───────────────────────────────────────────────────────────
 
-function BookingSummaryStep({ court, date, slot, clubId, onConfirm, onBack, submitting }) {
+function BookingSummaryStep({ court, date, slot, clubId, selectedAssets, onConfirm, onBack, submitting }) {
   const [notes, setNotes] = useState("");
   const [discountInput, setDiscountInput] = useState("");
   const [discountState, setDiscountState] = useState(null); // null | { valid, discountAmount, finalPrice, discountValue, discountType, discountCodeId, error }
@@ -310,9 +448,10 @@ function BookingSummaryStep({ court, date, slot, clubId, onConfirm, onBack, subm
   const baseTotal = Math.round(pricePerHour * durationHours);
   const originalTotal = slot.originalPrice ? Math.round(slot.originalPrice * durationHours) : null;
 
+  const assetsTotal = selectedAssets.reduce((sum, a) => sum + a.totalPrice, 0);
   const voucherDiscount = discountState?.valid ? discountState.discountAmount : 0;
   const afterVoucher = Math.max(0, baseTotal - voucherDiscount);
-  const finalTotal = afterVoucher;
+  const finalTotal = afterVoucher + assetsTotal;
   const walletBalance = wallet?.balance ?? 0;
   const canPayWithWallet = walletBalance >= finalTotal;
 
@@ -396,13 +535,18 @@ function BookingSummaryStep({ court, date, slot, clubId, onConfirm, onBack, subm
             { icon: <ClockIcon className="w-4 h-4" />, label: "مدت", value: `${durationHours} ساعت` },
             originalTotal ? { icon: <BanknoteIcon className="w-4 h-4" />, label: "قیمت اصلی", value: formatPrice(originalTotal) + " ت", strike: true } : null,
             originalTotal ? { icon: <BanknoteIcon className="w-4 h-4" />, label: `تخفیف اسلات (${slot.discount}٪)`, value: `- ${formatPrice(originalTotal - baseTotal)} ت`, discount: true } : null,
-            { icon: <BanknoteIcon className="w-4 h-4" />, label: "اجاره", value: `${formatPrice(baseTotal)} ت` },
+            { icon: <BanknoteIcon className="w-4 h-4" />, label: "اجاره زمین", value: `${formatPrice(baseTotal)} ت` },
             voucherDiscount > 0 ? {
               icon: <TicketIcon className="w-4 h-4" />,
               label: `کد تخفیف (${discountState.code})`,
               value: `- ${formatPrice(voucherDiscount)} ت`,
               discount: true,
             } : null,
+            ...selectedAssets.map((a) => ({
+              icon: <ShoppingBagIcon className="w-4 h-4" />,
+              label: `${a.name} ×${a.quantity}`,
+              value: `${formatPrice(a.totalPrice)} ت`,
+            })),
           ].filter(Boolean).map((row, i) => (
             <div key={i} className="flex items-center justify-between px-4 py-3 gap-3">
               <div className="flex items-center gap-2 text-muted-foreground text-xs">
@@ -421,7 +565,7 @@ function BookingSummaryStep({ court, date, slot, clubId, onConfirm, onBack, subm
           <div className="text-right">
             {voucherDiscount > 0 && (
               <p className="text-xs text-muted-foreground line-through leading-none mb-0.5">
-                {formatPrice(baseTotal)} ت
+                {formatPrice(baseTotal + assetsTotal)} ت
               </p>
             )}
             <span className="text-primary font-black text-2xl">
@@ -576,7 +720,7 @@ function BookingSummaryStep({ court, date, slot, clubId, onConfirm, onBack, subm
           بازگشت
         </Button>
         <Button
-          onClick={() => onConfirm(notes, discountState?.valid ? discountState.code : undefined, paymentMethod)}
+          onClick={() => onConfirm(notes, discountState?.valid ? discountState.code : undefined, paymentMethod, selectedAssets)}
           disabled={submitting}
           className="flex-1 rounded-xl font-bold text-sm h-12"
         >
@@ -651,6 +795,7 @@ function SuccessStep({ booking, onClose, onViewBookings }) {
 const STEP_TITLES = {
   court:   "انتخاب زمین",
   booking: "انتخاب تاریخ و زمان",
+  assets:  "تجهیزات اجاره‌ای",
   summary: "تأیید رزرو",
   success: "رزرو ثبت شد",
 };
@@ -670,6 +815,8 @@ export default function ClubBookingSheet({ open, onClose, club, initialCourt = n
   const [submitting, setSubmitting] = useState(false);
   const [createdBooking, setCreatedBooking] = useState(null);
   const [pendingDealSlotStart, setPendingDealSlotStart] = useState(null);
+  const [clubAssets, setClubAssets] = useState([]);
+  const [assetQuantities, setAssetQuantities] = useState({});
 
   const goToBooking = useCallback((court) => {
     setSelectedCourt(court);
@@ -682,6 +829,7 @@ export default function ClubBookingSheet({ open, onClose, club, initialCourt = n
     setSlots([]);
     setCreatedBooking(null);
     setPendingDealSlotStart(null);
+    setAssetQuantities({});
     if (initialCourt) {
       setSelectedCourt(initialCourt);
       setStep("booking");
@@ -711,6 +859,14 @@ export default function ClubBookingSheet({ open, onClose, club, initialCourt = n
     }
   }, [open, initialCourt, initialDate, initialSlotStart, courts, today]);
 
+  // Fetch club assets once when sheet opens
+  useEffect(() => {
+    if (!open || !club?.id) return;
+    bookingService.getClubAssets(club.id)
+      .then((res) => { if (res.ok) setClubAssets(res.data ?? []); })
+      .catch(() => {});
+  }, [open, club?.id]);
+
   // Fetch slots whenever court or date changes (in booking step)
   useEffect(() => {
     if (!open || step !== "booking" || !selectedCourt) return;
@@ -725,7 +881,7 @@ export default function ClubBookingSheet({ open, onClose, club, initialCourt = n
           const slot = nextSlots.find((item) => item.start === pendingDealSlotStart);
           if (slot && !slot.isBooked && !slot.isPending && !slot.isBlocked && !slot.isManualBooked) {
             setSelectedSlot(slot);
-            setStep("summary");
+            setStep(clubAssets.length > 0 ? "assets" : "summary");
           } else {
             toast.error("این آفر دیگر در دسترس نیست");
           }
@@ -736,7 +892,7 @@ export default function ClubBookingSheet({ open, onClose, club, initialCourt = n
       .finally(() => setSlotsLoading(false));
   }, [open, selectedCourt, selectedDate, step, pendingDealSlotStart]);
 
-  const handleConfirm = async (notes, discountCode, paymentMethod = "none") => {
+  const handleConfirm = async (notes, discountCode, paymentMethod = "none", selectedAssets = []) => {
     if (!selectedCourt || !selectedDate || !selectedSlot) return;
     setSubmitting(true);
     try {
@@ -748,6 +904,7 @@ export default function ClubBookingSheet({ open, onClose, club, initialCourt = n
         notes,
         paymentMethod,
         ...(discountCode ? { discountCode } : {}),
+        assets: selectedAssets.map((a) => ({ assetId: a.id, quantity: a.quantity })),
       });
       if (res.ok) {
         if (res.data?.wallet) {
@@ -765,12 +922,17 @@ export default function ClubBookingSheet({ open, onClose, club, initialCourt = n
     }
   };
 
-  const showBack = (step === "booking" && courts.length > 1 && !initialCourt) || step === "summary";
+  const showBack = (step === "booking" && courts.length > 1 && !initialCourt) || step === "assets" || step === "summary";
 
   const handleBack = () => {
     if (step === "booking") { setStep("court"); setSelectedCourt(null); }
-    else if (step === "summary") setStep("booking");
+    else if (step === "assets") setStep("booking");
+    else if (step === "summary") setStep(clubAssets.length > 0 ? "assets" : "booking");
   };
+
+  const selectedAssetsList = clubAssets
+    .filter((a) => (assetQuantities[a.id] ?? 0) > 0)
+    .map((a) => ({ id: a.id, name: a.name, quantity: assetQuantities[a.id], unitPrice: a.pricePerUnit, totalPrice: a.pricePerUnit * assetQuantities[a.id] }));
 
   return (
     <BottomSheet
@@ -815,7 +977,20 @@ export default function ClubBookingSheet({ open, onClose, club, initialCourt = n
                 slots={slots}
                 slotsLoading={slotsLoading}
                 selectedSlot={selectedSlot}
-                onSelectSlot={(slot) => { setSelectedSlot(slot); setStep("summary"); }}
+                onSelectSlot={(slot) => { setSelectedSlot(slot); setStep(clubAssets.length > 0 ? "assets" : "summary"); }}
+              />
+            </motion.div>
+          )}
+
+          {step === "assets" && selectedCourt && selectedSlot && (
+            <motion.div key="assets" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+              <AssetSelectionStep
+                clubId={club?.id}
+                assets={clubAssets}
+                quantities={assetQuantities}
+                onQuantitiesChange={setAssetQuantities}
+                onContinue={() => setStep("summary")}
+                onBack={() => setStep("booking")}
               />
             </motion.div>
           )}
@@ -827,8 +1002,9 @@ export default function ClubBookingSheet({ open, onClose, club, initialCourt = n
                 date={selectedDate}
                 slot={selectedSlot}
                 clubId={club?.id}
+                selectedAssets={selectedAssetsList}
                 onConfirm={handleConfirm}
-                onBack={() => setStep("booking")}
+                onBack={() => setStep(clubAssets.length > 0 ? "assets" : "booking")}
                 submitting={submitting}
               />
             </motion.div>

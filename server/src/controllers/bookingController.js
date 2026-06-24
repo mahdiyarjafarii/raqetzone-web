@@ -1,6 +1,6 @@
 import { eq, and, desc, count, inArray } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { bookings, courts, clubs, users, discountCodes, discountCodeUsages, slotOverrides, deals } from "../db/schema.js";
+import { bookings, courts, clubs, users, discountCodes, discountCodeUsages, slotOverrides, deals, clubAssets, bookingAssets } from "../db/schema.js";
 import { sendNotification } from "../utils/sendNotification.js";
 import { sendSMS } from "../utils/sms.js";
 import { formatBookingDateTimeFa } from "../utils/bookingTime.js";
@@ -167,7 +167,7 @@ async function findOrCreateWelcomeDiscount(clubId) {
 export const createBookingController = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { courtId, date, startTime, endTime, notes, discountCode, paymentMethod = "none" } = req.body;
+    const { courtId, date, startTime, endTime, notes, discountCode, paymentMethod = "none", assets = [] } = req.body;
     console.log("[CreateBooking] request body:", {
       userId,
       courtId,
@@ -177,6 +177,7 @@ export const createBookingController = async (req, res) => {
       notes,
       discountCode,
       paymentMethod,
+      assetsCount: assets.length,
     });
 
     if (!courtId || !date || !startTime || !endTime) {
@@ -353,7 +354,28 @@ export const createBookingController = async (req, res) => {
       }
     }
 
-    const totalPrice = Math.max(0, priceAfterSlot - discountAmount);
+    // Validate and snapshot assets
+    let resolvedAssets = [];
+    let assetsTotal = 0;
+    if (Array.isArray(assets) && assets.length > 0) {
+      const assetIds = assets.map((a) => a.assetId).filter(Boolean);
+      const assetRows = assetIds.length > 0
+        ? await db.select().from(clubAssets).where(and(inArray(clubAssets.id, assetIds), eq(clubAssets.clubId, court.clubId), eq(clubAssets.isActive, true)))
+        : [];
+
+      for (const item of assets) {
+        if (!item.assetId || !item.quantity || item.quantity <= 0) continue;
+        const row = assetRows.find((r) => r.id === item.assetId);
+        if (!row) return res.status(400).json({ message: `تجهیز با شناسه ${item.assetId} یافت نشد` });
+        const qty = Math.floor(item.quantity);
+        const unitPrice = row.pricePerUnit;
+        const totalPriceForAsset = qty * unitPrice;
+        assetsTotal += totalPriceForAsset;
+        resolvedAssets.push({ assetId: row.id, quantity: qty, unitPrice, totalPrice: totalPriceForAsset });
+      }
+    }
+
+    const totalPrice = Math.max(0, priceAfterSlot - discountAmount) + assetsTotal;
     const trackingCode = generateTrackingCode();
     console.log("[CreateBooking] insert values:", {
       userId,
@@ -406,6 +428,12 @@ export const createBookingController = async (req, res) => {
           .where(eq(discountCodes.id, discountCodeRow.id));
       }
 
+      if (resolvedAssets.length > 0) {
+        await tx.insert(bookingAssets).values(
+          resolvedAssets.map((a) => ({ ...a, bookingId: createdBooking.id }))
+        );
+      }
+
       let paidByWallet = null;
       if (paymentMethod === "wallet" && totalPrice > 0) {
         paidByWallet = await payBookingWithWallet({ userId, bookingId: createdBooking.id, amount: totalPrice }, tx);
@@ -456,7 +484,7 @@ export const createBookingController = async (req, res) => {
       console.log(`[SMS-Manager] skipped — no manager/club/owner phone for court ${court.id}`);
     }
 
-    const enriched = { ...booking, court };
+    const enriched = { ...booking, court, assets: resolvedAssets };
     return res.status(201).json({ booking: enriched, wallet: walletPayment?.wallet });
   } catch (error) {
     console.error("createBooking error:", {
@@ -496,9 +524,16 @@ export const getMyBookingsController = async (req, res) => {
         endTime: bookings.endTime,
         durationHours: bookings.durationHours,
         totalPrice: bookings.totalPrice,
+        basePrice: bookings.basePrice,
+        slotDiscountPercent: bookings.slotDiscountPercent,
+        discountCode: bookings.discountCode,
+        discountAmount: bookings.discountAmount,
         status: bookings.status,
         notes: bookings.notes,
         adminNote: bookings.adminNote,
+        trackingCode: bookings.trackingCode,
+        paymentMethod: bookings.paymentMethod,
+        paymentStatus: bookings.paymentStatus,
         createdAt: bookings.createdAt,
         court: {
           id: courts.id,
@@ -516,7 +551,31 @@ export const getMyBookingsController = async (req, res) => {
       .where(eq(bookings.userId, userId))
       .orderBy(desc(bookings.createdAt));
 
-    return res.status(200).json({ bookings: rows });
+    // Attach bookingAssets to each booking
+    const bookingIds = rows.map((r) => r.id);
+    let assetsByBookingId = {};
+    if (bookingIds.length > 0) {
+      const assetRows = await db
+        .select({
+          bookingId: bookingAssets.bookingId,
+          assetId: bookingAssets.assetId,
+          quantity: bookingAssets.quantity,
+          unitPrice: bookingAssets.unitPrice,
+          totalPrice: bookingAssets.totalPrice,
+          name: clubAssets.name,
+        })
+        .from(bookingAssets)
+        .innerJoin(clubAssets, eq(bookingAssets.assetId, clubAssets.id))
+        .where(inArray(bookingAssets.bookingId, bookingIds));
+
+      for (const ar of assetRows) {
+        if (!assetsByBookingId[ar.bookingId]) assetsByBookingId[ar.bookingId] = [];
+        assetsByBookingId[ar.bookingId].push(ar);
+      }
+    }
+
+    const enrichedRows = rows.map((r) => ({ ...r, assets: assetsByBookingId[r.id] ?? [] }));
+    return res.status(200).json({ bookings: enrichedRows });
   } catch (error) {
     console.error("getMyBookings error:", error);
     return res.status(500).json({ message: "خطای سرور" });
@@ -748,7 +807,19 @@ export const getBookingByTrackingCodeController = async (req, res) => {
       row.adminNote = BOOKING_TIME_PASSED_NOTE;
     }
 
-    return res.status(200).json({ booking: row });
+    const assetRows = await db
+      .select({
+        assetId: bookingAssets.assetId,
+        quantity: bookingAssets.quantity,
+        unitPrice: bookingAssets.unitPrice,
+        totalPrice: bookingAssets.totalPrice,
+        name: clubAssets.name,
+      })
+      .from(bookingAssets)
+      .innerJoin(clubAssets, eq(bookingAssets.assetId, clubAssets.id))
+      .where(eq(bookingAssets.bookingId, row.id));
+
+    return res.status(200).json({ booking: { ...row, assets: assetRows } });
   } catch (error) {
     console.error("getBookingByTrackingCode error:", error);
     return res.status(500).json({ message: "خطای سرور" });

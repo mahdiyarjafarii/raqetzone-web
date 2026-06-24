@@ -5,6 +5,7 @@ import {
   PlusIcon, PencilIcon, TrashIcon, Building2Icon,
   MapPinIcon, PhoneIcon, ClockIcon, ChevronRightIcon,
   ToggleLeftIcon, ToggleRightIcon, ImagePlusIcon, XCircleIcon,
+  ShoppingBagIcon,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAtomValue } from "jotai";
@@ -431,6 +432,138 @@ function ClubForm({ form, setForm, onSubmit, loading, submitLabel, isEdit = fals
   );
 }
 
+function AssetsModal({ club, open, onClose }) {
+  const [assets, setAssets] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [newAsset, setNewAsset] = useState({ name: "", pricePerUnit: "", quantity: "" });
+
+  const fetchAssets = async () => {
+    if (!club) return;
+    setLoading(true);
+    const { ok, data } = await apiClient.get(`/club-panel/clubs/${club.id}/assets`);
+    if (ok) setAssets(data);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    if (open && club) fetchAssets();
+    else setAssets([]);
+  }, [open, club?.id]);
+
+  const handleAdd = async () => {
+    if (!newAsset.name.trim() || !newAsset.pricePerUnit) return toast.error("نام و قیمت را وارد کنید");
+    const price = Number(newAsset.pricePerUnit);
+    if (!price || price <= 0) return toast.error("قیمت باید عدد مثبت باشد");
+    setSaving(true);
+    const payload = {
+      name: newAsset.name.trim(),
+      pricePerUnit: price,
+      isActive: true,
+      quantity: newAsset.quantity ? Number(newAsset.quantity) : null,
+    };
+    const { ok, data } = await apiClient.post(`/club-panel/clubs/${club.id}/assets`, payload);
+    setSaving(false);
+    if (!ok) return toast.error(data?.error ?? "خطا در افزودن تجهیز");
+    toast.success("تجهیز اضافه شد ✅");
+    setNewAsset({ name: "", pricePerUnit: "", quantity: "" });
+    fetchAssets();
+  };
+
+  const handleToggle = async (asset) => {
+    await apiClient.patch(`/club-panel/clubs/${club.id}/assets/${asset.id}`, { isActive: !asset.isActive });
+    fetchAssets();
+  };
+
+  const handleDelete = async (assetId) => {
+    if (!confirm("این تجهیز حذف شود؟")) return;
+    const { ok } = await apiClient.delete(`/club-panel/clubs/${club.id}/assets/${assetId}`);
+    if (ok) { toast.success("حذف شد"); fetchAssets(); }
+    else toast.error("خطا در حذف");
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title={`تجهیزات اجاره‌ای — ${club?.name ?? ""}`} size="lg">
+      <div className="space-y-5">
+        {/* Add new asset form */}
+        <div className="rounded-xl border border-border bg-muted/30 p-4 space-y-3">
+          <p className="text-xs font-semibold text-foreground">افزودن تجهیز جدید</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <Input
+              label="نام تجهیز *"
+              value={newAsset.name}
+              onChange={e => setNewAsset(p => ({ ...p, name: e.target.value }))}
+              placeholder="مثلاً راکت تنیس"
+            />
+            <Input
+              label="قیمت هر واحد (تومان) *"
+              type="number"
+              value={newAsset.pricePerUnit}
+              onChange={e => setNewAsset(p => ({ ...p, pricePerUnit: e.target.value }))}
+              placeholder="مثلاً 200000"
+            />
+            <Input
+              label="موجودی (اختیاری)"
+              type="number"
+              value={newAsset.quantity}
+              onChange={e => setNewAsset(p => ({ ...p, quantity: e.target.value }))}
+              placeholder="خالی = نامحدود"
+            />
+          </div>
+          <Button onClick={handleAdd} disabled={saving} size="sm" className="gap-1">
+            <PlusIcon className="w-3.5 h-3.5" />
+            {saving ? "در حال ذخیره..." : "افزودن"}
+          </Button>
+        </div>
+
+        {/* Asset list */}
+        {loading ? (
+          <div className="space-y-2">
+            {[1, 2].map(i => <div key={i} className="h-12 rounded-xl bg-muted animate-pulse" />)}
+          </div>
+        ) : assets.length === 0 ? (
+          <div className="text-center py-8 text-muted-foreground text-sm">
+            هنوز تجهیزی ثبت نشده است
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {assets.map(asset => (
+              <div key={asset.id} className="flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-foreground truncate">{asset.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {asset.pricePerUnit.toLocaleString("fa-IR")} تومان / واحد
+                    {asset.quantity != null && ` · موجودی: ${asset.quantity}`}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleToggle(asset)}
+                  className="shrink-0"
+                  title={asset.isActive ? "غیرفعال کردن" : "فعال کردن"}
+                >
+                  {asset.isActive
+                    ? <ToggleRightIcon className="w-5 h-5 text-emerald-500" />
+                    : <ToggleLeftIcon className="w-5 h-5 text-muted-foreground" />
+                  }
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleDelete(asset.id)}
+                  className="shrink-0 text-destructive hover:opacity-70"
+                  title="حذف"
+                >
+                  <TrashIcon className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
 function ClubCoverImage({ club }) {
   const raw = club.images?.[0];
   if (!raw) {
@@ -449,7 +582,7 @@ function ClubCoverImage({ club }) {
   );
 }
 
-function ClubCard({ club, index, onEdit, onDelete, onToggle, onManage }) {
+function ClubCard({ club, index, onEdit, onDelete, onToggle, onManage, onAssets }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 16 }}
@@ -517,6 +650,9 @@ function ClubCard({ club, index, onEdit, onDelete, onToggle, onManage }) {
           <ChevronRightIcon className="w-3.5 h-3.5" />
           مدیریت زمین‌ها
         </Button>
+        <Button size="sm" variant="outline" onClick={() => onAssets(club)} title="تجهیزات اجاره‌ای">
+          <ShoppingBagIcon className="w-3.5 h-3.5" />
+        </Button>
         <Button size="sm" variant="outline" onClick={() => onEdit(club)}>
           <PencilIcon className="w-3.5 h-3.5" />
         </Button>
@@ -545,6 +681,7 @@ export default function ClubsPage() {
   const [editTarget, setEditTarget] = useState(null);
   const [form, setForm]         = useState(emptyClub);
   const [saving, setSaving]     = useState(false);
+  const [assetsTarget, setAssetsTarget] = useState(null);
 
   const fetch = async () => {
     setLoading(true);
@@ -662,11 +799,14 @@ export default function ClubsPage() {
                 onDelete={handleDelete}
                 onToggle={handleToggle}
                 onManage={(c) => navigate(`/clubs/${c.id}`)}
+                onAssets={(c) => setAssetsTarget(c)}
               />
             ))}
           </div>
         )}
       </div>
+
+      <AssetsModal club={assetsTarget} open={!!assetsTarget} onClose={() => setAssetsTarget(null)} />
 
       <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="ثبت باشگاه جدید" size="lg">
         <ClubForm form={form} setForm={setForm} onSubmit={handleCreate} loading={saving} submitLabel="ثبت باشگاه" />

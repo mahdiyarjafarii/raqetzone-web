@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   SearchIcon, CheckCircle2Icon, XCircleIcon, ClockIcon,
   UserIcon, PhoneIcon, CalendarIcon, MapPinIcon,
-  BadgeCheckIcon, ReceiptIcon, BanknoteIcon, TagIcon, TicketIcon,
+  BadgeCheckIcon, ReceiptIcon, BanknoteIcon, TagIcon, TicketIcon, ShoppingBagIcon,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import apiClient from "@/lib/apiClient";
@@ -217,6 +217,18 @@ export default function VerifyBookingPage() {
                       </>
                     );
                   })()}
+                  {result.booking.assets?.length > 0 && (
+                    <>
+                      {result.booking.assets.map((a) => (
+                        <InfoRow
+                          key={a.assetId}
+                          icon={ShoppingBagIcon}
+                          label={`${a.name} ×${a.quantity}`}
+                          value={`${fmt(a.totalPrice)} تومان`}
+                        />
+                      ))}
+                    </>
+                  )}
                   <InfoRow icon={ReceiptIcon}  label="کد پیگیری"    value={result.booking.trackingCode} mono />
                 </div>
               </div>

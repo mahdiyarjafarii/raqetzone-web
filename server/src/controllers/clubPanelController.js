@@ -1,6 +1,6 @@
 import { eq, and, asc, desc, inArray, count, sum, gte, lte, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { clubs, courts, bookings, users, slotOverrides, tournaments, tournamentRegistrations, deals } from "../db/schema.js";
+import { clubs, courts, bookings, users, slotOverrides, tournaments, tournamentRegistrations, deals, bookingAssets, clubAssets } from "../db/schema.js";
 import { sendNotification } from "../utils/sendNotification.js";
 import { formatBookingDateTimeFa } from "../utils/bookingTime.js";
 import { validateIranianPhone } from "../utils/validation.js";
@@ -527,8 +527,34 @@ export const getClubBookingsController = async (req, res) => {
       .offset(offset);
 
     const totalCount = Number(total);
+
+    // Attach bookingAssets to each row
+    const bookingIds = rows.map((r) => r.id);
+    let assetsByBookingId = {};
+    if (bookingIds.length > 0) {
+      const assetRows = await db
+        .select({
+          bookingId: bookingAssets.bookingId,
+          assetId: bookingAssets.assetId,
+          quantity: bookingAssets.quantity,
+          unitPrice: bookingAssets.unitPrice,
+          totalPrice: bookingAssets.totalPrice,
+          name: clubAssets.name,
+        })
+        .from(bookingAssets)
+        .innerJoin(clubAssets, eq(bookingAssets.assetId, clubAssets.id))
+        .where(inArray(bookingAssets.bookingId, bookingIds));
+
+      for (const ar of assetRows) {
+        if (!assetsByBookingId[ar.bookingId]) assetsByBookingId[ar.bookingId] = [];
+        assetsByBookingId[ar.bookingId].push(ar);
+      }
+    }
+
+    const enrichedRows = rows.map((r) => ({ ...r, assets: assetsByBookingId[r.id] ?? [] }));
+
     return res.json({
-      bookings: rows,
+      bookings: enrichedRows,
       pagination: {
         page,
         limit,
@@ -1189,9 +1215,21 @@ export const verifyBookingController = async (req, res) => {
       return res.status(403).json({ message: "این رزرو متعلق به باشگاه شما نیست" });
     }
 
+    const assetRows = await db
+      .select({
+        assetId: bookingAssets.assetId,
+        quantity: bookingAssets.quantity,
+        unitPrice: bookingAssets.unitPrice,
+        totalPrice: bookingAssets.totalPrice,
+        name: clubAssets.name,
+      })
+      .from(bookingAssets)
+      .innerJoin(clubAssets, eq(bookingAssets.assetId, clubAssets.id))
+      .where(eq(bookingAssets.bookingId, row.id));
+
     const isValid = row.status === "approved";
 
-    return res.json({ booking: row, isValid });
+    return res.json({ booking: { ...row, assets: assetRows }, isValid });
   } catch (error) {
     console.error("verifyBooking error:", error);
     return res.status(500).json({ message: "خطای سرور" });
