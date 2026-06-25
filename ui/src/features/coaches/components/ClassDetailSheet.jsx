@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   XIcon,
@@ -17,9 +17,8 @@ import {
   ShieldCheckIcon,
   ListChecksIcon,
   DumbbellIcon,
-  UserCircle2Icon,
+  ChevronLeftIcon,
   TrophyIcon,
-  StarIcon,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { coachService } from "@/services/coachService";
@@ -104,8 +103,9 @@ function SectionTitle({ icon: Icon, children }) {
   );
 }
 
-export default function ClassDetailSheet({ cls, coachName, coachImage, open, onClose, isOwnCoach = false }) {
+export default function ClassDetailSheet({ cls, coachName, coachImage, coachId, open, onClose, isOwnCoach = false }) {
   const currentUser = useAtomValue(currentUserAtom);
+  const navigate = useNavigate();
   const [enrollSheetOpen, setEnrollSheetOpen] = useState(false);
   const [wallet, setWallet] = useState(null);
   const [walletLoading, setWalletLoading] = useState(false);
@@ -185,61 +185,94 @@ export default function ClassDetailSheet({ cls, coachName, coachImage, open, onC
             exit={{ y: "100%" }}
             transition={{ type: "spring", damping: 30, stiffness: 320 }}
             className="fixed inset-x-0 bottom-0 z-[80] flex justify-center"
-            style={{ maxHeight: "94dvh" }}
+            style={{ height: "100dvh" }}
           >
             <div
-              className="w-full max-w-[480px] bg-background rounded-t-[28px] overflow-hidden flex flex-col"
-              style={{ maxHeight: "94dvh" }}
+              className="w-full max-w-[480px] bg-background overflow-hidden flex flex-col"
+              style={{ height: "100dvh" }}
               onClick={(e) => e.stopPropagation()}
             >
-              {/* Handle */}
-              <div className="flex justify-center pt-3 pb-1 shrink-0">
-                <div className="w-10 h-1 rounded-full bg-border" />
-              </div>
+              {/* Hero banner — handle lives inside it, no white gap */}
+              <div className={`relative h-52 shrink-0 bg-gradient-to-br ${sportGrad} overflow-hidden`}>
+                {/* Court lines pattern */}
+                <svg
+                  className="absolute inset-0 w-full h-full"
+                  viewBox="0 0 480 208"
+                  fill="none"
+                  preserveAspectRatio="xMidYMid slice"
+                  style={{ opacity: 0.15 }}
+                >
+                  <rect x="48" y="12" width="384" height="184" stroke="white" strokeWidth="2" />
+                  <line x1="48" y1="104" x2="432" y2="104" stroke="white" strokeWidth="2.5" />
+                  <line x1="240" y1="12" x2="240" y2="104" stroke="white" strokeWidth="1.2" />
+                  <line x1="240" y1="104" x2="240" y2="196" stroke="white" strokeWidth="1.2" />
+                  <line x1="100" y1="12" x2="100" y2="196" stroke="white" strokeWidth="1" />
+                  <line x1="380" y1="12" x2="380" y2="196" stroke="white" strokeWidth="1" />
+                  <line x1="100" y1="56" x2="380" y2="56" stroke="white" strokeWidth="1" />
+                  <line x1="100" y1="152" x2="380" y2="152" stroke="white" strokeWidth="1" />
+                </svg>
+                {/* Speed streaks */}
+                <svg className="absolute inset-0 w-full h-full" viewBox="0 0 480 208" fill="none" style={{ opacity: 0.06 }}>
+                  <line x1="520" y1="-10" x2="280" y2="220" stroke="white" strokeWidth="36" />
+                  <line x1="460" y1="-10" x2="220" y2="220" stroke="white" strokeWidth="18" />
+                </svg>
+                {/* Rings bottom-right */}
+                <svg className="absolute -bottom-8 -right-8 w-36 h-36" viewBox="0 0 144 144" fill="none" style={{ opacity: 0.09 }}>
+                  <circle cx="72" cy="72" r="64" stroke="white" strokeWidth="2.5" />
+                  <circle cx="72" cy="72" r="46" stroke="white" strokeWidth="2" />
+                  <circle cx="72" cy="72" r="28" stroke="white" strokeWidth="1.5" />
+                </svg>
+                <div className="absolute -top-8 -left-8 w-32 h-32 rounded-full bg-white/20 blur-2xl" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/65 via-black/10 to-transparent" />
 
-              {/* Hero banner */}
-              <div className={`relative h-44 shrink-0 bg-gradient-to-br ${sportGrad} overflow-hidden`}>
-                {/* Pattern */}
-                {[
-                  { top: "10%", left: "8%", size: 60, rotate: -18, opacity: 0.12 },
-                  { top: "40%", left: "55%", size: 90, rotate: 12, opacity: 0.08 },
-                  { top: "60%", left: "15%", size: 40, rotate: 25, opacity: 0.10 },
-                  { top: "15%", left: "80%", size: 50, rotate: -8, opacity: 0.11 },
-                ].map((p, i) => (
-                  <span
-                    key={i}
-                    className="absolute select-none pointer-events-none leading-none"
-                    style={{ top: p.top, left: p.left, fontSize: p.size, opacity: p.opacity, transform: `rotate(${p.rotate}deg)` }}
-                  >
-                    {SPORT_LABELS[cls.sportType]?.split(" ")[0] ?? "🎾"}
-                  </span>
-                ))}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent" />
+                {/* Drag handle — sits at top of banner, no white gap */}
+                <div className="absolute top-3 inset-x-0 flex justify-center pointer-events-none">
+                  <div className="w-10 h-1 rounded-full bg-white/40" />
+                </div>
 
                 {/* Close */}
                 <button
                   type="button"
                   onClick={onClose}
-                  className="absolute top-3 left-3 w-8 h-8 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center text-white"
+                  className="absolute top-8 left-4 w-8 h-8 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center text-white"
                 >
                   <XIcon className="w-4 h-4" />
                 </button>
 
                 {/* Level badge */}
-                <div className={`absolute top-3 right-3 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gradient-to-r ${levelGrad} text-white text-[11px] font-black`}>
-                  {LEVEL_LABELS[cls.level] ?? "✨ همه سطوح"}
+                <div className={`absolute top-8 right-4 inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gradient-to-r ${levelGrad} text-white text-[11px] font-black`}>
+                  {LEVEL_LABELS[cls.level] ?? "همه سطوح"}
                 </div>
 
                 {/* Bottom content */}
                 <div className="absolute bottom-0 inset-x-0 px-4 pb-4">
                   <div className="flex items-end justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                      <h2 className="text-lg font-black text-white leading-tight line-clamp-2">{cls.title || "کلاس ورزشی"}</h2>
-                      <p className="mt-1 text-xs text-white/75">{SPORT_LABELS[cls.sportType] ?? "ورزش"} • {cls.city || "نامشخص"}</p>
+                      <h2 className="text-xl font-black text-white leading-tight line-clamp-2">{cls.title || "کلاس ورزشی"}</h2>
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        <span className="text-xs text-white/75">{SPORT_LABELS[cls.sportType] ?? "ورزش"}</span>
+                        {cls.city && (
+                          <>
+                            <span className="text-white/40">|</span>
+                            <span className="inline-flex items-center gap-1 text-xs text-white/75">
+                              <MapPinIcon className="w-3 h-3 shrink-0" />
+                              {cls.city}
+                            </span>
+                          </>
+                        )}
+                        {cls.location && (
+                          <>
+                            <span className="text-white/35 text-[10px]">•</span>
+                            <span className="text-xs text-white/65">{cls.location}</span>
+                          </>
+                        )}
+                      </div>
                     </div>
                     <div className="text-left shrink-0">
-                      <p className="text-lg font-black text-white">{price > 0 ? `${formatToman(price)}` : "رایگان"}</p>
-                      {price > 0 && <p className="text-[10px] text-white/70">تومان</p>}
+                      <p className={`text-xl font-black ${price > 0 ? "text-white" : "text-emerald-300"}`}>
+                        {price > 0 ? formatToman(price) : "رایگان"}
+                      </p>
+                      {price > 0 && <p className="text-[10px] text-white/60 text-left">تومان</p>}
                     </div>
                   </div>
                 </div>
@@ -251,22 +284,31 @@ export default function ClassDetailSheet({ cls, coachName, coachImage, open, onC
 
                   {/* Coach info */}
                   {coachName && (
-                    <div className="flex items-center gap-3 p-3 rounded-2xl bg-muted/50 border border-border">
-                      <div className="w-10 h-10 rounded-xl overflow-hidden bg-muted shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => { if (coachId) { onClose(); navigate(`/coaches/${coachId}`); } }}
+                      className={`w-full flex items-center gap-3 p-3.5 rounded-2xl bg-muted/50 border border-border text-right transition-colors ${coachId ? "hover:bg-muted/80 active:scale-[0.98] cursor-pointer" : "cursor-default"}`}
+                    >
+                      <div className="w-11 h-11 rounded-2xl overflow-hidden bg-primary/10 shrink-0 ring-2 ring-border">
                         {coachImage ? (
                           <img src={getProfileImage(coachImage)} alt={coachName} className="w-full h-full object-cover" />
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center text-base font-black text-muted-foreground">
+                          <div className="w-full h-full flex items-center justify-center text-base font-black text-primary">
                             {coachName?.[0] ?? "م"}
                           </div>
                         )}
                       </div>
-                      <div>
-                        <p className="text-[10px] text-muted-foreground">مربی</p>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] text-muted-foreground mb-0.5">مربی کلاس</p>
                         <p className="text-sm font-black text-foreground">{coachName}</p>
                       </div>
-                      <UserCircle2Icon className="w-4 h-4 text-muted-foreground mr-auto" />
-                    </div>
+                      {coachId && (
+                        <div className="shrink-0 flex items-center gap-1 text-[11px] text-primary font-bold">
+                          <span>مشاهده پروفایل</span>
+                          <ChevronLeftIcon className="w-3.5 h-3.5" />
+                        </div>
+                      )}
+                    </button>
                   )}
 
                   {/* Stats row */}
@@ -317,6 +359,7 @@ export default function ClassDetailSheet({ cls, coachName, coachImage, open, onC
                     <div className="rounded-2xl border border-border bg-card px-3">
                       <InfoRow icon={LayersIcon} label="سطح" value={LEVEL_LABELS[cls.level] ?? "✨ همه سطوح"} accent />
                       <InfoRow icon={MapPinIcon} label="شهر" value={cls.city || "نامشخص"} />
+                      {cls.location && <InfoRow icon={MapPinIcon} label="محل برگزاری" value={cls.location} accent />}
                       <InfoRow icon={CalendarDaysIcon} label="شروع" value={formatClassDate(cls.startDate) || "—"} />
                       <InfoRow icon={CalendarDaysIcon} label="پایان" value={formatClassDate(cls.endDate) || "—"} />
                       <InfoRow icon={UsersIcon} label="ظرفیت" value={`${cls.enrolledCount ?? 0} از ${cls.capacity ?? "—"} نفر`} />

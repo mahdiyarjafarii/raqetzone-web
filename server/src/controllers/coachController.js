@@ -58,6 +58,7 @@ const mapCoachClass = (cls) => {
     description: cls.description,
     sportType: cls.sportType,
     city: cls.city,
+    location: cls.location ?? null,
     level: cls.level ?? "all",
     price: cls.price,
     capacity: cls.capacity,
@@ -106,6 +107,61 @@ export const getCoachesController = async (_req, res) => {
     return res.status(200).json({ coaches: rows.map(mapCoachPublic) });
   } catch (error) {
     console.error("Get coaches error:", error);
+    return res.status(500).json({ message: "خطای سرور" });
+  }
+};
+
+export const getAllClassesController = async (_req, res) => {
+  try {
+    const rows = await db
+      .select({
+        id: coachClasses.id,
+        coachId: coachClasses.coachId,
+        title: coachClasses.title,
+        description: coachClasses.description,
+        sportType: coachClasses.sportType,
+        city: coachClasses.city,
+        level: coachClasses.level,
+        price: coachClasses.price,
+        capacity: coachClasses.capacity,
+        enrolledCount: coachClasses.enrolledCount,
+        sessions: coachClasses.sessions,
+        status: coachClasses.status,
+        createdAt: coachClasses.createdAt,
+        updatedAt: coachClasses.updatedAt,
+        coachUserId: users.id,
+        coachName: users.name,
+        coachFirstName: users.firstName,
+        coachLastName: users.lastName,
+        coachCity: users.city,
+        coachImage: users.image,
+        coachBio: users.bio,
+        coachHeadline: users.coachHeadline,
+        coachVerificationStatus: users.coachVerificationStatus,
+      })
+      .from(coachClasses)
+      .innerJoin(users, eq(coachClasses.coachId, users.id))
+      .where(eq(coachClasses.status, "active"))
+      .orderBy(desc(coachClasses.createdAt));
+
+    const classes = rows.map((row) => ({
+      ...mapCoachClass(row),
+      coach: {
+        id: row.coachUserId,
+        name: row.coachName,
+        firstName: row.coachFirstName,
+        lastName: row.coachLastName,
+        city: row.coachCity,
+        image: row.coachImage,
+        bio: row.coachBio,
+        coachHeadline: row.coachHeadline,
+        coachVerificationStatus: row.coachVerificationStatus,
+      },
+    }));
+
+    return res.status(200).json({ classes });
+  } catch (error) {
+    console.error("Get all classes error:", error);
     return res.status(500).json({ message: "خطای سرور" });
   }
 };

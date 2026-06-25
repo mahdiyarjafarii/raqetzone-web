@@ -313,6 +313,7 @@ export const coachClasses = pgTable("coach_classes", {
   description: text("description"),
   sportType: varchar("sport_type", { length: 50 }).notNull().default("padel"),
   city: varchar("city", { length: 100 }),
+  location: varchar("location", { length: 255 }),
   level: varchar("level", { length: 20 }).notNull().default("all"), // beginner | intermediate | advanced | all
   price: integer("price").notNull().default(0),
   capacity: integer("capacity").notNull().default(10),

@@ -2,6 +2,7 @@ import apiClient from "@/lib/apiClient";
 
 export const coachService = {
   getCoaches: () => apiClient.get("/coaches"),
+  getAllClasses: () => apiClient.get("/classes"),
   getMyClasses: () => apiClient.get("/coaches/me/classes"),
   getMyPrivateSessions: () => apiClient.get("/coaches/me/private-sessions"),
   getCoachDetail: (coachId) => apiClient.get(`/coaches/${coachId}`),

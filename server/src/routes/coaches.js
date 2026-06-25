@@ -13,6 +13,7 @@ import {
   getMyCoachPrivateSessionsController,
   getMyCoachReviewsController,
   getCoachesController,
+  getAllClassesController,
   replyCoachReviewController,
   upsertCoachReviewController,
   updateCoachPrivateSessionController,
@@ -22,6 +23,7 @@ import {
 const router = Router();
 
 router.get("/coaches", getCoachesController);
+router.get("/classes", getAllClassesController);
 router.get("/coaches/me/classes", authMiddleware, getMyCoachClassesController);
 router.get("/coaches/me/private-sessions", authMiddleware, getMyCoachPrivateSessionsController);
 router.get("/coaches/me/reviews", authMiddleware, getMyCoachReviewsController);
