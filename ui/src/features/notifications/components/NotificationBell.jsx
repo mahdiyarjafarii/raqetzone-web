@@ -38,8 +38,7 @@ export default function NotificationBell() {
         onClick={() => setOpen((v) => !v)}
         whileTap={{ scale: 0.93 }}
         className={cn(
-          "relative flex items-center gap-1.5 rounded-full h-9 transition-all",
-          unread > 0 ? "px-3" : "px-2.5",
+          "relative flex items-center justify-center rounded-full h-9 w-9 transition-all",
           open
             ? "bg-primary/12 text-primary ring-1 ring-primary/25"
             : unread > 0
@@ -54,20 +53,9 @@ export default function NotificationBell() {
           <BellIcon className="w-4 h-4 shrink-0" strokeWidth={2.2} />
         </motion.div>
 
-        <AnimatePresence mode="wait">
-          {unread > 0 && (
-            <motion.span
-              key="count"
-              initial={{ opacity: 0, width: 0 }}
-              animate={{ opacity: 1, width: "auto" }}
-              exit={{ opacity: 0, width: 0 }}
-              transition={{ type: "spring", stiffness: 350, damping: 25 }}
-              className="text-[11px] font-black tabular-nums overflow-hidden"
-            >
-              {unread > 9 ? "۹+" : unread}
-            </motion.span>
-          )}
-        </AnimatePresence>
+        {unread > 0 && (
+          <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500 ring-2 ring-background" />
+        )}
       </motion.button>
 
       {createPortal((
