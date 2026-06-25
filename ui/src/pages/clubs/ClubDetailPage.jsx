@@ -20,6 +20,7 @@ import ClubGallery from "@/features/clubs/components/ClubGallery";
 import ClubAmenities from "@/features/clubs/components/ClubAmenities";
 import ClubBookingSheet from "@/features/clubs/components/ClubBookingSheet";
 import ClubReviews from "@/features/clubs/components/ClubReviews";
+import ClubClasses from "@/features/clubs/components/ClubClasses";
 import { Button } from "@/components/ui/button";
 
 const SPORT_ICONS = { padel: "🥎", tennis: "🎾", squash: "🟡", badminton: "🏸" };
@@ -35,24 +36,31 @@ function formatPrice(p) {
   return new Intl.NumberFormat("fa-IR").format(p);
 }
 
+const SPORT_BG = {
+  padel: "bg-emerald-500/10 ring-emerald-500/20",
+  tennis: "bg-yellow-500/10 ring-yellow-500/20",
+  squash: "bg-red-500/10 ring-red-500/20",
+  badminton: "bg-blue-500/10 ring-blue-500/20",
+};
+
 function CourtRow({ court, index, onBook }) {
   return (
     <motion.button
-      initial={{ opacity: 0, y: 10 }}
+      initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: index * 0.07 }}
-      whileTap={{ scale: 0.98 }}
+      transition={{ delay: index * 0.07, type: "spring", stiffness: 280, damping: 22 }}
+      whileTap={{ scale: 0.97 }}
       onClick={() => onBook(court)}
-      className="w-full flex items-center gap-3 rounded-2xl border border-border/70 bg-card p-3 text-right shadow-sm transition-colors active:bg-muted"
+      className="w-full flex items-center gap-3 rounded-2xl border border-border/60 bg-card p-3.5 text-right shadow-sm active:bg-muted/60 transition-colors"
     >
-      <div className="h-11 w-11 rounded-2xl bg-primary/10 flex items-center justify-center text-xl shrink-0">
+      <div className={cn("h-12 w-12 rounded-2xl flex items-center justify-center text-2xl shrink-0 ring-1", SPORT_BG[court.sportType] ?? "bg-primary/10 ring-primary/20")}>
         {SPORT_ICONS[court.sportType] ?? "🏅"}
       </div>
       <div className="flex-1 min-w-0">
         <p className="font-bold text-sm text-foreground leading-snug">{court.name}</p>
-        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+        <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
           {court.surfaceType && (
-            <span className={cn("text-[10px] px-2 py-0.5 rounded-full font-medium", SURFACE_COLOR[court.surfaceType] ?? "bg-muted text-muted-foreground")}>
+            <span className={cn("text-[10px] px-2 py-0.5 rounded-full font-semibold", SURFACE_COLOR[court.surfaceType] ?? "bg-muted text-muted-foreground")}>
               {SURFACE_LABEL[court.surfaceType] ?? court.surfaceType}
             </span>
           )}
@@ -62,11 +70,13 @@ function CourtRow({ court, index, onBook }) {
           </span>
         </div>
       </div>
-      <div className="text-right shrink-0">
+      <div className="text-right shrink-0 ml-1">
         <p className="text-primary font-black text-sm">{formatPrice(court.pricePerHour)}</p>
-        <p className="text-muted-foreground text-[10px]">ت/ساعت</p>
+        <p className="text-muted-foreground text-[10px]">تومان/ساعت</p>
       </div>
-      <CalendarCheckIcon className="w-4 h-4 text-primary shrink-0" />
+      <div className="w-7 h-7 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+        <CalendarCheckIcon className="w-3.5 h-3.5 text-primary" />
+      </div>
     </motion.button>
   );
 }
@@ -154,40 +164,42 @@ export default function ClubDetailPage() {
       <div className="relative">
         <ClubGallery images={club.images} clubName={club.name} />
 
-        <div className="absolute top-4 right-4 z-10 flex items-center gap-2">
+        {/* Floating header bar */}
+        <div className="absolute top-0 inset-x-0 z-10 flex items-center justify-between px-4 pt-4 pb-2">
           <button
             onClick={() => navigate("/clubs")}
             className="h-10 w-10 rounded-2xl bg-white/90 backdrop-blur-md shadow-lg shadow-black/10 flex items-center justify-center active:scale-90 transition-transform"
           >
             <ArrowRightIcon className="w-4 h-4 text-gray-800" />
           </button>
-        </div>
 
-        <div className="absolute top-4 left-4 z-10 flex items-center gap-2">
-          <button
-            onClick={() => setLiked((v) => !v)}
-            className="h-10 w-10 rounded-2xl bg-white/90 backdrop-blur-md shadow-lg shadow-black/10 flex items-center justify-center active:scale-90 transition-transform"
-          >
-            <HeartIcon className={cn("w-4 h-4 transition-colors", liked ? "fill-red-500 text-red-500" : "text-gray-600")} />
-          </button>
-          <button
-            type="button"
-            onClick={handleShare}
-            className="h-10 w-10 rounded-2xl bg-white/90 backdrop-blur-md shadow-lg shadow-black/10 flex items-center justify-center active:scale-90 transition-transform"
-          >
-            <ShareIcon className="w-4 h-4 text-gray-600" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setLiked((v) => !v)}
+              className="h-10 w-10 rounded-2xl bg-white/90 backdrop-blur-md shadow-lg shadow-black/10 flex items-center justify-center active:scale-90 transition-transform"
+            >
+              <HeartIcon className={cn("w-4 h-4 transition-colors", liked ? "fill-red-500 text-red-500" : "text-gray-600")} />
+            </button>
+            <button
+              type="button"
+              onClick={handleShare}
+              className="h-10 w-10 rounded-2xl bg-white/90 backdrop-blur-md shadow-lg shadow-black/10 flex items-center justify-center active:scale-90 transition-transform"
+            >
+              <ShareIcon className="w-4 h-4 text-gray-600" />
+            </button>
+          </div>
         </div>
       </div>
 
       <div className="px-4 pt-5 pb-4">
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+        <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ type: "spring", stiffness: 300, damping: 26 }}>
+          {/* Name + rating */}
           <div className="flex items-start justify-between gap-3 mb-2">
             <h1 className="text-2xl font-black text-foreground leading-snug flex-1">{club.name}</h1>
             {reviewStats.total > 0 && (
-              <div className="shrink-0 rounded-2xl bg-amber-500/10 px-3 py-2 text-right">
+              <div className="shrink-0 rounded-2xl bg-amber-500/10 ring-1 ring-amber-500/20 px-3 py-2 text-right">
                 <div className="flex items-center gap-1 justify-end mb-0.5">
-                  <StarIcon className="w-4 h-4 fill-amber-400 text-amber-400" />
+                  <StarIcon className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
                   <span className="font-black text-foreground text-sm">{reviewStats.average}</span>
                 </div>
                 <p className="text-muted-foreground text-[10px]">{reviewStats.total} نظر</p>
@@ -195,65 +207,74 @@ export default function ClubDetailPage() {
             )}
           </div>
 
+          {/* Address */}
           <div className="flex items-start gap-1.5 text-muted-foreground text-sm mb-3">
             <MapPinIcon className="w-4 h-4 text-primary shrink-0 mt-0.5" />
             <span className="leading-6">{club.address}</span>
           </div>
 
+          {/* Sport tags + hours */}
           <div className="flex items-center gap-2 flex-wrap mb-4">
             {club.sportTypes.map((sport) => {
               const meta = SPORT_META[sport];
               return meta ? (
-                <span key={sport} className={cn("text-xs font-semibold px-3 py-1 rounded-full", meta.color)}>
+                <span key={sport} className={cn("text-xs font-bold px-3 py-1 rounded-full ring-1 ring-inset ring-current/20", meta.color)}>
                   {meta.label}
                 </span>
               ) : null;
             })}
-            <span className="flex items-center gap-1 rounded-full bg-muted px-3 py-1 text-muted-foreground text-xs font-medium">
+            <span className="flex items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-muted-foreground text-xs font-medium">
               <ClockIcon className="w-3.5 h-3.5" />
               {club.openTime} – {club.closeTime}
             </span>
           </div>
 
-          <div className="flex items-center gap-2 bg-primary/5 border border-primary/15 rounded-2xl px-4 py-3 mb-5">
-            <CalendarCheckIcon className="w-4 h-4 text-primary shrink-0" />
-            <span className="text-muted-foreground text-sm">شروع قیمت از</span>
-            <span className="text-primary font-black text-base mr-auto">
-              {formatPrice(club.priceFrom)} <span className="text-sm font-medium">تومان/ساعت</span>
+          {/* Price banner */}
+          <div className="flex items-center gap-3 bg-primary/8 border border-primary/15 rounded-2xl px-4 py-3.5 mb-5">
+            <div className="w-8 h-8 rounded-xl bg-primary/15 flex items-center justify-center shrink-0">
+              <CalendarCheckIcon className="w-4 h-4 text-primary" />
+            </div>
+            <span className="text-muted-foreground text-sm flex-1">شروع قیمت از</span>
+            <span className="text-primary font-black text-lg">
+              {formatPrice(club.priceFrom)}{" "}
+              <span className="text-xs font-medium text-muted-foreground">ت/ساعت</span>
             </span>
           </div>
         </motion.div>
 
+        {/* About */}
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="rounded-3xl border border-border/70 bg-card p-4 shadow-sm"
+          className="rounded-3xl border border-border/60 bg-card p-4 shadow-sm"
         >
           <h2 className="font-bold text-foreground text-base mb-2">درباره مجموعه</h2>
           <p className="text-muted-foreground text-sm leading-relaxed">{club.description}</p>
         </motion.div>
 
+        {/* Amenities */}
         {club.amenities?.length > 0 && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
-            className="mt-4 rounded-3xl border border-border/70 bg-card p-4 shadow-sm"
+            className="mt-4 rounded-3xl border border-border/60 bg-card p-4 shadow-sm"
           >
             <ClubAmenities amenities={club.amenities} />
           </motion.div>
         )}
 
+        {/* Courts */}
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
           className="mt-4"
         >
           <div className="mb-3 flex items-center justify-between">
             <h2 className="font-bold text-foreground text-base">زمین‌های موجود</h2>
-            <span className="rounded-full bg-muted px-3 py-1 text-xs font-bold text-muted-foreground">{club.courts.length} زمین</span>
+            <span className="rounded-full bg-primary/10 text-primary px-3 py-1 text-xs font-bold ring-1 ring-primary/20">{club.courts.length} زمین</span>
           </div>
           <div className="space-y-2.5">
             {club.courts.map((court, i) => (
@@ -262,10 +283,20 @@ export default function ClubDetailPage() {
           </div>
         </motion.div>
 
+        {/* Classes */}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25 }}
+          className="mt-4"
+        >
+          <ClubClasses clubId={clubId} />
+        </motion.div>
+
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.25 }}
+          transition={{ delay: 0.3 }}
           className="mt-5"
         >
           <ClubReviews clubId={clubId} onStatsLoad={setReviewStats} />
@@ -273,22 +304,14 @@ export default function ClubDetailPage() {
       </div>
 
       {!bookingOpen && !onboarding && (
-        <div className="fixed bottom-0 inset-x-0 z-30 bg-background/95 backdrop-blur-md border-t border-border px-4 py-3 safe-area-bottom">
-          <div className="flex items-center gap-3">
-            <div>
-              <p className="text-xs text-muted-foreground">از</p>
-              <p className="font-black text-primary text-base leading-none">
-                {formatPrice(club.priceFrom)} <span className="text-xs font-medium text-muted-foreground">ت/ساعت</span>
-              </p>
-            </div>
-            <Button
-              onClick={() => openBooking(null)}
-              className="flex-1 h-12 rounded-2xl font-bold text-sm shadow-lg shadow-primary/20"
-            >
-              <CalendarCheckIcon className="w-4 h-4 ml-2" />
-              شروع رزرو
-            </Button>
-          </div>
+        <div className="fixed bottom-0 inset-x-0 z-30 bg-background/95 backdrop-blur-md border-t border-border/60 px-4 py-3 pb-6 safe-area-bottom">
+          <Button
+            onClick={() => openBooking(null)}
+            className="w-full h-12 rounded-2xl font-bold text-sm shadow-lg shadow-primary/25"
+          >
+            <CalendarCheckIcon className="w-4 h-4 ml-2" />
+            شروع رزرو
+          </Button>
         </div>
       )}
 

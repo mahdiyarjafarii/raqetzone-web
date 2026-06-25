@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { BottomSheet } from "react-spring-bottom-sheet";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRightIcon, CalendarIcon, ClockIcon, BanknoteIcon, CheckCircle2Icon, ClipboardListIcon, TicketIcon, XCircleIcon, CheckCircleIcon, LoaderIcon, SparklesIcon, WalletIcon, CreditCardIcon, MinusIcon, PlusIcon, ShoppingBagIcon } from "lucide-react";
+import { ArrowRightIcon, CalendarIcon, ClockIcon, BanknoteIcon, CheckCircle2Icon, ClipboardListIcon, TicketIcon, XCircleIcon, CheckCircleIcon, LoaderIcon, SparklesIcon, WalletIcon, CreditCardIcon, MinusIcon, PlusIcon, ShoppingBagIcon, FootprintsIcon, ShirtIcon, BackpackIcon, PackageIcon, DumbbellIcon, MedalIcon, LayersIcon, ZapIcon } from "lucide-react";
 import toast from "react-hot-toast";
 import { cn } from "@/lib/utils";
 import {
@@ -296,26 +296,25 @@ function DateSlotsStep({ court, selectedDate, onDateChange, slots, slotsLoading,
 
 // ── Asset Selection ───────────────────────────────────────────────────────────
 
-const ASSET_EMOJI_MAP = [
-  { keys: ["پدل", "padel racket", "padel"],              emoji: "🏓" },
-  { keys: ["راکت تنیس", "tennis racket", "tennis"],      emoji: "🎾" },
-  { keys: ["راکت بدمینتون", "badminton"],                emoji: "🏸" },
-  { keys: ["اسکواش", "squash"],                          emoji: "🟡" },
-  { keys: ["توپ تنیس", "tennis ball"],                   emoji: "🎾" },
-  { keys: ["ست توپ", "توپ", "ball"],                    emoji: "🟢" },
-  { keys: ["حوله", "towel"],                             emoji: "🏊" },
-  { keys: ["کفش", "shoe"],                               emoji: "👟" },
-  { keys: ["ساک", "bag"],                                emoji: "🎒" },
-  { keys: ["دستکش", "glove"],                            emoji: "🧤" },
-  { keys: ["مچ‌بند", "wristband"],                       emoji: "💪" },
+const ASSET_ICON_MAP = [
+  { keys: ["پدل", "padel"],                                     Icon: DumbbellIcon,   gradient: "from-emerald-500/20 to-emerald-600/10", iconColor: "text-emerald-600 dark:text-emerald-400" },
+  { keys: ["راکت تنیس", "tennis racket", "tennis", "تنیس"],    Icon: DumbbellIcon,   gradient: "from-yellow-500/20 to-yellow-600/10",   iconColor: "text-yellow-600 dark:text-yellow-400" },
+  { keys: ["راکت بدمینتون", "badminton", "بدمینتون"],           Icon: DumbbellIcon,   gradient: "from-blue-500/20 to-blue-600/10",      iconColor: "text-blue-600 dark:text-blue-400"    },
+  { keys: ["اسکواش", "squash"],                                 Icon: DumbbellIcon,   gradient: "from-red-500/20 to-red-600/10",        iconColor: "text-red-600 dark:text-red-400"      },
+  { keys: ["توپ", "ball"],                                      Icon: LayersIcon,     gradient: "from-orange-500/20 to-orange-600/10",  iconColor: "text-orange-600 dark:text-orange-400"},
+  { keys: ["حوله", "towel"],                                    Icon: ZapIcon,        gradient: "from-cyan-500/20 to-cyan-600/10",      iconColor: "text-cyan-600 dark:text-cyan-400"    },
+  { keys: ["کفش", "shoe"],                                      Icon: FootprintsIcon, gradient: "from-purple-500/20 to-purple-600/10",  iconColor: "text-purple-600 dark:text-purple-400"},
+  { keys: ["ساک", "bag", "کیف"],                               Icon: BackpackIcon,   gradient: "from-slate-500/20 to-slate-600/10",   iconColor: "text-slate-600 dark:text-slate-400"  },
+  { keys: ["دستکش", "glove"],                                   Icon: ShirtIcon,      gradient: "from-pink-500/20 to-pink-600/10",      iconColor: "text-pink-600 dark:text-pink-400"    },
+  { keys: ["مچ‌بند", "wristband"],                              Icon: MedalIcon,      gradient: "from-amber-500/20 to-amber-600/10",   iconColor: "text-amber-600 dark:text-amber-500"  },
 ];
 
-function getAssetEmoji(name) {
+function getAssetIconConfig(name) {
   const lower = name.toLowerCase();
-  for (const { keys, emoji } of ASSET_EMOJI_MAP) {
-    if (keys.some((k) => lower.includes(k.toLowerCase()))) return emoji;
+  for (const cfg of ASSET_ICON_MAP) {
+    if (cfg.keys.some((k) => lower.includes(k.toLowerCase()))) return cfg;
   }
-  return "🎽";
+  return { Icon: PackageIcon, gradient: "from-muted/60 to-muted/30", iconColor: "text-muted-foreground" };
 }
 
 function AssetSelectionStep({ quantities, onQuantitiesChange, assets, onContinue, onBack }) {
@@ -327,74 +326,81 @@ function AssetSelectionStep({ quantities, onQuantitiesChange, assets, onContinue
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="relative overflow-hidden rounded-3xl border border-primary/20 bg-gradient-to-br from-primary/8 via-background to-background p-5">
-        <div className="absolute -left-8 -top-8 h-24 w-24 rounded-full bg-primary/10 blur-2xl" />
-        <div className="relative">
-          <p className="text-[11px] font-bold text-primary uppercase tracking-widest mb-1">تجهیزات اجاره‌ای</p>
-          <h3 className="text-lg font-black text-foreground leading-snug">
-            برای بازی به اینا<br />احتیاج نداری؟ 🤔
-          </h3>
-          <p className="text-xs text-muted-foreground mt-1.5">اجاره اختیاریه — هر چی نخوای صفر بذار</p>
+      <div className="relative overflow-hidden rounded-3xl border border-primary/15 bg-gradient-to-br from-primary/8 via-background to-background p-5">
+        <div className="absolute -left-8 -top-8 h-24 w-24 rounded-full bg-primary/15 blur-2xl pointer-events-none" />
+        <div className="relative flex items-start gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-primary/12 ring-1 ring-primary/20 flex items-center justify-center shrink-0">
+            <ShoppingBagIcon className="w-5 h-5 text-primary" />
+          </div>
+          <div>
+            <p className="text-[10px] font-bold text-primary/70 uppercase tracking-widest mb-0.5">اختیاری</p>
+            <h3 className="text-base font-black text-foreground leading-snug">تجهیزات اجاره‌ای</h3>
+            <p className="text-xs text-muted-foreground mt-1">هر چیزی نیاز نداری، روی صفر بذار</p>
+          </div>
         </div>
       </div>
 
       {/* Asset list */}
       <div className="space-y-2.5">
-        {assets.map((asset) => {
+        {assets.map((asset, i) => {
           const qty = quantities[asset.id] ?? 0;
-          const emoji = getAssetEmoji(asset.name);
+          const { Icon, gradient, iconColor } = getAssetIconConfig(asset.name);
           const isSelected = qty > 0;
           return (
             <motion.div
               key={asset.id}
-              animate={{ scale: isSelected ? 1.01 : 1 }}
-              transition={{ type: "spring", stiffness: 400, damping: 25 }}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.05, type: "spring", stiffness: 300, damping: 24 }}
               className={cn(
-                "flex items-center gap-3 rounded-2xl border-2 px-4 py-3.5 transition-colors",
-                isSelected
-                  ? "border-primary bg-primary/5"
-                  : "border-border bg-card"
+                "flex items-center gap-3 rounded-2xl border-2 px-4 py-3.5 transition-all",
+                isSelected ? "border-primary bg-primary/5 shadow-sm shadow-primary/10" : "border-border bg-card"
               )}
             >
+              {/* Icon */}
               <div className={cn(
-                "h-11 w-11 rounded-2xl flex items-center justify-center text-2xl shrink-0 transition-colors",
-                isSelected ? "bg-primary/10" : "bg-muted"
+                "h-11 w-11 rounded-2xl flex items-center justify-center shrink-0 bg-gradient-to-br ring-1 transition-all",
+                isSelected ? `${gradient} ring-primary/20` : "from-muted/60 to-muted/30 ring-border"
               )}>
-                {emoji}
+                <Icon className={cn("w-5 h-5 transition-colors", isSelected ? iconColor : "text-muted-foreground")} strokeWidth={2} />
               </div>
+
+              {/* Info */}
               <div className="flex-1 min-w-0">
-                <p className={cn("text-sm font-bold", isSelected ? "text-foreground" : "text-foreground")}>{asset.name}</p>
+                <p className="text-sm font-bold text-foreground leading-tight">{asset.name}</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {formatPrice(asset.pricePerUnit)} تومان / واحد
-                  {isSelected && (
-                    <span className="text-primary font-bold mr-1.5">
-                      · جمع: {formatPrice(asset.pricePerUnit * qty)} ت
-                    </span>
-                  )}
+                  {formatPrice(asset.pricePerUnit)} <span className="opacity-70">ت / عدد</span>
                 </p>
+                {isSelected && (
+                  <p className="text-[11px] text-primary font-semibold mt-0.5">
+                    جمع: {formatPrice(asset.pricePerUnit * qty)} تومان
+                  </p>
+                )}
               </div>
-              <div className="flex items-center gap-1.5 shrink-0">
+
+              {/* Counter */}
+              <div className="flex items-center gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => onQuantitiesChange({ ...quantities, [asset.id]: Math.max(0, qty - 1) })}
                   disabled={qty === 0}
-                  className="w-8 h-8 rounded-xl bg-muted flex items-center justify-center text-foreground disabled:opacity-25 active:scale-90 transition-all"
+                  className="w-9 h-9 rounded-xl bg-muted flex items-center justify-center disabled:opacity-25 active:scale-90 transition-all"
                 >
-                  <MinusIcon className="w-3.5 h-3.5" />
+                  <MinusIcon className="w-4 h-4 text-foreground" />
                 </button>
                 <span className={cn(
-                  "text-sm font-black w-6 text-center tabular-nums",
-                  isSelected ? "text-primary" : "text-foreground"
+                  "text-base font-black w-6 text-center tabular-nums transition-colors",
+                  isSelected ? "text-primary" : "text-foreground/40"
                 )}>{qty}</span>
                 <button
                   type="button"
                   onClick={() => onQuantitiesChange({ ...quantities, [asset.id]: qty + 1 })}
                   className={cn(
-                    "w-8 h-8 rounded-xl flex items-center justify-center active:scale-90 transition-all",
-                    isSelected ? "bg-primary text-primary-foreground" : "bg-primary/15 text-primary"
+                    "w-9 h-9 rounded-xl flex items-center justify-center active:scale-90 transition-all",
+                    isSelected ? "bg-primary text-primary-foreground shadow-sm shadow-primary/30" : "bg-primary/12 text-primary"
                   )}
                 >
-                  <PlusIcon className="w-3.5 h-3.5" />
+                  <PlusIcon className="w-4 h-4" />
                 </button>
               </div>
             </motion.div>
@@ -402,30 +408,36 @@ function AssetSelectionStep({ quantities, onQuantitiesChange, assets, onContinue
         })}
       </div>
 
-      {/* Total */}
+      {/* Total / empty state */}
       {total > 0 ? (
-        <div className="flex items-center justify-between rounded-2xl bg-primary/8 border border-primary/20 px-4 py-3">
-          <span className="text-sm text-muted-foreground">
-            {selectedCount} آیتم انتخاب شده
-          </span>
-          <span className="text-primary font-black">{formatPrice(total)} تومان</span>
-        </div>
+        <motion.div
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex items-center justify-between rounded-2xl bg-primary/8 border border-primary/20 px-4 py-3.5"
+        >
+          <div className="flex items-center gap-2 text-muted-foreground text-sm">
+            <ShoppingBagIcon className="w-4 h-4 text-primary" />
+            <span>{selectedCount} تجهیز انتخاب شده</span>
+          </div>
+          <span className="text-primary font-black text-base">{formatPrice(total)} ت</span>
+        </motion.div>
       ) : (
-        <p className="text-center text-xs text-muted-foreground py-1">
-          هیچ تجهیزی انتخاب نشده — می‌تونی بدون تجهیزات هم ادامه بدی
-        </p>
+        <div className="flex items-center justify-center gap-2 py-1 text-xs text-muted-foreground">
+          <PackageIcon className="w-3.5 h-3.5" />
+          <span>بدون تجهیزات هم می‌تونی ادامه بدی</span>
+        </div>
       )}
 
-      <div className="flex gap-3">
+      <div className="flex gap-3 pt-1">
         <button
           type="button"
           onClick={onBack}
-          className="h-12 px-4 rounded-xl border border-border text-sm font-bold text-foreground bg-background"
+          className="h-12 px-5 rounded-2xl border border-border text-sm font-bold text-foreground bg-background active:bg-muted transition-colors"
         >
           بازگشت
         </button>
-        <Button onClick={onContinue} className="flex-1 rounded-xl font-bold text-sm h-12">
-          {total > 0 ? "ادامه با تجهیزات" : "ادامه بدون تجهیزات"}
+        <Button onClick={onContinue} className="flex-1 rounded-2xl font-bold text-sm h-12">
+          {total > 0 ? `ادامه · ${formatPrice(total)} ت` : "ادامه بدون تجهیزات"}
         </Button>
       </div>
     </div>

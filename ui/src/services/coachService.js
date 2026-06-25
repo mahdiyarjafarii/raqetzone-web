@@ -3,6 +3,13 @@ import apiClient from "@/lib/apiClient";
 export const coachService = {
   getCoaches: () => apiClient.get("/coaches"),
   getAllClasses: () => apiClient.get("/classes"),
+  getClassesByClub: async (clubId) => {
+    const { ok, data } = await apiClient.get("/classes");
+    const all = ok && Array.isArray(data?.classes) ? data.classes : [];
+    return all.filter((cls) =>
+      Array.isArray(cls.sessions) && cls.sessions.some((s) => s.clubId === clubId)
+    );
+  },
   getMyClasses: () => apiClient.get("/coaches/me/classes"),
   getMyPrivateSessions: () => apiClient.get("/coaches/me/private-sessions"),
   getCoachDetail: (coachId) => apiClient.get(`/coaches/${coachId}`),

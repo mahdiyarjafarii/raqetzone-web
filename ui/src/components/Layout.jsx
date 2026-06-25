@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 
 import NotificationBell from "@/features/notifications/components/NotificationBell";
+import UserAvatar from "@/components/ui/UserAvatar";
 
 import OneTimeCheck from "./OneTimeCheck";
 import PricingSheet from "./PricingSheet";
@@ -135,6 +136,7 @@ function Layout() {
   const isChatPage = location.pathname.startsWith("/chat") || isDirectMessagePage;
   const isVideoGeneratePage = location.pathname === "/video-generate";
   const isImageGeneratePage = location.pathname === "/image-generate";
+  const isClubDetailPage = /^\/clubs\/[^/]+$/.test(location.pathname);
 
   const formatNumber = (num) => {
     if (num == null || num === undefined) return num;
@@ -292,8 +294,15 @@ function Layout() {
                 if (!open) setGemHint(false);
               }}
             >
-              <DropdownMenuTrigger>
-                <User size={26} />
+              <DropdownMenuTrigger className="outline-none">
+                <div className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-border active:ring-primary transition-all">
+                  <UserAvatar
+                    image={currentUser?.image}
+                    name={currentUser?.name ?? currentUser?.phone}
+                    className="w-9 h-9 rounded-full bg-muted text-sm text-foreground"
+                    fallbackClassName="w-9 h-9 rounded-full bg-primary/10 text-primary text-sm"
+                  />
+                </div>
               </DropdownMenuTrigger>
 
               <DropdownMenuContent className="transform translate-x-3 min-w-[200px] z-10 rounded-[20px] border border-black/[0.06] dark:border-white/10 bg-white/95 dark:bg-card/95 p-1.5 shadow-2xl shadow-black/15 backdrop-blur-xl">
@@ -311,33 +320,7 @@ function Layout() {
                     </span>
                   </div>
                 </div>
-                <DropdownMenuItem
-                  onClick={(e) => {
-                    e.preventDefault();
-                    navigate("/profile");
-                    setIsDropdownOpen(false);
-                  }}
-                  className="cursor-pointer rounded-2xl border border-primary/10 text-primary! bg-primary/10! px-3 py-2.5 min-h-[44px] mb-1"
-                >
-                  <div className="w-8 h-8 rounded-xl bg-primary/12 flex items-center justify-center">
-                    <GemIcon size={16} className="text-primary!" />
-                  </div>
-                  <span className="text-sm font-bold">
-                    اعتبار: {formatNumber(currentUser?.credits)}
-                  </span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => {
-                    setPricingSheetTriggerSource("user_dropdown_menu");
-                    setShowPricingSheet(true);
-                  }}
-                  className="rounded-2xl px-3 py-2.5 min-h-[44px] cursor-pointer"
-                >
-                  <div className="w-8 h-8 rounded-xl bg-[#ef1871]/10 text-[#ef1871] flex items-center justify-center">
-                    <ShoppingCart size={16} />
-                  </div>
-                  <span className="text-sm font-bold">رکت‌زون پلاس</span>
-                </DropdownMenuItem>
+
                 <DropdownMenuItem
                   onClick={(e) => {
                     e.preventDefault();
@@ -375,6 +358,20 @@ function Layout() {
                     </motion.span>
                   </div>
                 </DropdownMenuItem>
+            
+                <DropdownMenuItem
+                  onClick={() => {
+                    setPricingSheetTriggerSource("user_dropdown_menu");
+                    setShowPricingSheet(true);
+                  }}
+                  className="rounded-2xl px-3 py-2.5 min-h-[44px] cursor-pointer"
+                >
+                  <div className="w-8 h-8 rounded-xl bg-[#ef1871]/10 text-[#ef1871] flex items-center justify-center">
+                    <ShoppingCart size={16} />
+                  </div>
+                  <span className="text-sm font-bold">رکت‌زون پلاس</span>
+                </DropdownMenuItem>
+                
                 <DropdownMenuItem
                   onClick={handleOpenPrizes}
                   className="rounded-2xl px-3 py-2.5 min-h-[44px] cursor-pointer"
@@ -454,7 +451,7 @@ function Layout() {
         )}
       </AnimatePresence>
 
-      {!isChatPage && !isImageGeneratePage && !isVideoGeneratePage && (
+      {!isChatPage && !isImageGeneratePage && !isVideoGeneratePage && !isClubDetailPage && (
         <>
           <footer className="fixed bottom-0 left-0 right-0 flex justify-center z-50 bg-background overflow-visible">
             <LimelightNav />

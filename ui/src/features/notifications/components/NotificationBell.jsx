@@ -33,29 +33,42 @@ export default function NotificationBell() {
   return (
     <div className="relative" ref={panelRef}>
       {/* Bell button */}
-      <button
+      <motion.button
         id="tour-notification-bell"
         onClick={() => setOpen((v) => !v)}
+        whileTap={{ scale: 0.93 }}
         className={cn(
-          "relative h-10 w-10 rounded-2xl flex items-center justify-center transition-all",
-          open ? "bg-primary/10 text-primary shadow-sm" : "hover:bg-muted text-foreground"
+          "relative flex items-center gap-1.5 rounded-full h-9 transition-all",
+          unread > 0 ? "px-3" : "px-2.5",
+          open
+            ? "bg-primary/12 text-primary ring-1 ring-primary/25"
+            : unread > 0
+            ? "bg-red-500/10 text-red-600 dark:text-red-400 ring-1 ring-red-400/25"
+            : "bg-muted text-muted-foreground ring-1 ring-border"
         )}
       >
-        <motion.div animate={unread > 0 ? { rotate: [0, -15, 15, -10, 10, 0] } : {}} transition={{ duration: 0.5 }}>
-          <BellIcon className="w-5 h-5" />
+        <motion.div
+          animate={unread > 0 ? { rotate: [0, -18, 18, -10, 10, 0] } : {}}
+          transition={{ duration: 0.5, delay: 0.2 }}
+        >
+          <BellIcon className="w-4 h-4 shrink-0" strokeWidth={2.2} />
         </motion.div>
 
-        {unread > 0 && (
-          <motion.span
-            key={unread}
-            initial={{ scale: 0.5 }}
-            animate={{ scale: 1 }}
-            className="absolute -top-0.5 -right-0.5 h-4 min-w-4 px-0.5 rounded-full bg-primary text-primary-foreground text-[9px] font-bold flex items-center justify-center"
-          >
-            {unread > 9 ? "9+" : unread}
-          </motion.span>
-        )}
-      </button>
+        <AnimatePresence mode="wait">
+          {unread > 0 && (
+            <motion.span
+              key="count"
+              initial={{ opacity: 0, width: 0 }}
+              animate={{ opacity: 1, width: "auto" }}
+              exit={{ opacity: 0, width: 0 }}
+              transition={{ type: "spring", stiffness: 350, damping: 25 }}
+              className="text-[11px] font-black tabular-nums overflow-hidden"
+            >
+              {unread > 9 ? "۹+" : unread}
+            </motion.span>
+          )}
+        </AnimatePresence>
+      </motion.button>
 
       {createPortal((
         <AnimatePresence>
