@@ -189,7 +189,12 @@ export default function CoachesPage() {
 
                     <div className="mt-2 flex items-center gap-1.5">
                       <p className="text-base font-black text-foreground truncate">{fullName}</p>
-                      <BadgeCheckIcon className={`w-4 h-4 shrink-0 ${coach.coachVerificationStatus === "approved" ? "text-emerald-500" : "text-muted-foreground/40"}`} />
+                      {coach.coachVerificationStatus === "true" && (
+                        <span className="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded-full text-[10px] font-bold shrink-0">
+                          <BadgeCheckIcon className="w-3 h-3" />
+                          تأیید شده
+                        </span>
+                      )}
                     </div>
 
                     <div className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">

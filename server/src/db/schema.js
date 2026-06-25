@@ -30,7 +30,7 @@ export const users = pgTable("users", {
   isAdmin: boolean("is_admin").notNull().default(false),
   isClubOwner: boolean("is_club_owner").notNull().default(false),
   isCoach: boolean("is_coach").notNull().default(false),
-  coachVerificationStatus: varchar("coach_verification_status", { length: 20 }).notNull().default("none"), // none | pending | approved | rejected
+  coachVerificationStatus: varchar("coach_verification_status", { length: 20 }).notNull().default("none"), // none | semi-true | true
   coachHeadline: varchar("coach_headline", { length: 255 }),
   coachExperienceYears: smallint("coach_experience_years"),
   coachHourlyPrice: integer("coach_hourly_price"),

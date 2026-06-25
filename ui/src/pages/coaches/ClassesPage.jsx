@@ -9,6 +9,7 @@ import {
   SparklesIcon,
   XIcon,
   SlidersHorizontalIcon,
+  BadgeCheckIcon,
 } from "lucide-react";
 
 import { coachService } from "@/services/coachService";
@@ -158,6 +159,14 @@ function SportCourtPattern({ sportType }) {
   );
 }
 
+function getClassVenue(cls) {
+  if (cls.location) return cls.location.split(" · ")[0];
+  const s = Array.isArray(cls.sessions) ? cls.sessions[0] : null;
+  if (!s) return null;
+  if (s.venueMode === "custom") return s.location || null;
+  return s.clubName || null;
+}
+
 function ClassCard({ cls, coach, index, onClick }) {
   const isFull = Number(cls.enrolledCount) >= Number(cls.capacity);
   const sessionsCount = cls.sessionsCount ?? (Array.isArray(cls.sessions) ? cls.sessions.length : 0);
@@ -225,10 +234,10 @@ function ClassCard({ cls, coach, index, onClick }) {
                 </span>
               </>
             )}
-            {cls.location && (
+            {getClassVenue(cls) && (
               <>
                 <span className="text-white/35 text-[10px]">•</span>
-                <span className="text-[11px] text-white/65 font-medium truncate max-w-[120px]">{cls.location}</span>
+                <span className="text-[11px] text-white/65 font-medium truncate max-w-[140px]">{getClassVenue(cls)}</span>
               </>
             )}
           </div>
@@ -253,7 +262,15 @@ function ClassCard({ cls, coach, index, onClick }) {
           {/* Name */}
           <div className="flex-1 min-w-0">
             <p className="text-[10px] text-muted-foreground leading-none mb-1">مربی کلاس</p>
-            <p className="text-sm font-bold text-foreground leading-none truncate">{coachName}</p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-sm font-bold text-foreground leading-none truncate">{coachName}</p>
+              {coach?.coachVerificationStatus === "true" && (
+                <span className="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded-full text-[10px] font-bold shrink-0">
+                  <BadgeCheckIcon className="w-3 h-3" />
+                  تأیید شده
+                </span>
+              )}
+            </div>
           </div>
           {/* Status */}
           {isFull ? (
@@ -535,6 +552,7 @@ export default function ClassesPage() {
         coachName={selectedCoach ? getUserFullName(selectedCoach) || "مربی رکت‌زون" : ""}
         coachImage={selectedCoach?.image}
         coachId={selectedCoach?.id}
+        coachVerificationStatus={selectedCoach?.coachVerificationStatus}
         open={sheetOpen}
         onClose={() => setSheetOpen(false)}
       />

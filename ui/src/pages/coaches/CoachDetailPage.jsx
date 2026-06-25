@@ -363,6 +363,12 @@ export default function CoachDetailPage() {
             <div className="min-w-0 flex-1 pb-1">
               <div className="flex items-center gap-1.5">
                 <h1 className="text-xl font-black text-foreground truncate">{coachName}</h1>
+                {coach.coachVerificationStatus === "true" && (
+                  <span className="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 rounded-full text-[10px] font-bold shrink-0">
+                    <BadgeCheckIcon className="w-3 h-3" />
+                    تأیید شده 
+                  </span>
+                )}
               </div>
               <p className="mt-1 text-xs text-muted-foreground line-clamp-2">
                 {coach.coachHeadline || coach.bio || "مربی حرفه‌ای رکت‌زون"}
@@ -717,6 +723,8 @@ export default function CoachDetailPage() {
         cls={selectedClass}
         coachName={coachName}
         coachImage={coach?.image}
+        coachId={coach?.id}
+        coachVerificationStatus={coach?.coachVerificationStatus}
         open={classSheetOpen}
         onClose={() => setClassSheetOpen(false)}
         isOwnCoach={isOwnCoachProfile}

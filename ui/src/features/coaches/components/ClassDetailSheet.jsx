@@ -19,6 +19,8 @@ import {
   DumbbellIcon,
   ChevronLeftIcon,
   TrophyIcon,
+  Building2Icon,
+  BadgeCheckIcon,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { coachService } from "@/services/coachService";
@@ -72,6 +74,14 @@ function formatToman(value) {
   return Number(value || 0).toLocaleString("fa-IR");
 }
 
+function getClassVenue(cls) {
+  if (cls.location) return cls.location;
+  const s = Array.isArray(cls.sessions) ? cls.sessions[0] : null;
+  if (!s) return null;
+  if (s.venueMode === "custom") return [s.location, s.courtName].filter(Boolean).join(" · ");
+  return [s.clubName, s.courtName].filter(Boolean).join(" · ") || null;
+}
+
 function getProfileImage(image) {
   if (!image) return null;
   if (image.startsWith("http")) return image;
@@ -103,7 +113,7 @@ function SectionTitle({ icon: Icon, children }) {
   );
 }
 
-export default function ClassDetailSheet({ cls, coachName, coachImage, coachId, open, onClose, isOwnCoach = false }) {
+export default function ClassDetailSheet({ cls, coachName, coachImage, coachId, coachVerificationStatus, open, onClose, isOwnCoach = false }) {
   const currentUser = useAtomValue(currentUserAtom);
   const navigate = useNavigate();
   const [enrollSheetOpen, setEnrollSheetOpen] = useState(false);
@@ -260,10 +270,10 @@ export default function ClassDetailSheet({ cls, coachName, coachImage, coachId, 
                             </span>
                           </>
                         )}
-                        {cls.location && (
+                        {getClassVenue(cls) && (
                           <>
                             <span className="text-white/35 text-[10px]">•</span>
-                            <span className="text-xs text-white/65">{cls.location}</span>
+                            <span className="text-xs text-white/65">{getClassVenue(cls)}</span>
                           </>
                         )}
                       </div>
@@ -300,7 +310,15 @@ export default function ClassDetailSheet({ cls, coachName, coachImage, coachId, 
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-[10px] text-muted-foreground mb-0.5">مربی کلاس</p>
-                        <p className="text-sm font-black text-foreground">{coachName}</p>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="text-sm font-black text-foreground">{coachName}</p>
+                          {coachVerificationStatus === "true" && (
+                            <span className="inline-flex items-center gap-1 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-1.5 py-0.5 rounded-full text-[10px] font-bold shrink-0">
+                              <BadgeCheckIcon className="w-3 h-3" />
+                              تأیید شده
+                            </span>
+                          )}
+                        </div>
                       </div>
                       {coachId && (
                         <div className="shrink-0 flex items-center gap-1 text-[11px] text-primary font-bold">
@@ -325,7 +343,16 @@ export default function ClassDetailSheet({ cls, coachName, coachImage, coachId, 
                     </div>
                     <div className="rounded-2xl bg-muted/60 p-3 text-center space-y-1">
                       <Clock3Icon className="w-4 h-4 text-primary mx-auto" />
-                      <p className="text-sm font-black text-foreground">{cls.sessionDurationMinutes ? `${cls.sessionDurationMinutes} دقیقه` : "—"}</p>
+                      <p className="text-sm font-black text-foreground">
+                        {(() => {
+                          const s = Array.isArray(cls.sessions) ? cls.sessions[0] : null;
+                          if (!s?.startTime || !s?.endTime) return "—";
+                          const [sh, sm] = s.startTime.split(":").map(Number);
+                          const [eh, em] = s.endTime.split(":").map(Number);
+                          const mins = (eh * 60 + em) - (sh * 60 + sm);
+                          return mins > 0 ? `${mins} دقیقه` : "—";
+                        })()}
+                      </p>
                       <p className="text-[10px] text-muted-foreground">مدت هر جلسه</p>
                     </div>
                   </div>
@@ -338,28 +365,30 @@ export default function ClassDetailSheet({ cls, coachName, coachImage, coachId, 
                     </div>
                   )}
 
-                  {/* Goal */}
-                  {cls.goal ? (
-                    <div className="space-y-2">
-                      <SectionTitle icon={TargetIcon}>هدف کلاس</SectionTitle>
-                      <p className="text-xs text-muted-foreground leading-6 bg-muted/40 rounded-2xl p-3">{cls.goal}</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <SectionTitle icon={TargetIcon}>هدف کلاس</SectionTitle>
-                      <p className="text-xs text-muted-foreground/50 leading-6 bg-muted/20 rounded-2xl p-3 border border-dashed border-border">
-                        هدف این کلاس بزودی تکمیل می‌شود.
-                      </p>
-                    </div>
-                  )}
-
                   {/* Details */}
                   <div className="space-y-1">
                     <SectionTitle icon={LayersIcon}>جزئیات کلاس</SectionTitle>
                     <div className="rounded-2xl border border-border bg-card px-3">
                       <InfoRow icon={LayersIcon} label="سطح" value={LEVEL_LABELS[cls.level] ?? "✨ همه سطوح"} accent />
                       <InfoRow icon={MapPinIcon} label="شهر" value={cls.city || "نامشخص"} />
-                      {cls.location && <InfoRow icon={MapPinIcon} label="محل برگزاری" value={cls.location} accent />}
+                      {(() => {
+                        const s = Array.isArray(cls.sessions) ? cls.sessions[0] : null;
+                        if (!s) return null;
+                        if (s.venueMode === "custom") {
+                          return (
+                            <>
+                              {s.location && <InfoRow icon={MapPinIcon} label="آدرس برگزاری" value={s.location} accent />}
+                              {s.courtName && <InfoRow icon={Building2Icon} label="نام زمین" value={s.courtName} />}
+                            </>
+                          );
+                        }
+                        return (
+                          <>
+                            {s.clubName && <InfoRow icon={Building2Icon} label="باشگاه" value={s.clubName} accent />}
+                            {s.courtName && <InfoRow icon={MapPinIcon} label="زمین" value={s.courtName} />}
+                          </>
+                        );
+                      })()}
                       <InfoRow icon={CalendarDaysIcon} label="شروع" value={formatClassDate(cls.startDate) || "—"} />
                       <InfoRow icon={CalendarDaysIcon} label="پایان" value={formatClassDate(cls.endDate) || "—"} />
                       <InfoRow icon={UsersIcon} label="ظرفیت" value={`${cls.enrolledCount ?? 0} از ${cls.capacity ?? "—"} نفر`} />

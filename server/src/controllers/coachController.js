@@ -820,6 +820,11 @@ export const createCoachClassController = async (req, res) => {
       return res.status(403).json({ message: "فقط مربی می‌تواند کلاس ایجاد کند" });
     }
 
+    const verificationStatus = user.coachVerificationStatus ?? "none";
+    if (verificationStatus === "none") {
+      return res.status(403).json({ message: "ابتدا با ما تماس بگیرید تا اکانت مربی شما فعال شود" });
+    }
+
     const {
       title,
       description,
@@ -851,6 +856,12 @@ export const createCoachClassController = async (req, res) => {
       ? sessions.filter((item) => item && item.date && item.startTime && item.endTime)
       : [];
 
+    const firstSession = normalizedSessions[0] ?? {};
+    const derivedLocation =
+      firstSession.venueMode === "custom"
+        ? [firstSession.location, firstSession.courtName].filter(Boolean).join(" · ")
+        : [firstSession.clubName, firstSession.courtName].filter(Boolean).join(" · ") || null;
+
     const [created] = await db
       .insert(coachClasses)
       .values({
@@ -859,6 +870,7 @@ export const createCoachClassController = async (req, res) => {
         description: typeof description === "string" ? description.trim() : null,
         sportType,
         city: typeof city === "string" ? city.trim() : user.city,
+        location: derivedLocation,
         level: normalizedLevel,
         price: parsedPrice,
         capacity: parsedCapacity,
