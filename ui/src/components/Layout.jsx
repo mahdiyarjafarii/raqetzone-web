@@ -37,6 +37,7 @@ import {
   showFeatureTourAtom,
   featureTourStepAtom,
 } from "@/config/state";
+import { tournamentDetailOpenAtom } from "@/features/tournaments/store/tournamentStore";
 import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
@@ -137,6 +138,7 @@ function Layout() {
   const isVideoGeneratePage = location.pathname === "/video-generate";
   const isImageGeneratePage = location.pathname === "/image-generate";
   const isClubDetailPage = /^\/clubs\/[^/]+$/.test(location.pathname);
+  const [tournamentDetailOpen] = useAtom(tournamentDetailOpenAtom);
 
   const formatNumber = (num) => {
     if (num == null || num === undefined) return num;
@@ -451,7 +453,7 @@ function Layout() {
         )}
       </AnimatePresence>
 
-      {!isChatPage && !isImageGeneratePage && !isVideoGeneratePage && !isClubDetailPage && (
+      {!isChatPage && !isImageGeneratePage && !isVideoGeneratePage && !isClubDetailPage && !tournamentDetailOpen && (
         <>
           <footer className="fixed bottom-0 left-0 right-0 flex justify-center z-50 bg-background overflow-visible">
             <LimelightNav />

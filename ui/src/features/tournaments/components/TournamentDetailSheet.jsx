@@ -575,7 +575,7 @@ export default function TournamentDetailSheet() {
             </div>
 
             {/* CTA */}
-            <div className="shrink-0 px-5 pb-3 pt-3 border-t border-border bg-background/95 backdrop-blur-sm">
+            <div className="shrink-0 px-5 pt-3 border-t border-border bg-background/95 backdrop-blur-sm" style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}>
               {registered ? (
                 <div className="space-y-2.5">
                   <div className="flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/25">
