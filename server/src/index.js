@@ -35,6 +35,7 @@ import { errorHandler } from "./middleware/errorHandler.js";
 
 import "./jobs/dailyCreditsReset.js";
 import "./jobs/bookingReminder.js";
+import "./jobs/expireUnpaidBookings.js";
 import "./jobs/certifiedMatchFiller.js";
 import "./jobs/matchResultReminder.js";
 import "./jobs/matchFillReminder.js";
@@ -102,6 +103,8 @@ app.use("/api", publicRoutes);
 
 app.use("/api", authRoutes);
 app.use("/api", paymentRoutes);
+app.use("/api", courtRoutes);
+app.use("/api", bookingRoutes);
 app.use("/api", walletRoutes);
 app.use("/api", preferenceRoutes);
 app.use("/api", chatRoutes);
@@ -109,8 +112,6 @@ app.use("/api", userRoutes);
 app.use("/api", analyticsRoutes);
 app.use("/api", uploadRoutes);
 app.use("/api", matchRoutes);
-app.use("/api", courtRoutes);
-app.use("/api", bookingRoutes);
 app.use("/api", homeRoutes);
 app.use("/api", profileRoutes);
 app.use("/api", notificationRoutes);

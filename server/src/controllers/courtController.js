@@ -34,15 +34,22 @@ function generateSlots(openTime, closeTime, slotDuration, bookedSlots, pricePerH
     const end = `${eh}:${em}`;
 
     const override = overrides.find((o) => o.startTime === start);
+    const unpaidExpiryMs = 10 * 60 * 1000;
     const overlapping = bookedSlots.find((b) => {
       if (b.status === "rejected" || b.status === "cancelled") return false;
+      if (b.paymentMethod === "online" && b.paymentStatus === "unpaid") {
+        if (currentUserId && b.userId === currentUserId) return false;
+        const age = Date.now() - new Date(b.createdAt).getTime();
+        if (age > unpaidExpiryMs) return false;
+      }
       const bStart = toMinutes(b.startTime);
       const bEnd = normalizeEndMin(toMinutes(b.endTime), bStart);
       return t < bEnd && t + slotDuration > bStart;
     });
 
-    const isPending = overlapping?.status === "pending";
     const isBookedByUser = overlapping?.status === "approved";
+    const isAwaitingPayment = overlapping?.status === "pending" && overlapping?.paymentMethod === "online" && overlapping?.paymentStatus === "unpaid";
+    const isPending = overlapping?.status === "pending" && !isAwaitingPayment;
     const isMine = Boolean(currentUserId && overlapping?.userId === currentUserId);
 
     const overrideStatus = override?.status ?? "available";
@@ -55,6 +62,7 @@ function generateSlots(openTime, closeTime, slotDuration, bookedSlots, pricePerH
       end,
       isBooked: isBookedByUser || overrideStatus === "blocked" || overrideStatus === "booked",
       isPending: isPending && !isBookedByUser,
+      isAwaitingPayment: isAwaitingPayment && !isBookedByUser,
       isBlocked: overrideStatus === "blocked",
       isManualBooked: overrideStatus === "booked",
       isMine,
@@ -114,7 +122,7 @@ export const getCourtAvailabilityController = async (req, res) => {
     if (!court) return res.status(404).json({ message: "زمین یافت نشد" });
 
     const bookedSlots = await db
-      .select({ startTime: bookings.startTime, endTime: bookings.endTime, status: bookings.status, userId: bookings.userId })
+      .select({ startTime: bookings.startTime, endTime: bookings.endTime, status: bookings.status, userId: bookings.userId, paymentMethod: bookings.paymentMethod, paymentStatus: bookings.paymentStatus, createdAt: bookings.createdAt })
       .from(bookings)
       .where(and(eq(bookings.courtId, id), eq(bookings.date, date)));
 

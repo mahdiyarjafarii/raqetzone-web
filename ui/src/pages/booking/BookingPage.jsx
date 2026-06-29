@@ -109,6 +109,10 @@ export default function BookingPage() {
         paymentMethod,
       });
       if (res.ok) {
+        if (paymentMethod === "online" && res.data?.payment?.redirectUrl) {
+          window.location.href = res.data.payment.redirectUrl;
+          return;
+        }
         setCreatedBooking({ ...res.data.booking, court: selectedCourt });
         setStep("success");
       } else {

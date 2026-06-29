@@ -132,6 +132,19 @@ export default function BookingSummary({ court, date, slot, onConfirm, onBack, s
               {!canPayWithWallet ? " · موجودی کافی نیست" : ""}
             </span>
           </button>
+          <button
+            type="button"
+            onClick={() => setPaymentMethod("online")}
+            className={cn(
+              "rounded-xl border px-3 py-3 text-right text-sm transition-colors",
+              paymentMethod === "online" ? "border-primary bg-primary/10" : "border-border bg-muted/30"
+            )}
+          >
+            <span className="font-bold">پرداخت آنلاین (زرین‌پال)</span>
+            <span className="block text-xs text-muted-foreground mt-1">
+              پس از ثبت، به درگاه پرداخت منتقل می‌شوید
+            </span>
+          </button>
         </div>
       </div>
 

@@ -190,7 +190,7 @@ function DateSlotsStep({ court, selectedDate, onDateChange, slots, slotsLoading,
           </div>
           <div className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary">
             <SparklesIcon className="h-3.5 w-3.5" />
-            {slots?.filter((slot) => !slot.isBooked && !slot.isPending).length?.toLocaleString("fa-IR") ?? "۰"} موجود
+            {slots?.filter((slot) => !slot.isBooked && !slot.isPending && !slot.isAwaitingPayment).length?.toLocaleString("fa-IR") ?? "۰"} موجود
           </div>
         </div>
 
@@ -232,8 +232,9 @@ function DateSlotsStep({ court, selectedDate, onDateChange, slots, slotsLoading,
               const isBlocked = slot.isBlocked;
               const isManualBooked = slot.isManualBooked;
               const isPending = slot.isPending;
+              const isAwaitingPayment = slot.isAwaitingPayment;
               const hasDiscount = slot.discount > 0 && slot.originalPrice;
-              const unavailable = isBooked || isPending;
+              const unavailable = isBooked || isPending || isAwaitingPayment;
               const durationHours = getSlotDurationHours(slot);
               const displayPrice = Math.round(slot.price * durationHours);
               const displayOriginalPrice = slot.originalPrice ? Math.round(slot.originalPrice * durationHours) : null;
@@ -241,6 +242,7 @@ function DateSlotsStep({ court, selectedDate, onDateChange, slots, slotsLoading,
               let label = `تا ${slot.end}`;
               if (isBlocked) label = "بسته";
               else if (isManualBooked || (isBooked && !isBlocked)) label = "رزرو شده";
+              else if (isAwaitingPayment) label = "در پرداخت";
               else if (isPending) label = "در بررسی";
 
               return (
@@ -258,6 +260,8 @@ function DateSlotsStep({ court, selectedDate, onDateChange, slots, slotsLoading,
                       ? "bg-muted/30 border-border text-muted-foreground/40 cursor-not-allowed"
                       : isManualBooked || (isBooked && !isBlocked)
                       ? "bg-orange-500/10 border-orange-300 text-orange-500 cursor-not-allowed"
+                      : isAwaitingPayment
+                      ? "bg-blue-500/10 border-blue-400 text-blue-600 cursor-not-allowed"
                       : isPending
                       ? "bg-yellow-500/10 border-yellow-400 text-yellow-600 cursor-not-allowed"
                       : isSelected
@@ -665,10 +669,29 @@ function BookingSummaryStep({ court, date, slot, clubId, selectedAssets, onConfi
               <CreditCardIcon className="w-5 h-5" />
             </div>
             <div className="flex-1">
-              <p className="text-sm font-black text-foreground">پرداخت عادی</p>
+              <p className="text-sm font-black text-foreground">پرداخت حضوری</p>
               <p className="text-xs text-muted-foreground mt-0.5">رزرو ثبت می‌شود و تسویه طبق روال مجموعه انجام می‌شود</p>
             </div>
             {paymentMethod === "none" && <CheckCircleIcon className="w-5 h-5 text-primary" />}
+          </div>
+        </button>
+        <button
+          type="button"
+          onClick={() => setPaymentMethod("online")}
+          className={cn(
+            "w-full rounded-2xl border-2 p-3 text-right transition-all",
+            paymentMethod === "online" ? "border-primary bg-primary/10" : "border-border bg-muted/30"
+          )}
+        >
+          <div className="flex items-center gap-3">
+            <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center", paymentMethod === "online" ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground")}>
+              <CreditCardIcon className="w-5 h-5" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-black text-foreground">پرداخت آنلاین (زرین‌پال)</p>
+              <p className="text-xs text-muted-foreground mt-0.5">بعد از ثبت رزرو، به درگاه پرداخت منتقل می‌شوید</p>
+            </div>
+            {paymentMethod === "online" && <CheckCircleIcon className="w-5 h-5 text-primary" />}
           </div>
         </button>
         <button
@@ -694,6 +717,7 @@ function BookingSummaryStep({ court, date, slot, clubId, selectedAssets, onConfi
             {paymentMethod === "wallet" && <CheckCircleIcon className="w-5 h-5 text-primary" />}
           </div>
         </button>
+        
         <div className="w-full rounded-2xl border-2 border-border bg-muted/20 p-3 text-right opacity-50 cursor-not-allowed select-none">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center shrink-0">
@@ -919,6 +943,10 @@ export default function ClubBookingSheet({ open, onClose, club, initialCourt = n
         assets: selectedAssets.map((a) => ({ assetId: a.id, quantity: a.quantity })),
       });
       if (res.ok) {
+        if (paymentMethod === "online" && res.data?.payment?.redirectUrl) {
+          window.location.href = res.data.payment.redirectUrl;
+          return;
+        }
         if (res.data?.wallet) {
           window.dispatchEvent(new CustomEvent("wallet:updated", { detail: res.data.wallet }));
         }

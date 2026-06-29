@@ -5,8 +5,11 @@ dotenv.config();
 export const config = {
   port: process.env.PORT,
   frontendUrl: process.env.FRONTEND_URL,
+  publicServerUrl: process.env.PUBLIC_SERVER_URL,
   databaseUrl: process.env.DATABASE_URL,
   paymentGatewayUrl: process.env.PAYMENT_GATEWAY_URL,
+  zarinpalMerchantId: process.env.ZARINPAL_MERCHANT_ID,
+  zarinpalSandbox: String(process.env.ZARINPAL_SANDBOX ?? "true").toLowerCase() === "true",
   jwtSecret: process.env.JWT_SECRET,
   openaiApiKey: process.env.OPENAI_API_KEY,
   anthropicApiKey: process.env.ANTHROPIC_API_KEY,

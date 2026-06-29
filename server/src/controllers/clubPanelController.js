@@ -1,4 +1,4 @@
-import { eq, and, asc, desc, inArray, count, sum, gte, lte, sql } from "drizzle-orm";
+import { eq, and, or, ne, asc, desc, inArray, count, sum, gte, lte, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
 import { clubs, courts, bookings, users, slotOverrides, tournaments, tournamentRegistrations, deals, bookingAssets, clubAssets } from "../db/schema.js";
 import { sendNotification } from "../utils/sendNotification.js";
@@ -477,6 +477,8 @@ export const getClubBookingsController = async (req, res) => {
     const conditions = [];
     if (ownerId && courtIds.length > 0) conditions.push(inArray(bookings.courtId, courtIds));
     if (status) conditions.push(eq(bookings.status, status));
+    // Exclude unpaid online bookings — payment not confirmed yet
+    conditions.push(or(ne(bookings.paymentMethod, "online"), ne(bookings.paymentStatus, "unpaid")));
 
     const whereClause = conditions.length === 1 ? conditions[0] : conditions.length > 1 ? and(...conditions) : undefined;
 
@@ -499,6 +501,8 @@ export const getClubBookingsController = async (req, res) => {
         discountCode: bookings.discountCode,
         discountAmount: bookings.discountAmount,
         status: bookings.status,
+        paymentMethod: bookings.paymentMethod,
+        paymentStatus: bookings.paymentStatus,
         notes: bookings.notes,
         adminNote: bookings.adminNote,
         createdAt: bookings.createdAt,

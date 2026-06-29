@@ -1,6 +1,8 @@
-import { eq, and, desc, count, inArray } from "drizzle-orm";
+import { eq, and, or, ne, desc, count, inArray } from "drizzle-orm";
+import { ZarinPal } from "zarinpal-node-sdk";
 import { db } from "../db/index.js";
-import { bookings, courts, clubs, users, discountCodes, discountCodeUsages, slotOverrides, deals, clubAssets, bookingAssets } from "../db/schema.js";
+import { bookings, courts, clubs, users, discountCodes, discountCodeUsages, slotOverrides, deals, clubAssets, bookingAssets, walletTransactions, transactions } from "../db/schema.js";
+import { config } from "../config/env.js";
 import { sendNotification } from "../utils/sendNotification.js";
 import { sendSMS } from "../utils/sms.js";
 import { formatBookingDateTimeFa } from "../utils/bookingTime.js";
@@ -11,6 +13,14 @@ const PLATFORM_PUBLIC_DISCOUNT_CODES = new Set([WELCOME_DISCOUNT_CODE]);
 const TEHRAN_OFFSET = "+03:30";
 const TEHRAN_TIME_ZONE = "Asia/Tehran";
 const BOOKING_TIME_PASSED_NOTE = "تایم زمین گذشته";
+const ONLINE_PAYMENT_FAILED_NOTE = "پرداخت آنلاین ناموفق بود";
+
+const zarinpal = config.zarinpalMerchantId
+  ? new ZarinPal({
+      merchantId: config.zarinpalMerchantId,
+      sandbox: config.zarinpalSandbox,
+    })
+  : null;
 
 function getDatePart(parts, type) {
   return parts.find((part) => part.type === type)?.value;
@@ -46,6 +56,55 @@ function generateTrackingCode() {
 function timeToMinutes(t) {
   const [h, m] = t.split(":").map(Number);
   return h * 60 + m;
+}
+
+function getServerBaseUrl(req) {
+  if (config.publicServerUrl) return config.publicServerUrl.replace(/\/api\/?$/, "").replace(/\/$/, "");
+  const host = req.get("x-forwarded-host") || req.get("host");
+  const proto = req.get("x-forwarded-proto") || req.protocol;
+  return `${proto}://${host}`.replace(/\/$/, "");
+}
+
+function getFrontendBaseUrl() {
+  return (config.frontendUrl || "http://localhost:5173").replace(/\/$/, "");
+}
+
+function getBookingPaymentMethod(paymentMethod, totalPrice) {
+  if (totalPrice <= 0) return "none";
+  if (paymentMethod === "wallet") return "wallet";
+  if (paymentMethod === "online") return "online";
+  return "none";
+}
+
+function extractZarinpalAuthority(response) {
+  return response?.data?.authority || response?.authority || null;
+}
+
+function getZarinpalRedirectUrl(authority) {
+  if (!authority) return null;
+  try {
+    return zarinpal?.payments?.getRedirectUrl(authority);
+  } catch {
+    const host = config.zarinpalSandbox ? "sandbox.zarinpal.com" : "www.zarinpal.com";
+    return `https://${host}/pg/StartPay/${authority}`;
+  }
+}
+
+function isZarinpalVerifySuccess(verifyResponse) {
+  const code = Number(
+    verifyResponse?.data?.code ?? verifyResponse?.code ?? verifyResponse?.status ?? 0
+  );
+  return code === 100 || code === 101;
+}
+
+function getBookingPaymentReturnUrl(status, trackingCode) {
+  if (status === "success" && trackingCode) {
+    const search = new URLSearchParams({ tracking: trackingCode });
+    return `${getFrontendBaseUrl()}/booking/success?${search.toString()}`;
+  }
+  const search = new URLSearchParams({ payment: status });
+  if (trackingCode) search.set("tracking", trackingCode);
+  return `${getFrontendBaseUrl()}/mybooking?${search.toString()}`;
 }
 
 function parseBookingEndDateTime(date, endTime, startTime) {
@@ -184,7 +243,7 @@ export const createBookingController = async (req, res) => {
       return res.status(400).json({ message: "اطلاعات ناقص است" });
     }
 
-    if (!["none", "wallet"].includes(paymentMethod)) {
+    if (!["none", "wallet", "online"].includes(paymentMethod)) {
       return res.status(400).json({ message: "روش پرداخت نامعتبر است" });
     }
 
@@ -213,6 +272,8 @@ export const createBookingController = async (req, res) => {
         date: bookings.date,
         startTime: bookings.startTime,
         endTime: bookings.endTime,
+        paymentMethod: bookings.paymentMethod,
+        paymentStatus: bookings.paymentStatus,
       })
       .from(bookings)
       .where(and(
@@ -224,6 +285,8 @@ export const createBookingController = async (req, res) => {
     const hasOverlappingUserBooking = sameDayUserBookings.some((booking) => {
       if (expiredSameDayIds.includes(booking.id)) return false;
       if (booking.status === "rejected" || booking.status === "cancelled") return false;
+      // Allow user to retry their own unpaid online booking
+      if (booking.paymentMethod === "online" && booking.paymentStatus === "unpaid") return false;
       const bookingStartMin = timeToMinutes(booking.startTime);
       let bookingEndMin = timeToMinutes(booking.endTime);
       if (bookingEndMin <= bookingStartMin) bookingEndMin += 1440;
@@ -259,8 +322,16 @@ export const createBookingController = async (req, res) => {
         )
       );
 
+    const unpaidExpiryMs = 10 * 60 * 1000;
     const hasOverlap = existing.some((b) => {
       if (b.status === "rejected" || b.status === "cancelled") return false;
+      if (b.paymentMethod === "online" && b.paymentStatus === "unpaid") {
+        // same user retrying → always allow
+        if (b.userId === userId) return false;
+        // other users → block only within 10 min window
+        const age = Date.now() - new Date(b.createdAt).getTime();
+        if (age > unpaidExpiryMs) return false;
+      }
       const bStart = timeToMinutes(b.startTime);
       let bEnd = timeToMinutes(b.endTime);
       if (bEnd <= bStart) bEnd += 1440;
@@ -376,7 +447,37 @@ export const createBookingController = async (req, res) => {
     }
 
     const totalPrice = Math.max(0, priceAfterSlot - discountAmount) + assetsTotal;
+    const resolvedPaymentMethod = getBookingPaymentMethod(paymentMethod, totalPrice);
     const trackingCode = generateTrackingCode();
+
+    let onlinePayment = null;
+    if (resolvedPaymentMethod === "online") {
+      if (!zarinpal) {
+        return res.status(500).json({ message: "تنظیمات درگاه پرداخت کامل نیست" });
+      }
+
+      const callbackBaseUrl = getServerBaseUrl(req);
+      const callbackUrl = `${callbackBaseUrl}/api/bookings/payment/callback?tracking=${encodeURIComponent(trackingCode)}`;
+      console.log(callbackUrl)
+
+      const paymentResponse = await zarinpal.payments.create({
+        amount: totalPrice,
+        currency: "IRT",
+        callback_url: callbackUrl,
+        description: `رزرو زمین ${court.name} - ${date} ${startTime}-${endTime}`,
+      });
+      console.log(paymentResponse)
+
+
+      const authority = extractZarinpalAuthority(paymentResponse);
+      const paymentUrl = getZarinpalRedirectUrl(authority);
+      if (!authority || !paymentUrl) {
+        return res.status(502).json({ message: "پاسخ درگاه پرداخت نامعتبر است" });
+      }
+
+      onlinePayment = { authority, paymentUrl, rawResponse: paymentResponse };
+    }
+
     console.log("[CreateBooking] insert values:", {
       userId,
       courtId,
@@ -388,13 +489,29 @@ export const createBookingController = async (req, res) => {
       totalPrice,
       notes,
       trackingCode,
-      paymentMethod: paymentMethod === "wallet" ? "wallet" : "none",
+      paymentMethod: resolvedPaymentMethod,
       paymentStatus: totalPrice === 0 ? "paid" : "unpaid",
       discountAmount,
       discountCodeId: discountCodeRow?.id ?? null,
     });
 
     const { booking, walletPayment } = await db.transaction(async (tx) => {
+      // Cancel any previous unpaid online bookings by same user for this slot
+      const prevUnpaid = sameDayUserBookings.filter(
+        (b) => b.paymentMethod === "online" && b.paymentStatus === "unpaid" &&
+               b.status !== "cancelled" && b.status !== "rejected"
+      );
+      if (prevUnpaid.length > 0) {
+        await tx
+          .update(bookings)
+          .set({ status: "cancelled", adminNote: "رزرو مجدد توسط کاربر", updatedAt: new Date() })
+          .where(inArray(bookings.id, prevUnpaid.map((b) => b.id)));
+        await tx
+          .update(transactions)
+          .set({ status: "failed" })
+          .where(and(inArray(transactions.bookingId, prevUnpaid.map((b) => b.id)), eq(transactions.status, "pending")));
+      }
+
       const [createdBooking] = await tx
         .insert(bookings)
         .values({
@@ -411,7 +528,7 @@ export const createBookingController = async (req, res) => {
           discountAmount,
           notes,
           trackingCode,
-          paymentMethod: paymentMethod === "wallet" ? "wallet" : "none",
+          paymentMethod: resolvedPaymentMethod,
           paymentStatus: totalPrice === 0 ? "paid" : "unpaid",
         })
         .returning();
@@ -434,8 +551,35 @@ export const createBookingController = async (req, res) => {
         );
       }
 
+      if (resolvedPaymentMethod === "online" && totalPrice > 0 && onlinePayment?.authority) {
+        await tx.insert(walletTransactions).values({
+          userId,
+          amount: totalPrice,
+          direction: "debit",
+          type: "booking_online_payment",
+          status: "pending",
+          referenceType: "booking",
+          referenceId: createdBooking.id,
+          gatewayTrackCode: onlinePayment.authority,
+          metadata: {
+            gateway: "zarinpal",
+            paymentUrl: onlinePayment.paymentUrl,
+            paymentInitResponse: onlinePayment.rawResponse,
+          },
+        });
+
+        await tx.insert(transactions).values({
+          userId,
+          amount: totalPrice,
+          type: "booking",
+          bookingId: createdBooking.id,
+          status: "pending",
+          authority: onlinePayment.authority,
+        });
+      }
+
       let paidByWallet = null;
-      if (paymentMethod === "wallet" && totalPrice > 0) {
+      if (resolvedPaymentMethod === "wallet" && totalPrice > 0) {
         paidByWallet = await payBookingWithWallet({ userId, bookingId: createdBooking.id, amount: totalPrice }, tx);
         createdBooking.paymentMethod = "wallet";
         createdBooking.paymentStatus = "paid";
@@ -457,35 +601,43 @@ export const createBookingController = async (req, res) => {
     const courtFullName = court.clubName ? `زمین ${court.name} باشگاه ${court.clubName}` : `زمین ${court.name}`;
     const bookingDateTime = formatBookingDateTimeFa({ date, startTime, endTime });
 
-    // Notify user of pending booking
-    sendNotification(userId, {
-      title: "درخواست رزرو ثبت شد ⏳",
-      message: `رزرو ${courtFullName} برای ${bookingDateTime} ثبت شد. منتظر تأیید مدیر باشید.`,
-      type: "BOOKING",
-      metadata: { bookingId: booking.id, courtName: court.name, date, startTime, endTime, ctaHref: "/mybooking", ctaLabel: "مشاهده رزرو" },
-      smsText: `پلتفرم رکت‌زون: درخواست رزرو ${courtFullName} برای ${bookingDateTime} ثبت شد و در انتظار تأیید مدیر زمین است.`,
-    }).catch(() => {});
+    // For online payment, defer notifications until callback confirms payment
+    if (resolvedPaymentMethod !== "online") {
+      sendNotification(userId, {
+        title: "درخواست رزرو ثبت شد ⏳",
+        message: `رزرو ${courtFullName} برای ${bookingDateTime} ثبت شد. منتظر تأیید مدیر باشید.`,
+        type: "BOOKING",
+        metadata: { bookingId: booking.id, courtName: court.name, date, startTime, endTime, ctaHref: "/mybooking", ctaLabel: "مشاهده رزرو" },
+        smsText: `پلتفرم رکت‌زون: درخواست رزرو ${courtFullName} برای ${bookingDateTime} ثبت شد و در انتظار تأیید مدیر زمین است.`,
+      }).catch(() => {});
 
-    // Notify court manager + club owner (all unique phones)
-    const recipientPhones = [...new Set(
-      [court.managerPhone, court.clubPhone, court.clubOwnerPhone].filter(Boolean)
-    )];
-    if (recipientPhones.length > 0) {
-      const [requester] = await db.select({ name: users.name, phone: users.phone }).from(users).where(eq(users.id, userId)).limit(1);
-      const requesterInfo = requester?.name ? `${requester.name} (${requester.phone})` : requester?.phone ?? "کاربر";
-      const managerMsg = `پلتفرم رکت‌زون: درخواست رزرو جدید - ${courtFullName} - ${bookingDateTime} - رزرو کننده: ${requesterInfo} - لطفا از پنل تایید یا رد کنید.`;
-      console.log(`[SMS-Manager] → ${recipientPhones.join(", ")}`);
-      for (const phone of recipientPhones) {
-        sendSMS(phone, managerMsg)
-          .then(ok => console.log(`[SMS-Manager] ${phone}: ${ok}`))
-          .catch(err => console.error(`[SMS-Manager] ${phone}:`, err.message));
+      const recipientPhones = [...new Set(
+        [court.managerPhone, court.clubPhone, court.clubOwnerPhone].filter(Boolean)
+      )];
+      if (recipientPhones.length > 0) {
+        const [requester] = await db.select({ name: users.name, phone: users.phone }).from(users).where(eq(users.id, userId)).limit(1);
+        const requesterInfo = requester?.name ? `${requester.name} (${requester.phone})` : requester?.phone ?? "کاربر";
+        const managerMsg = `پلتفرم رکت‌زون: درخواست رزرو جدید - ${courtFullName} - ${bookingDateTime} - رزرو کننده: ${requesterInfo} - لطفا از پنل تایید یا رد کنید.`;
+        for (const phone of recipientPhones) {
+          sendSMS(phone, managerMsg)
+            .then(ok => console.log(`[SMS-Manager] ${phone}: ${ok}`))
+            .catch(err => console.error(`[SMS-Manager] ${phone}:`, err.message));
+        }
       }
-    } else {
-      console.log(`[SMS-Manager] skipped — no manager/club/owner phone for court ${court.id}`);
     }
 
     const enriched = { ...booking, court, assets: resolvedAssets };
-    return res.status(201).json({ booking: enriched, wallet: walletPayment?.wallet });
+    return res.status(201).json({
+      booking: enriched,
+      wallet: walletPayment?.wallet,
+      payment: onlinePayment
+        ? {
+            provider: "zarinpal",
+            authority: onlinePayment.authority,
+            redirectUrl: onlinePayment.paymentUrl,
+          }
+        : null,
+    });
   } catch (error) {
     console.error("createBooking error:", {
       message: error.message,
@@ -495,6 +647,179 @@ export const createBookingController = async (req, res) => {
       stack: error.stack,
     });
     return res.status(error.statusCode ?? 500).json({ message: error.statusCode ? error.message : "خطای سرور" });
+  }
+};
+
+export const bookingPaymentCallbackController = async (req, res) => {
+  const { Status, Authority, tracking } = req.query;
+  const failedRedirectUrl = getBookingPaymentReturnUrl("failed", tracking);
+
+  console.log("[Callback] query:", req.query);
+
+  try {
+    if (!tracking) return res.redirect(failedRedirectUrl);
+
+    const [booking] = await db
+      .select()
+      .from(bookings)
+      .where(eq(bookings.trackingCode, String(tracking).toUpperCase()))
+      .limit(1);
+
+    if (!booking) return res.redirect(failedRedirectUrl);
+
+    const [paymentTransaction] = await db
+      .select()
+      .from(walletTransactions)
+      .where(
+        and(
+          eq(walletTransactions.referenceType, "booking"),
+          eq(walletTransactions.referenceId, booking.id)
+        )
+      )
+      .orderBy(desc(walletTransactions.createdAt))
+      .limit(1);
+
+    if (Status !== "OK" || !Authority || !zarinpal) {
+      if (paymentTransaction) {
+        await db
+          .update(walletTransactions)
+          .set({ status: "failed", callbackBody: req.query })
+          .where(eq(walletTransactions.id, paymentTransaction.id));
+      }
+
+      await db
+        .update(bookings)
+        .set({ status: "cancelled", adminNote: ONLINE_PAYMENT_FAILED_NOTE, updatedAt: new Date() })
+        .where(eq(bookings.id, booking.id));
+
+      await db
+        .update(transactions)
+        .set({ status: "failed", callbackBody: req.query })
+        .where(eq(transactions.bookingId, booking.id));
+
+      return res.redirect(getBookingPaymentReturnUrl("failed", booking.trackingCode));
+    }
+
+    if (paymentTransaction?.gatewayTrackCode && paymentTransaction.gatewayTrackCode !== Authority) {
+      await db
+        .update(walletTransactions)
+        .set({ status: "failed", callbackBody: req.query })
+        .where(eq(walletTransactions.id, paymentTransaction.id));
+
+      await db
+        .update(bookings)
+        .set({ status: "cancelled", adminNote: ONLINE_PAYMENT_FAILED_NOTE, updatedAt: new Date() })
+        .where(eq(bookings.id, booking.id));
+
+      await db
+        .update(transactions)
+        .set({ status: "failed", callbackBody: req.query })
+        .where(eq(transactions.bookingId, booking.id));
+
+      return res.redirect(getBookingPaymentReturnUrl("failed", booking.trackingCode));
+    }
+
+    const verifyResponse = await zarinpal.verifications.verify({
+      authority: Authority,
+      amount: booking.totalPrice,
+      currency: "IRT",
+    });
+
+    console.log("[Callback] verifyResponse:", JSON.stringify(verifyResponse));
+
+    if (!isZarinpalVerifySuccess(verifyResponse)) {
+      if (paymentTransaction) {
+        await db
+          .update(walletTransactions)
+          .set({ status: "failed", callbackBody: verifyResponse })
+          .where(eq(walletTransactions.id, paymentTransaction.id));
+      }
+
+      await db
+        .update(bookings)
+        .set({ status: "cancelled", adminNote: ONLINE_PAYMENT_FAILED_NOTE, updatedAt: new Date() })
+        .where(eq(bookings.id, booking.id));
+
+      await db
+        .update(transactions)
+        .set({ status: "failed", callbackBody: verifyResponse })
+        .where(and(eq(transactions.bookingId, booking.id), eq(transactions.authority, Authority)));
+
+      return res.redirect(getBookingPaymentReturnUrl("failed", booking.trackingCode));
+    }
+
+    await db
+      .update(bookings)
+      .set({
+        paymentMethod: "online",
+        paymentStatus: "paid",
+        adminNote: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(bookings.id, booking.id));
+
+    if (paymentTransaction) {
+      await db
+        .update(walletTransactions)
+        .set({
+          status: "completed",
+          callbackBody: verifyResponse,
+          gatewayTrackCode: Authority,
+        })
+        .where(eq(walletTransactions.id, paymentTransaction.id));
+    }
+
+    await db
+      .update(transactions)
+      .set({ status: "completed", callbackBody: verifyResponse })
+      .where(and(eq(transactions.bookingId, booking.id), eq(transactions.authority, Authority)));
+
+    // Notify user and managers now that payment is confirmed
+    const [fullBooking] = await db
+      .select({
+        id: bookings.id, userId: bookings.userId, date: bookings.date,
+        startTime: bookings.startTime, endTime: bookings.endTime,
+        courtName: courts.name, clubName: clubs.name,
+        managerPhone: courts.managerPhone, clubPhone: clubs.phone, clubOwnerPhone: users.phone,
+      })
+      .from(bookings)
+      .leftJoin(courts, eq(bookings.courtId, courts.id))
+      .leftJoin(clubs, eq(courts.clubId, clubs.id))
+      .leftJoin(users, eq(clubs.ownerId, users.id))
+      .where(eq(bookings.id, booking.id))
+      .limit(1);
+
+    if (fullBooking) {
+      const courtFullName = fullBooking.clubName
+        ? `زمین ${fullBooking.courtName} باشگاه ${fullBooking.clubName}`
+        : `زمین ${fullBooking.courtName}`;
+      const bookingDateTime = formatBookingDateTimeFa(fullBooking);
+
+      sendNotification(fullBooking.userId, {
+        title: "درخواست رزرو ثبت شد ⏳",
+        message: `رزرو ${courtFullName} برای ${bookingDateTime} ثبت شد. منتظر تأیید مدیر باشید.`,
+        type: "BOOKING",
+        metadata: { bookingId: fullBooking.id, courtName: fullBooking.courtName, date: fullBooking.date, startTime: fullBooking.startTime, endTime: fullBooking.endTime, ctaHref: "/mybooking", ctaLabel: "مشاهده رزرو" },
+        smsText: `پلتفرم رکت‌زون: درخواست رزرو ${courtFullName} برای ${bookingDateTime} ثبت شد و در انتظار تأیید مدیر زمین است.`,
+      }).catch(() => {});
+
+      const recipientPhones = [...new Set(
+        [fullBooking.managerPhone, fullBooking.clubPhone, fullBooking.clubOwnerPhone].filter(Boolean)
+      )];
+      if (recipientPhones.length > 0) {
+        const [requester] = await db.select({ name: users.name, phone: users.phone }).from(users).where(eq(users.id, fullBooking.userId)).limit(1);
+        const requesterInfo = requester?.name ? `${requester.name} (${requester.phone})` : requester?.phone ?? "کاربر";
+        const managerMsg = `پلتفرم رکت‌زون: درخواست رزرو جدید - ${courtFullName} - ${bookingDateTime} - رزرو کننده: ${requesterInfo} - لطفا از پنل تایید یا رد کنید.`;
+        for (const phone of recipientPhones) {
+          sendSMS(phone, managerMsg).catch(() => {});
+        }
+      }
+    }
+
+    return res.redirect(getBookingPaymentReturnUrl("success", booking.trackingCode));
+  } catch (error) {
+    console.error("bookingPaymentCallback error:", error);
+    return res.redirect(failedRedirectUrl);
   }
 };
 
@@ -548,7 +873,10 @@ export const getMyBookingsController = async (req, res) => {
       })
       .from(bookings)
       .innerJoin(courts, eq(bookings.courtId, courts.id))
-      .where(eq(bookings.userId, userId))
+      .where(and(
+        eq(bookings.userId, userId),
+        or(ne(bookings.paymentMethod, "online"), ne(bookings.paymentStatus, "unpaid"))
+      ))
       .orderBy(desc(bookings.createdAt));
 
     // Attach bookingAssets to each booking

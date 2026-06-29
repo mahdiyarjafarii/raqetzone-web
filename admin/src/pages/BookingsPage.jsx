@@ -227,7 +227,7 @@ export default function BookingsPage() {
         {/* Table */}
         <div className="rounded-2xl border border-border bg-card overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[860px] text-sm">
+            <table className="w-full min-w-[980px] text-sm">
               <thead>
                 <tr className="border-b border-border bg-muted/40">
                   <th className="px-4 py-3.5 text-right text-xs font-semibold text-muted-foreground">کاربر</th>
@@ -235,6 +235,7 @@ export default function BookingsPage() {
                   <th className="px-4 py-3.5 text-right text-xs font-semibold text-muted-foreground">تاریخ</th>
                   <th className="px-4 py-3.5 text-right text-xs font-semibold text-muted-foreground">ساعت</th>
                   <th className="px-4 py-3.5 text-right text-xs font-semibold text-muted-foreground">مبلغ</th>
+                  <th className="px-4 py-3.5 text-right text-xs font-semibold text-muted-foreground">روش پرداخت</th>
                   <th className="px-4 py-3.5 text-right text-xs font-semibold text-muted-foreground">وضعیت</th>
                   <th className="px-4 py-3.5 text-right text-xs font-semibold text-muted-foreground">
                     <SortButton dir={sortDir} onClick={handleSortToggle} />
@@ -246,7 +247,7 @@ export default function BookingsPage() {
                 {loading ? (
                   Array.from({ length: 6 }).map((_, i) => (
                     <tr key={i} className="border-b border-border">
-                      {Array.from({ length: 8 }).map((__, j) => (
+                      {Array.from({ length: 9 }).map((__, j) => (
                         <td key={j} className="px-4 py-3.5">
                           <div className={cn("h-4 bg-muted rounded-lg animate-pulse", j === 0 ? "w-32" : "w-20")} />
                         </td>
@@ -255,7 +256,7 @@ export default function BookingsPage() {
                   ))
                 ) : error ? (
                   <tr>
-                    <td colSpan={8}>
+                    <td colSpan={9}>
                       <ErrorState
                         message="رزروها بارگذاری نشدند"
                         onRetry={() => fetchPage({ page: 1 })}
@@ -264,7 +265,7 @@ export default function BookingsPage() {
                   </tr>
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="text-center py-16">
+                    <td colSpan={9} className="text-center py-16">
                       <div className="flex flex-col items-center gap-3 text-muted-foreground">
                         <CalendarIcon className="w-10 h-10 opacity-20" />
                         <span className="text-sm">رزروی یافت نشد</span>
@@ -342,6 +343,17 @@ export default function BookingsPage() {
                                 </div>
                               ))}
                             </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3.5">
+                          {b.paymentMethod === "online" ? (
+                            <span className="inline-flex items-center rounded-full bg-blue-500/10 text-blue-600 px-2.5 py-1 text-xs font-semibold">
+                              آنلاین
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center rounded-full bg-muted text-muted-foreground px-2.5 py-1 text-xs font-semibold">
+                              در محل
+                            </span>
                           )}
                         </td>
                         <td className="px-4 py-3.5">

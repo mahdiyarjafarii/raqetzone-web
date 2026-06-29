@@ -123,10 +123,12 @@ export const transactions = pgTable("transactions", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   amount: integer("amount").notNull(),
-  type: varchar("type", { length: 20 }).notNull(), // 'basic' or 'premium' or 'pro'
-  period: varchar("period", { length: 20 }).notNull(), // 'monthly' or 'quarterly' or 'halfYearly' or 'yearly'
-  status: varchar("status", { length: 20 }).default('pending'), // 'pending' or 'completed' or 'failed'
+  type: varchar("type", { length: 20 }).notNull(), // 'basic' | 'premium' | 'pro' | 'booking'
+  period: varchar("period", { length: 20 }),        // null for booking payments
+  bookingId: uuid("booking_id").references(() => bookings.id, { onDelete: "set null" }),
+  status: varchar("status", { length: 20 }).default('pending'), // 'pending' | 'completed' | 'failed'
   trackCode: varchar("track_code", { length: 255 }),
+  authority: varchar("authority", { length: 255 }),  // zarinpal authority
   callbackBody: jsonb("callback_body"),
   createdAt: timestamp("created_at").defaultNow(),
 });

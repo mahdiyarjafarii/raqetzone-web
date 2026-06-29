@@ -25,6 +25,7 @@ const CoachManagementPage = lazy(() => import("@/pages/coaches/CoachManagementPa
 const ClassesPage = lazy(() => import("@/pages/coaches/ClassesPage"));
 const MyBookingPage = lazy(() => import("@/pages/mybooking/MyBookingPage"));
 const BookingTrackPage = lazy(() => import("@/pages/booking/BookingTrackPage"));
+const BookingSuccessPage = lazy(() => import("@/pages/booking/BookingSuccessPage"));
 const ConversationsPage = lazy(() => import("@/pages/messages/ConversationsPage"));
 const DirectChatPage = lazy(() => import("@/pages/messages/DirectChatPage"));
 const TennisDuelPage = lazy(() => import("@/pages/game/TennisDuelPage"));
@@ -62,6 +63,7 @@ const router = createBrowserRouter([
       { path: "classes", element: s(ClassesPage) },
       { path: "mybooking", element: s(MyBookingPage) },
       { path: "booking/track/:code", element: s(BookingTrackPage) },
+      { path: "booking/success", element: s(BookingSuccessPage) },
       { path: "notifications", element: s(NotificationsPage) },
       { path: "profile", element: s(ProfilePage) },
       { path: "chat/new", element: <NewChatPage /> },
