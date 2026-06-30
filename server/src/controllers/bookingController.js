@@ -1,12 +1,12 @@
-import { eq, and, or, ne, desc, count, inArray } from "drizzle-orm";
+import { eq, and, or, ne, desc, count, inArray, sql } from "drizzle-orm";
 import { ZarinPal } from "zarinpal-node-sdk";
 import { db } from "../db/index.js";
-import { bookings, courts, clubs, users, discountCodes, discountCodeUsages, slotOverrides, deals, clubAssets, bookingAssets, walletTransactions, transactions } from "../db/schema.js";
+import { bookings, courts, clubs, users, discountCodes, discountCodeUsages, slotOverrides, deals, clubAssets, bookingAssets, walletTransactions, wallets, transactions } from "../db/schema.js";
 import { config } from "../config/env.js";
 import { sendNotification } from "../utils/sendNotification.js";
 import { sendSMS } from "../utils/sms.js";
 import { formatBookingDateTimeFa } from "../utils/bookingTime.js";
-import { payBookingWithWallet } from "./walletController.js";
+import { payBookingWithWallet, ensureWallet } from "./walletController.js";
 
 const WELCOME_DISCOUNT_CODE = "WELCOME20";
 const PLATFORM_PUBLIC_DISCOUNT_CODES = new Set([WELCOME_DISCOUNT_CODE]);
@@ -1071,6 +1071,36 @@ export const updateBookingStatusController = async (req, res) => {
       .set({ status, adminNote: adminNote || null, updatedAt: new Date() })
       .where(eq(bookings.id, id))
       .returning();
+
+    // Refund to wallet if booking was paid online and is now rejected
+    if (status === "rejected" && booking.paymentMethod === "online" && booking.paymentStatus === "paid" && booking.totalPrice > 0) {
+      try {
+        await db.transaction(async (tx) => {
+          const wallet = await ensureWallet(booking.userId, tx);
+          await tx
+            .update(wallets)
+            .set({ balance: sql`${wallets.balance} + ${booking.totalPrice}`, updatedAt: new Date() })
+            .where(eq(wallets.id, wallet.id));
+          await tx.insert(walletTransactions).values({
+            walletId: wallet.id,
+            userId: booking.userId,
+            amount: booking.totalPrice,
+            direction: "credit",
+            type: "booking_refund",
+            status: "completed",
+            referenceType: "booking",
+            referenceId: booking.id,
+            metadata: { reason: "booking_rejected_by_admin", trackingCode: booking.trackingCode },
+          });
+        });
+
+        const bookingDateTime = formatBookingDateTimeFa(booking);
+        const refundAmount = booking.totalPrice.toLocaleString("fa-IR");
+        sendSMS(await getUserPhone(booking.userId), `رکت‌زون: رزرو شما برای ${bookingDateTime} رد شد. مبلغ ${refundAmount} تومان به کیف پول شما بازگردانده شد.`).catch(() => {});
+      } catch (refundErr) {
+        console.error("refund wallet error:", refundErr);
+      }
+    }
 
     // Notify the booking owner
     const isApproved = status === "approved";
