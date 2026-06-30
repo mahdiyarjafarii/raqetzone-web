@@ -58,6 +58,17 @@ function timeToMinutes(t) {
   return h * 60 + m;
 }
 
+function toShamsiDate(isoDate) {
+  try {
+    return new Intl.DateTimeFormat("fa-IR", {
+      timeZone: TEHRAN_TIME_ZONE,
+      year: "numeric", month: "long", day: "numeric",
+    }).format(new Date(isoDate));
+  } catch {
+    return isoDate;
+  }
+}
+
 function getServerBaseUrl(req) {
   if (config.publicServerUrl) return config.publicServerUrl.replace(/\/api\/?$/, "").replace(/\/$/, "");
   const host = req.get("x-forwarded-host") || req.get("host");
@@ -460,11 +471,16 @@ export const createBookingController = async (req, res) => {
       const callbackUrl = `${callbackBaseUrl}/api/bookings/payment/callback?tracking=${encodeURIComponent(trackingCode)}`;
       console.log(callbackUrl)
 
+      const userPhone = await getUserPhone(userId);
+      const shamsiDate = toShamsiDate(date);
+      const clubPart = court.clubName ? ` باشگاه ${court.clubName}` : "";
+      const paymentDescription = `رزرو زمین ${court.name}${clubPart} - ${shamsiDate} ساعت ${startTime} تا ${endTime} - کاربر: ${userPhone ?? userId}`;
+
       const paymentResponse = await zarinpal.payments.create({
         amount: 10000,
         currency: "IRT",
         callback_url: callbackUrl,
-        description: `رزرو زمین ${court.name} - ${date} ${startTime}-${endTime}`,
+        description: paymentDescription,
       });
       console.log(paymentResponse)
 
