@@ -1073,6 +1073,7 @@ export const updateBookingStatusController = async (req, res) => {
       .returning();
 
     // Refund to wallet if booking was paid online and is now rejected
+    console.log("[Refund check]", { status, paymentMethod: booking.paymentMethod, paymentStatus: booking.paymentStatus, totalPrice: booking.totalPrice });
     if (status === "rejected" && booking.paymentMethod === "online" && booking.paymentStatus === "paid" && booking.totalPrice > 0) {
       try {
         await db.transaction(async (tx) => {
