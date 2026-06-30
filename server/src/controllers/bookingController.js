@@ -461,7 +461,7 @@ export const createBookingController = async (req, res) => {
       console.log(callbackUrl)
 
       const paymentResponse = await zarinpal.payments.create({
-        amount: totalPrice,
+        amount: 10000,
         currency: "IRT",
         callback_url: callbackUrl,
         description: `رزرو زمین ${court.name} - ${date} ${startTime}-${endTime}`,
