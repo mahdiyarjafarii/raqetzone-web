@@ -477,7 +477,7 @@ export const createBookingController = async (req, res) => {
       const paymentDescription = `رزرو زمین ${court.name}${clubPart} - ${shamsiDate} ساعت ${startTime} تا ${endTime} - کاربر: ${userPhone ?? userId}`;
 
       const paymentResponse = await zarinpal.payments.create({
-        amount: 10000,
+        amount: totalPrice,
         currency: "IRT",
         callback_url: callbackUrl,
         description: paymentDescription,
@@ -670,10 +670,13 @@ export const bookingPaymentCallbackController = async (req, res) => {
   const { Status, Authority, tracking } = req.query;
   const failedRedirectUrl = getBookingPaymentReturnUrl("failed", tracking);
 
-  console.log("[Callback] query:", req.query);
+  console.log("[Callback] ── incoming ──", { Status, Authority, tracking });
 
   try {
-    if (!tracking) return res.redirect(failedRedirectUrl);
+    if (!tracking) {
+      console.log("[Callback] FAIL: no tracking param");
+      return res.redirect(failedRedirectUrl);
+    }
 
     const [booking] = await db
       .select()
@@ -681,7 +684,14 @@ export const bookingPaymentCallbackController = async (req, res) => {
       .where(eq(bookings.trackingCode, String(tracking).toUpperCase()))
       .limit(1);
 
+    console.log("[Callback] booking:", booking ? { id: booking.id, status: booking.status, paymentStatus: booking.paymentStatus, totalPrice: booking.totalPrice } : "NOT FOUND");
     if (!booking) return res.redirect(failedRedirectUrl);
+
+    // Already paid — redirect to success without re-verifying
+    if (booking.paymentStatus === "paid") {
+      console.log("[Callback] already paid, redirect success");
+      return res.redirect(getBookingPaymentReturnUrl("success", booking.trackingCode));
+    }
 
     const [paymentTransaction] = await db
       .select()
@@ -695,7 +705,10 @@ export const bookingPaymentCallbackController = async (req, res) => {
       .orderBy(desc(walletTransactions.createdAt))
       .limit(1);
 
+    console.log("[Callback] walletTx:", paymentTransaction ? { id: paymentTransaction.id, status: paymentTransaction.status, gatewayTrackCode: paymentTransaction.gatewayTrackCode } : "NOT FOUND");
+
     if (Status !== "OK" || !Authority || !zarinpal) {
+      console.log("[Callback] FAIL: Status not OK or missing Authority. Status:", Status, "Authority:", Authority);
       if (paymentTransaction) {
         await db
           .update(walletTransactions)
@@ -717,6 +730,7 @@ export const bookingPaymentCallbackController = async (req, res) => {
     }
 
     if (paymentTransaction?.gatewayTrackCode && paymentTransaction.gatewayTrackCode !== Authority) {
+      console.log("[Callback] FAIL: authority mismatch. stored:", paymentTransaction.gatewayTrackCode, "got:", Authority);
       await db
         .update(walletTransactions)
         .set({ status: "failed", callbackBody: req.query })
@@ -742,6 +756,7 @@ export const bookingPaymentCallbackController = async (req, res) => {
     });
 
     console.log("[Callback] verifyResponse:", JSON.stringify(verifyResponse));
+    console.log("[Callback] isSuccess:", isZarinpalVerifySuccess(verifyResponse));
 
     if (!isZarinpalVerifySuccess(verifyResponse)) {
       if (paymentTransaction) {
