@@ -1,9 +1,11 @@
 import { eq, and, or, ne, asc, desc, inArray, count, sum, gte, lte, sql } from "drizzle-orm";
 import { db } from "../db/index.js";
-import { clubs, courts, bookings, users, slotOverrides, tournaments, tournamentRegistrations, deals, bookingAssets, clubAssets } from "../db/schema.js";
+import { clubs, courts, bookings, users, slotOverrides, tournaments, tournamentRegistrations, deals, bookingAssets, clubAssets, walletTransactions, wallets } from "../db/schema.js";
 import { sendNotification } from "../utils/sendNotification.js";
+import { sendSMS } from "../utils/sms.js";
 import { formatBookingDateTimeFa } from "../utils/bookingTime.js";
 import { validateIranianPhone } from "../utils/validation.js";
+import { ensureWallet } from "./walletController.js";
 
 const TEHRAN_TIME_ZONE = "Asia/Tehran";
 const TEHRAN_OFFSET = "+03:30";
@@ -649,6 +651,39 @@ export const approveClubBookingController = async (req, res) => {
   }
 };
 
+async function refundBookingToWallet(booking, reason) {
+  if (booking.paymentMethod !== "online" || booking.paymentStatus !== "paid" || booking.totalPrice <= 0) return;
+  try {
+    await db.transaction(async (tx) => {
+      const wallet = await ensureWallet(booking.userId, tx);
+      await tx
+        .update(wallets)
+        .set({ balance: sql`${wallets.balance} + ${booking.totalPrice}`, updatedAt: new Date() })
+        .where(eq(wallets.id, wallet.id));
+      await tx.insert(walletTransactions).values({
+        walletId: wallet.id,
+        userId: booking.userId,
+        amount: booking.totalPrice,
+        direction: "credit",
+        type: "booking_refund",
+        status: "completed",
+        referenceType: "booking",
+        referenceId: booking.id,
+        metadata: { reason, trackingCode: booking.trackingCode },
+      });
+    });
+
+    const [user] = await db.select({ phone: users.phone }).from(users).where(eq(users.id, booking.userId)).limit(1);
+    if (user?.phone) {
+      const bookingDateTime = formatBookingDateTimeFa(booking);
+      const refundAmount = booking.totalPrice.toLocaleString("fa-IR");
+      sendSMS(user.phone, `رکت‌زون: مبلغ ${refundAmount} تومان بابت لغو رزرو ${bookingDateTime} به کیف پول شما بازگردانده شد.`).catch(() => {});
+    }
+  } catch (err) {
+    console.error("refundBookingToWallet error:", err);
+  }
+}
+
 export const cancelClubBookingController = async (req, res) => {
   try {
     const { id } = req.params;
@@ -673,10 +708,13 @@ export const cancelClubBookingController = async (req, res) => {
       and(eq(slotOverrides.courtId, booking.courtId), eq(slotOverrides.date, booking.date), eq(slotOverrides.startTime, booking.startTime), eq(slotOverrides.status, "booked"))
     );
 
+    await refundBookingToWallet(booking, "booking_cancelled_by_club");
+
     const bookingDateTime = formatBookingDateTimeFa(booking);
+    const hasRefund = booking.paymentMethod === "online" && booking.paymentStatus === "paid" && booking.totalPrice > 0;
     sendNotification(booking.userId, {
       title: "رزرو شما لغو شد 🚫",
-      message: `متأسفانه رزرو شما برای ${bookingDateTime} توسط باشگاه لغو شد.${adminNote ? ` دلیل: ${adminNote}` : ""}`,
+      message: `متأسفانه رزرو شما برای ${bookingDateTime} توسط باشگاه لغو شد.${adminNote ? ` دلیل: ${adminNote}` : ""}${hasRefund ? ` مبلغ پرداختی به کیف پول شما بازگردانده شد.` : ""}`,
       type: "BOOKING",
       metadata: { bookingId: id, ctaHref: "/mybooking", ctaLabel: "مشاهده رزروها" },
       smsText: `پلتفرم رکت‌زون: رزرو شما برای ${bookingDateTime} توسط باشگاه لغو شد.${adminNote ? ` دلیل: ${adminNote}` : ""}`,
@@ -713,10 +751,13 @@ export const rejectClubBookingController = async (req, res) => {
       and(eq(slotOverrides.courtId, booking.courtId), eq(slotOverrides.date, booking.date), eq(slotOverrides.startTime, booking.startTime), eq(slotOverrides.status, "booked"))
     );
 
+    await refundBookingToWallet(booking, "booking_rejected_by_club");
+
     const bookingDateTime = formatBookingDateTimeFa(booking);
+    const hasRefund = booking.paymentMethod === "online" && booking.paymentStatus === "paid" && booking.totalPrice > 0;
     sendNotification(booking.userId, {
       title: "رزرو شما رد شد ❌",
-      message: `متأسفانه رزرو شما برای ${bookingDateTime} رد شد.${adminNote ? ` دلیل: ${adminNote}` : ""}`,
+      message: `متأسفانه رزرو شما برای ${bookingDateTime} رد شد.${adminNote ? ` دلیل: ${adminNote}` : ""}${hasRefund ? ` مبلغ پرداختی به کیف پول شما بازگردانده شد.` : ""}`,
       type: "BOOKING",
       metadata: { bookingId: id, ctaHref: "/mybooking", ctaLabel: "مشاهده رزروها" },
       smsText: `پلتفرم رکت‌زون: رزرو شما برای ${bookingDateTime} رد شد.${adminNote ? ` دلیل: ${adminNote}` : ""}`,
