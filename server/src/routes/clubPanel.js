@@ -16,6 +16,7 @@ import {
   approveClubBookingController,
   rejectClubBookingController,
   cancelClubBookingController,
+  getClubOnlinePaymentsController,
   getClubStatsController,
   getSlotOverridesController,
   upsertSlotOverrideController,
@@ -23,6 +24,7 @@ import {
   getAutoFillOpportunitiesController,
   runAutoFillController,
   getClubCustomersController,
+  getClubCoachesController,
   verifyBookingController,
   getClubDealsController,
   createClubDealController,
@@ -93,6 +95,9 @@ router.post("/club-panel/autofill/run",                      runAutoFillControll
 // Customers
 router.get("/club-panel/customers",                          getClubCustomersController);
 
+// Coaches
+router.get("/club-panel/coaches",                            getClubCoachesController);
+
 // Verify booking by tracking code
 router.get("/club-panel/verify-booking/:code",               verifyBookingController);
 
@@ -118,6 +123,7 @@ router.delete("/club-panel/clubs/:clubId/assets/:assetId",   deleteAssetControll
 
 // Bookings
 router.get("/club-panel/bookings",                           getClubBookingsController);
+router.get("/club-panel/online-payments",                    getClubOnlinePaymentsController);
 router.patch("/club-panel/bookings/:id/approve",             approveClubBookingController);
 router.patch("/club-panel/bookings/:id/reject",              rejectClubBookingController);
 router.patch("/club-panel/bookings/:id/cancel",              cancelClubBookingController);

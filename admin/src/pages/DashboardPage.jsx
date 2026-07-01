@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
@@ -8,7 +8,7 @@ import {
 import {
   CalendarCheckIcon, ClockIcon, MapPinIcon, UsersIcon,
   BanknoteIcon, Building2Icon, TrendingUpIcon, CheckCircle2Icon,
-  XCircleIcon, AlertCircleIcon, RefreshCwIcon, ActivityIcon,
+  XCircleIcon, AlertCircleIcon, RefreshCwIcon, ActivityIcon, CreditCardIcon,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import apiClient from "@/lib/apiClient";
@@ -275,15 +275,24 @@ export default function DashboardPage() {
           ? `آخرین بروزرسانی: ${lastUpdated.toLocaleTimeString("fa-IR", { timeZone: TEHRAN_TIME_ZONE, hour: "2-digit", minute: "2-digit" })}`
           : `امروز ${new Date().toLocaleDateString("fa-IR", { timeZone: TEHRAN_TIME_ZONE, weekday: "long", year: "numeric", month: "long", day: "numeric" })}`}
         actions={
-          <button
-            type="button"
-            onClick={() => loadDashboard({ silent: true })}
-            disabled={refreshing}
-            className="inline-flex w-full sm:w-auto justify-center items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground shadow-sm transition-all hover:shadow-md disabled:opacity-60"
-          >
-            <RefreshCwIcon className={cn("h-4 w-4", refreshing && "animate-spin")} />
-            {refreshing ? "در حال بروزرسانی..." : "بروزرسانی دیتا"}
-          </button>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Link
+              to="/payments"
+              className="inline-flex flex-1 sm:flex-none justify-center items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition-all hover:bg-emerald-700 hover:shadow-md"
+            >
+              <CreditCardIcon className="h-4 w-4" />
+              تسویه حساب
+            </Link>
+            <button
+              type="button"
+              onClick={() => loadDashboard({ silent: true })}
+              disabled={refreshing}
+              className="inline-flex flex-1 sm:flex-none justify-center items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-bold text-primary-foreground shadow-sm transition-all hover:shadow-md disabled:opacity-60"
+            >
+              <RefreshCwIcon className={cn("h-4 w-4", refreshing && "animate-spin")} />
+              {refreshing ? "در حال بروزرسانی..." : "بروزرسانی"}
+            </button>
+          </div>
         }
       />
 

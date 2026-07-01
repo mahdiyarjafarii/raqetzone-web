@@ -770,6 +770,90 @@ export const rejectClubBookingController = async (req, res) => {
   }
 };
 
+// ── Online Payments ───────────────────────────────────────────────────────────
+
+export const getClubOnlinePaymentsController = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const myClubs = await db.select({ id: clubs.id }).from(clubs).where(eq(clubs.ownerId, userId));
+    const clubIds = myClubs.map((c) => c.id);
+    if (clubIds.length === 0) return res.json({ payments: [], summary: {} });
+
+    const myCourts = await db.select({ id: courts.id }).from(courts).where(inArray(courts.clubId, clubIds));
+    const courtIds = myCourts.map((c) => c.id);
+    if (courtIds.length === 0) return res.json({ payments: [], summary: {} });
+
+    const rows = await db
+      .select({
+        id: bookings.id,
+        trackingCode: bookings.trackingCode,
+        date: bookings.date,
+        startTime: bookings.startTime,
+        endTime: bookings.endTime,
+        totalPrice: bookings.totalPrice,
+        status: bookings.status,
+        paymentStatus: bookings.paymentStatus,
+        adminNote: bookings.adminNote,
+        createdAt: bookings.createdAt,
+        courtName: courts.name,
+        clubName: clubs.name,
+        userName: users.name,
+        userPhone: users.phone,
+      })
+      .from(bookings)
+      .innerJoin(courts, eq(bookings.courtId, courts.id))
+      .innerJoin(clubs, eq(courts.clubId, clubs.id))
+      .innerJoin(users, eq(bookings.userId, users.id))
+      .where(and(
+        inArray(bookings.courtId, courtIds),
+        eq(bookings.paymentMethod, "online"),
+        eq(bookings.paymentStatus, "paid"),
+        eq(bookings.status, "approved"),
+      ))
+      .orderBy(desc(bookings.createdAt));
+
+    const now = new Date();
+    const thisMonth = now.getMonth();
+    const thisYear = now.getFullYear();
+
+    const thisMonthTotal = rows
+      .filter((r) => {
+        const d = new Date(r.createdAt);
+        return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
+      })
+      .reduce((s, r) => s + (r.totalPrice ?? 0), 0);
+
+    const lastMonthTotal = rows
+      .filter((r) => {
+        const d = new Date(r.createdAt);
+        const lm = thisMonth === 0 ? 11 : thisMonth - 1;
+        const ly = thisMonth === 0 ? thisYear - 1 : thisYear;
+        return d.getMonth() === lm && d.getFullYear() === ly;
+      })
+      .reduce((s, r) => s + (r.totalPrice ?? 0), 0);
+
+    const allTimeTotal = rows.reduce((s, r) => s + (r.totalPrice ?? 0), 0);
+
+    return res.json({
+      payments: rows,
+      summary: {
+        thisMonth: thisMonthTotal,
+        lastMonth: lastMonthTotal,
+        allTime: allTimeTotal,
+        count: rows.length,
+        thisMonthCount: rows.filter((r) => {
+          const d = new Date(r.createdAt);
+          return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
+        }).length,
+      },
+    });
+  } catch (error) {
+    console.error("getClubOnlinePayments error:", error);
+    return res.status(500).json({ message: "خطای سرور" });
+  }
+};
+
 // ── Dashboard Stats ───────────────────────────────────────────────────────────
 
 export const getClubStatsController = async (req, res) => {
@@ -1246,6 +1330,69 @@ export const getClubCustomersController = async (req, res) => {
     });
   } catch (error) {
     console.error("getClubCustomers error:", error);
+    return res.status(500).json({ message: "خطای سرور" });
+  }
+};
+
+// ── Club Coaches ──────────────────────────────────────────────────────────────
+// Lists all users flagged as coaches (isCoach = true) with their basic profile.
+
+export const getClubCoachesController = async (req, res) => {
+  try {
+    const page  = Math.max(1, parseInt(req.query.page  ?? "1",  10));
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit ?? "20", 10)));
+    const offset = (page - 1) * limit;
+    const search = (req.query.search ?? "").trim();
+
+    const conditions = [eq(users.isCoach, true)];
+    if (search) {
+      const like = `%${search}%`;
+      conditions.push(
+        or(
+          sql`${users.name} ilike ${like}`,
+          sql`${users.firstName} ilike ${like}`,
+          sql`${users.lastName} ilike ${like}`,
+          sql`${users.phone} ilike ${like}`,
+        )
+      );
+    }
+    const whereClause = conditions.length > 1 ? and(...conditions) : conditions[0];
+
+    const [{ value: totalCount }] = await db
+      .select({ value: count() })
+      .from(users)
+      .where(whereClause);
+
+    const coaches = await db
+      .select({
+        id: users.id,
+        name: users.name,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        phone: users.phone,
+        image: users.image,
+        city: users.city,
+        headline: users.coachHeadline,
+        verificationStatus: users.coachVerificationStatus,
+        memberSince: users.createdAt,
+      })
+      .from(users)
+      .where(whereClause)
+      .orderBy(desc(users.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    return res.json({
+      coaches,
+      pagination: {
+        page,
+        limit,
+        total: Number(totalCount),
+        totalPages: Math.ceil(Number(totalCount) / limit),
+      },
+    });
+  } catch (error) {
+    console.error("getClubCoaches error:", error);
     return res.status(500).json({ message: "خطای سرور" });
   }
 };

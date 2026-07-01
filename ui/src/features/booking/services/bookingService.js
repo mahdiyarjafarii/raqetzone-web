@@ -11,6 +11,7 @@ export const bookingService = {
   validateDiscount: (code, clubId, bookingPrice) =>
     apiClient.post("/bookings/validate-discount", { code, clubId, bookingPrice }),
   createBooking: (data) => apiClient.post("/bookings", data),
+  createBulkBooking: (data) => apiClient.post("/bookings/bulk", data),
   getMyBookings: () => apiClient.get("/bookings/my"),
   cancelBooking: (id) => apiClient.patch(`/bookings/${id}/cancel`),
 

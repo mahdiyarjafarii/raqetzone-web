@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { eq, and, or, ne, desc, count, inArray, sql } from "drizzle-orm";
 import { ZarinPal } from "zarinpal-node-sdk";
 import { db } from "../db/index.js";
@@ -230,6 +231,123 @@ async function findOrCreateWelcomeDiscount(clubId) {
     .where(eq(discountCodes.code, WELCOME_DISCOUNT_CODE))
     .limit(1);
   return row ?? null;
+}
+
+// Validate one court-booking item and compute its price. Throws an Error with a
+// `statusCode` + Persian message on any validation failure. Mirrors the validation
+// and slot-pricing logic of createBookingController (minus discount codes / assets)
+// and is used by the bulk booking flow.
+async function validateAndPriceBookingItem({ userId, item }) {
+  const { courtId, date, startTime, endTime, notes } = item || {};
+
+  if (!courtId || !date || !startTime || !endTime) {
+    const e = new Error("اطلاعات سانس ناقص است"); e.statusCode = 400; throw e;
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    const e = new Error("فرمت تاریخ نامعتبر است (YYYY-MM-DD)"); e.statusCode = 400; throw e;
+  }
+
+  const startMin = timeToMinutes(startTime);
+  let endMin = timeToMinutes(endTime);
+  if (endMin <= startMin) endMin += 1440;
+  if (endMin <= startMin) {
+    const e = new Error("زمان پایان باید بعد از زمان شروع باشد"); e.statusCode = 400; throw e;
+  }
+
+  const today = getTodayDateKeyInTehran();
+  if (date < today) {
+    const e = new Error("نمی‌توان برای تاریخ گذشته رزرو کرد"); e.statusCode = 400; throw e;
+  }
+
+  // Overlap with the user's own existing bookings on that date
+  const sameDayUserBookings = await db
+    .select({
+      id: bookings.id, status: bookings.status, date: bookings.date,
+      startTime: bookings.startTime, endTime: bookings.endTime,
+      paymentMethod: bookings.paymentMethod, paymentStatus: bookings.paymentStatus,
+    })
+    .from(bookings)
+    .where(and(eq(bookings.userId, userId), eq(bookings.date, date)));
+  const expiredIds = await expirePendingBookings(sameDayUserBookings);
+  const hasUserOverlap = sameDayUserBookings.some((b) => {
+    if (expiredIds.includes(b.id)) return false;
+    if (b.status === "rejected" || b.status === "cancelled") return false;
+    if (b.paymentMethod === "online" && b.paymentStatus === "unpaid") return false;
+    const bStart = timeToMinutes(b.startTime);
+    let bEnd = timeToMinutes(b.endTime);
+    if (bEnd <= bStart) bEnd += 1440;
+    return startMin < bEnd && endMin > bStart;
+  });
+  if (hasUserOverlap) {
+    const e = new Error("شما در این بازه زمانی قبلاً رزرو ثبت کرده‌اید"); e.statusCode = 409; throw e;
+  }
+
+  const [court] = await db
+    .select({ id: courts.id, clubId: courts.clubId, name: courts.name, location: courts.location, address: courts.address,
+              surfaceType: courts.surfaceType, sportType: courts.sportType, pricePerHour: courts.pricePerHour,
+              image: courts.image, managerPhone: courts.managerPhone, openTime: courts.openTime,
+              closeTime: courts.closeTime, slotDuration: courts.slotDuration, isActive: courts.isActive,
+              clubName: clubs.name, clubPhone: clubs.phone, clubOwnerPhone: users.phone })
+    .from(courts)
+    .leftJoin(clubs, eq(courts.clubId, clubs.id))
+    .leftJoin(users, eq(clubs.ownerId, users.id))
+    .where(and(eq(courts.id, courtId), eq(courts.isActive, true)))
+    .limit(1);
+  if (!court) { const e = new Error("زمین یافت نشد"); e.statusCode = 404; throw e; }
+
+  // Prevent double booking — overlapping active bookings on the same court/date
+  const existing = await db.select().from(bookings).where(and(eq(bookings.courtId, courtId), eq(bookings.date, date)));
+  const unpaidExpiryMs = 10 * 60 * 1000;
+  const hasOverlap = existing.some((b) => {
+    if (b.status === "rejected" || b.status === "cancelled") return false;
+    if (b.paymentMethod === "online" && b.paymentStatus === "unpaid") {
+      if (b.userId === userId) return false;
+      const age = Date.now() - new Date(b.createdAt).getTime();
+      if (age > unpaidExpiryMs) return false;
+    }
+    const bStart = timeToMinutes(b.startTime);
+    let bEnd = timeToMinutes(b.endTime);
+    if (bEnd <= bStart) bEnd += 1440;
+    return startMin < bEnd && endMin > bStart;
+  });
+  if (hasOverlap) { const e = new Error("این بازه زمانی قبلاً رزرو شده است"); e.statusCode = 409; throw e; }
+
+  const durationHours = (endMin - startMin) / 60;
+  const storedDurationHours = Math.ceil(durationHours);
+
+  let slotOverride = null;
+  try {
+    [slotOverride] = await db
+      .select()
+      .from(slotOverrides)
+      .where(and(eq(slotOverrides.courtId, courtId), eq(slotOverrides.date, date), eq(slotOverrides.startTime, startTime)))
+      .limit(1);
+  } catch { /* table may not exist yet */ }
+
+  const effectivePerHour = slotOverride?.price ?? court.pricePerHour;
+  const slotDiscountPercent = slotOverride?.discountPercent ?? 0;
+  const basePrice = Math.round(effectivePerHour * durationHours);
+  const finalPerHour = slotDiscountPercent > 0
+    ? Math.round(effectivePerHour * (1 - slotDiscountPercent / 100))
+    : effectivePerHour;
+  const totalPrice = Math.round(finalPerHour * durationHours);
+
+  return {
+    court,
+    totalPrice,
+    insertValues: {
+      userId,
+      courtId,
+      date,
+      startTime,
+      endTime,
+      durationHours: storedDurationHours,
+      totalPrice,
+      basePrice,
+      slotDiscountPercent,
+      notes: notes ?? null,
+    },
+  };
 }
 
 // ─── User endpoints ───────────────────────────────────────────────────────────
@@ -666,8 +784,268 @@ export const createBookingController = async (req, res) => {
   }
 };
 
+// Bulk court booking for coaches — reserve several sessions (across different
+// days / courts) at once with a single combined payment. Coach-only.
+export const createBulkBookingController = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { items, paymentMethod = "none" } = req.body;
+
+    // Gate: coaches only
+    const [me] = await db.select({ isCoach: users.isCoach }).from(users).where(eq(users.id, userId)).limit(1);
+    if (!me?.isCoach) {
+      return res.status(403).json({ message: "این قابلیت فقط برای مربیان فعال است" });
+    }
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: "حداقل یک سانس انتخاب کنید" });
+    }
+    if (items.length > 20) {
+      return res.status(400).json({ message: "حداکثر ۲۰ سانس در هر رزرو گروهی مجاز است" });
+    }
+    if (!["none", "wallet", "online"].includes(paymentMethod)) {
+      return res.status(400).json({ message: "روش پرداخت نامعتبر است" });
+    }
+
+    // Reject overlaps among the selected items themselves (same court + date)
+    for (let i = 0; i < items.length; i++) {
+      for (let j = i + 1; j < items.length; j++) {
+        const a = items[i], b = items[j];
+        if (!a?.courtId || !b?.courtId || a.courtId !== b.courtId || a.date !== b.date) continue;
+        const aS = timeToMinutes(a.startTime); let aE = timeToMinutes(a.endTime); if (aE <= aS) aE += 1440;
+        const bS = timeToMinutes(b.startTime); let bE = timeToMinutes(b.endTime); if (bE <= bS) bE += 1440;
+        if (aS < bE && aE > bS) {
+          return res.status(409).json({ message: "سانس‌های انتخاب‌شده با هم تداخل دارند" });
+        }
+      }
+    }
+
+    // Validate + price every item first (all-or-nothing: no rows inserted if any fails)
+    const priced = [];
+    for (let i = 0; i < items.length; i++) {
+      try {
+        priced.push(await validateAndPriceBookingItem({ userId, item: items[i] }));
+      } catch (err) {
+        return res.status(err.statusCode ?? 400).json({ message: `سانس ${i + 1}: ${err.message}` });
+      }
+    }
+
+    const grandTotal = priced.reduce((sum, p) => sum + p.totalPrice, 0);
+    const resolvedPaymentMethod = getBookingPaymentMethod(paymentMethod, grandTotal);
+    const groupId = randomUUID();
+
+    // One Zarinpal payment for the whole group
+    let onlinePayment = null;
+    if (resolvedPaymentMethod === "online") {
+      if (!zarinpal) return res.status(500).json({ message: "تنظیمات درگاه پرداخت کامل نیست" });
+      const callbackBaseUrl = getServerBaseUrl(req);
+      const callbackUrl = `${callbackBaseUrl}/api/bookings/payment/callback?group=${encodeURIComponent(groupId)}`;
+      const userPhone = await getUserPhone(userId);
+      const paymentDescription = `رزرو گروهی ${priced.length} سانس - کاربر: ${userPhone ?? userId}`;
+      const paymentResponse = await zarinpal.payments.create({
+        amount: grandTotal,
+        currency: "IRT",
+        callback_url: callbackUrl,
+        description: paymentDescription,
+      });
+      const authority = extractZarinpalAuthority(paymentResponse);
+      const paymentUrl = getZarinpalRedirectUrl(authority);
+      if (!authority || !paymentUrl) {
+        return res.status(502).json({ message: "پاسخ درگاه پرداخت نامعتبر است" });
+      }
+      onlinePayment = { authority, paymentUrl, rawResponse: paymentResponse };
+    }
+
+    const createdBookings = await db.transaction(async (tx) => {
+      const rows = [];
+      for (const p of priced) {
+        const [row] = await tx
+          .insert(bookings)
+          .values({
+            ...p.insertValues,
+            groupId,
+            trackingCode: generateTrackingCode(),
+            paymentMethod: resolvedPaymentMethod,
+            paymentStatus: p.totalPrice === 0 ? "paid" : "unpaid",
+          })
+          .returning();
+        rows.push({ ...row, court: p.court });
+      }
+
+      if (resolvedPaymentMethod === "online" && grandTotal > 0 && onlinePayment?.authority) {
+        await tx.insert(walletTransactions).values({
+          userId,
+          amount: grandTotal,
+          direction: "debit",
+          type: "booking_online_payment",
+          status: "pending",
+          referenceType: "booking_group",
+          referenceId: groupId,
+          gatewayTrackCode: onlinePayment.authority,
+          metadata: {
+            gateway: "zarinpal",
+            paymentUrl: onlinePayment.paymentUrl,
+            groupId,
+            bookingIds: rows.map((r) => r.id),
+            paymentInitResponse: onlinePayment.rawResponse,
+          },
+        });
+        await tx.insert(transactions).values({
+          userId,
+          amount: grandTotal,
+          type: "booking",
+          bookingId: rows[0].id,
+          status: "pending",
+          authority: onlinePayment.authority,
+        });
+      }
+
+      // Wallet: deduct each session's price within the same tx (rolls back the
+      // whole group if the balance runs out on any session).
+      if (resolvedPaymentMethod === "wallet") {
+        for (const row of rows) {
+          if (row.totalPrice > 0) {
+            await payBookingWithWallet({ userId, bookingId: row.id, amount: row.totalPrice }, tx);
+            row.paymentMethod = "wallet";
+            row.paymentStatus = "paid";
+          }
+        }
+      }
+
+      return rows;
+    });
+
+    // Notifications for non-online groups (online defers to the payment callback)
+    if (resolvedPaymentMethod !== "online") {
+      sendNotification(userId, {
+        title: "درخواست رزرو گروهی ثبت شد ⏳",
+        message: `${createdBookings.length} سانس ثبت شد. منتظر تأیید مدیر زمین باشید.`,
+        type: "BOOKING",
+        metadata: { groupId, count: createdBookings.length, ctaHref: "/mybooking", ctaLabel: "مشاهده رزروها" },
+        smsText: `پلتفرم رکت‌زون: درخواست رزرو گروهی شامل ${createdBookings.length} سانس ثبت شد و در انتظار تأیید مدیر زمین است.`,
+      }).catch(() => {});
+
+      // One summary SMS per involved court's managers
+      const byCourt = new Map();
+      for (const row of createdBookings) {
+        const list = byCourt.get(row.courtId) || [];
+        list.push(row);
+        byCourt.set(row.courtId, list);
+      }
+      const [requester] = await db.select({ name: users.name, phone: users.phone }).from(users).where(eq(users.id, userId)).limit(1);
+      const requesterInfo = requester?.name ? `${requester.name} (${requester.phone})` : requester?.phone ?? "کاربر";
+      for (const list of byCourt.values()) {
+        const court = list[0].court;
+        const courtFullName = court?.clubName ? `زمین ${court.name} باشگاه ${court.clubName}` : `زمین ${court?.name ?? ""}`;
+        const recipientPhones = [...new Set([court?.managerPhone, court?.clubPhone, court?.clubOwnerPhone].filter(Boolean))];
+        if (recipientPhones.length === 0) continue;
+        const sessionsText = list.map((r) => formatBookingDateTimeFa({ date: r.date, startTime: r.startTime, endTime: r.endTime })).join(" - ");
+        const managerMsg = `پلتفرم رکت‌زون: درخواست رزرو گروهی جدید - ${courtFullName} - ${list.length} سانس (${sessionsText}) - رزرو کننده: ${requesterInfo} - لطفا از پنل تایید یا رد کنید.`;
+        for (const phone of recipientPhones) {
+          sendSMS(phone, managerMsg).catch(() => {});
+        }
+      }
+    }
+
+    return res.status(201).json({
+      groupId,
+      totalPrice: grandTotal,
+      bookings: createdBookings,
+      payment: onlinePayment
+        ? { provider: "zarinpal", authority: onlinePayment.authority, redirectUrl: onlinePayment.paymentUrl }
+        : null,
+    });
+  } catch (error) {
+    console.error("createBulkBooking error:", { message: error.message, stack: error.stack });
+    return res.status(error.statusCode ?? 500).json({ message: error.statusCode ? error.message : "خطای سرور" });
+  }
+};
+
+// Zarinpal callback for a bulk (group) booking — verifies the combined amount once
+// and marks every booking in the group paid (or cancels them all on failure).
+async function handleBulkPaymentCallback(req, res) {
+  const { Status, Authority, group } = req.query;
+  const groupId = String(group);
+  const successRedirect = `${getFrontendBaseUrl()}/mybooking?payment=success`;
+  const failedRedirect = `${getFrontendBaseUrl()}/mybooking?payment=failed`;
+
+  console.log("[BulkCallback] ── incoming ──", { Status, Authority, group: groupId });
+
+  try {
+    const groupBookings = await db.select().from(bookings).where(eq(bookings.groupId, groupId));
+    if (groupBookings.length === 0) return res.redirect(failedRedirect);
+
+    // Already paid — idempotent success
+    if (groupBookings.every((b) => b.paymentStatus === "paid")) {
+      return res.redirect(successRedirect);
+    }
+
+    const [groupTx] = await db
+      .select()
+      .from(walletTransactions)
+      .where(and(eq(walletTransactions.referenceType, "booking_group"), eq(walletTransactions.referenceId, groupId)))
+      .orderBy(desc(walletTransactions.createdAt))
+      .limit(1);
+
+    const totalAmount = groupBookings.reduce((sum, b) => sum + b.totalPrice, 0);
+    const bookingIds = groupBookings.map((b) => b.id);
+
+    const failGroup = async (callbackBody) => {
+      if (groupTx) {
+        await db.update(walletTransactions).set({ status: "failed", callbackBody }).where(eq(walletTransactions.id, groupTx.id));
+      }
+      await db.update(bookings)
+        .set({ status: "cancelled", adminNote: ONLINE_PAYMENT_FAILED_NOTE, updatedAt: new Date() })
+        .where(inArray(bookings.id, bookingIds));
+      if (Authority) {
+        await db.update(transactions).set({ status: "failed", callbackBody }).where(eq(transactions.authority, Authority));
+      }
+    };
+
+    if (Status !== "OK" || !Authority || !zarinpal) {
+      await failGroup(req.query);
+      return res.redirect(failedRedirect);
+    }
+    if (groupTx?.gatewayTrackCode && groupTx.gatewayTrackCode !== Authority) {
+      await failGroup(req.query);
+      return res.redirect(failedRedirect);
+    }
+
+    const verifyResponse = await zarinpal.verifications.verify({ authority: Authority, amount: totalAmount, currency: "IRT" });
+    console.log("[BulkCallback] verify:", JSON.stringify(verifyResponse), "success:", isZarinpalVerifySuccess(verifyResponse));
+
+    if (!isZarinpalVerifySuccess(verifyResponse)) {
+      await failGroup(verifyResponse);
+      return res.redirect(failedRedirect);
+    }
+
+    await db.update(bookings)
+      .set({ paymentMethod: "online", paymentStatus: "paid", adminNote: null, updatedAt: new Date() })
+      .where(inArray(bookings.id, bookingIds));
+    if (groupTx) {
+      await db.update(walletTransactions)
+        .set({ status: "completed", callbackBody: verifyResponse, gatewayTrackCode: Authority })
+        .where(eq(walletTransactions.id, groupTx.id));
+    }
+    await db.update(transactions).set({ status: "completed", callbackBody: verifyResponse }).where(eq(transactions.authority, Authority));
+
+    sendNotification(groupBookings[0].userId, {
+      title: "پرداخت رزرو گروهی انجام شد ✅",
+      message: `${groupBookings.length} سانس با موفقیت ثبت شد. منتظر تأیید مدیر زمین باشید.`,
+      type: "BOOKING",
+      metadata: { groupId, count: groupBookings.length, ctaHref: "/mybooking", ctaLabel: "مشاهده رزروها" },
+    }).catch(() => {});
+
+    return res.redirect(successRedirect);
+  } catch (error) {
+    console.error("bulkPaymentCallback error:", error);
+    return res.redirect(failedRedirect);
+  }
+}
+
 export const bookingPaymentCallbackController = async (req, res) => {
-  const { Status, Authority, tracking } = req.query;
+  const { Status, Authority, tracking, group } = req.query;
+  if (group) return handleBulkPaymentCallback(req, res);
   const failedRedirectUrl = getBookingPaymentReturnUrl("failed", tracking);
 
   console.log("[Callback] ── incoming ──", { Status, Authority, tracking });

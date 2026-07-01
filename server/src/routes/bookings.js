@@ -2,6 +2,7 @@ import { Router } from "express";
 import { authMiddleware } from "../middleware/auth.js";
 import {
   createBookingController,
+  createBulkBookingController,
   getMyBookingsController,
   cancelBookingController,
   getAdminBookingsController,
@@ -15,6 +16,7 @@ const router = Router();
 // User routes
 router.post("/bookings/validate-discount", authMiddleware, validateDiscountCodeController);
 router.post("/bookings", authMiddleware, createBookingController);
+router.post("/bookings/bulk", authMiddleware, createBulkBookingController);
 router.get("/bookings/payment/callback", bookingPaymentCallbackController);
 router.get("/bookings/my", authMiddleware, getMyBookingsController);
 router.patch("/bookings/:id/cancel", authMiddleware, cancelBookingController);

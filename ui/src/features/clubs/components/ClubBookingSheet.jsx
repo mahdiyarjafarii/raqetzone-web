@@ -13,9 +13,13 @@ import {
   getCurrentMinutesInTehran,
   getTodayDateKeyInTehran,
 } from "@/lib/timezone";
+import { useAtomValue } from "jotai";
 import { Button } from "@/components/ui/button";
 import { bookingService } from "@/features/booking/services/bookingService";
 import { walletService } from "@/features/wallet/walletService";
+import { currentUserAtom } from "@/config/state";
+import BulkBookingSummary from "@/features/booking/components/BulkBookingSummary";
+import { bulkItemPrice } from "@/features/booking/utils/pricing";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -103,9 +107,11 @@ function CourtSelector({ courts, onSelect }) {
 
 // ── Combined Date + Slots Step ────────────────────────────────────────────────
 
-function DateSlotsStep({ court, selectedDate, onDateChange, slots, slotsLoading, selectedSlot, onSelectSlot }) {
+function DateSlotsStep({ court, selectedDate, onDateChange, slots, slotsLoading, selectedSlot, onSelectSlot, isCoach, bulkMode, onToggleBulk, cartStarts = [], bulkCount = 0, bulkTotal = 0, onContinueBulk }) {
   const today = getTodayDateKeyInTehran();
-  const dates = Array.from({ length: 10 }, (_, i) => addDays(today, i));
+  // Coaches booking in bulk get a 2-week horizon; everyone else sees 10 days.
+  const dayCount = isCoach && bulkMode ? 14 : 10;
+  const dates = Array.from({ length: dayCount }, (_, i) => addDays(today, i));
 
   return (
     <div className="space-y-5">
@@ -132,6 +138,30 @@ function DateSlotsStep({ court, selectedDate, onDateChange, slots, slotsLoading,
           </div>
         </div>
       </div>
+
+      {isCoach && (
+        <button
+          type="button"
+          onClick={onToggleBulk}
+          className={cn(
+            "w-full flex items-center justify-between rounded-3xl border-2 px-4 py-3 transition-all",
+            bulkMode ? "border-primary bg-primary/10" : "border-border bg-muted/30"
+          )}
+        >
+          <span className="flex items-center gap-2 text-sm font-black text-foreground">
+            <LayersIcon className={cn("h-4 w-4", bulkMode ? "text-primary" : "text-muted-foreground")} />
+            رزرو گروهی چند سانس
+          </span>
+          <span className={cn("relative h-6 w-11 rounded-full transition-colors", bulkMode ? "bg-primary" : "bg-muted-foreground/30")}>
+            <span className={cn("absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all", bulkMode ? "right-0.5" : "left-0.5")} />
+          </span>
+        </button>
+      )}
+      {isCoach && bulkMode && (
+        <p className="rounded-2xl bg-primary/5 border border-primary/15 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
+          چند اسلات از روزها و زمین‌های مختلف را انتخاب کنید؛ همه با یک پرداخت ثبت می‌شوند.
+        </p>
+      )}
 
       <div className="space-y-3">
         <div className="flex items-center justify-between">
@@ -227,7 +257,9 @@ function DateSlotsStep({ court, selectedDate, onDateChange, slots, slotsLoading,
               const [sh, sm] = slot.start.split(":").map(Number);
               return (sh * 60 + sm) > nowMins;
             }).map((slot, i) => {
-              const isSelected = selectedSlot?.start === slot.start;
+              const isSelected = bulkMode
+                ? cartStarts.includes(slot.start)
+                : selectedSlot?.start === slot.start;
               const isBooked = slot.isBooked;
               const isBlocked = slot.isBlocked;
               const isManualBooked = slot.isManualBooked;
@@ -294,6 +326,20 @@ function DateSlotsStep({ court, selectedDate, onDateChange, slots, slotsLoading,
           </div>
         )}
       </div>
+
+      {isCoach && bulkMode && bulkCount > 0 && (
+        <div className="sticky bottom-0 -mx-4 px-4 pt-2 pb-1 bg-gradient-to-t from-background via-background to-transparent">
+          <div className="flex items-center justify-between gap-3 rounded-3xl border-2 border-primary/30 bg-card shadow-lg px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-sm font-black text-foreground">{formatPrice(bulkCount)} سانس در سبد</p>
+              <p className="text-xs text-primary font-bold">{formatPrice(bulkTotal)} تومان</p>
+            </div>
+            <Button onClick={onContinueBulk} className="shrink-0 rounded-xl font-bold h-11 px-5">
+              ادامه
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -829,16 +875,19 @@ function SuccessStep({ booking, onClose, onViewBookings }) {
 // ── Main Component ────────────────────────────────────────────────────────────
 
 const STEP_TITLES = {
-  court:   "انتخاب زمین",
-  booking: "انتخاب تاریخ و زمان",
-  assets:  "تجهیزات اجاره‌ای",
-  summary: "تأیید رزرو",
-  success: "رزرو ثبت شد",
+  court:       "انتخاب زمین",
+  booking:     "انتخاب تاریخ و زمان",
+  assets:      "تجهیزات اجاره‌ای",
+  summary:     "تأیید رزرو",
+  bulkSummary: "تأیید رزرو گروهی",
+  success:     "رزرو ثبت شد",
 };
 
 export default function ClubBookingSheet({ open, onClose, club, initialCourt = null, initialDate = null, initialSlotStart = null }) {
   const navigate = useNavigate();
   const today = getTodayDateKeyInTehran();
+  const currentUser = useAtomValue(currentUserAtom);
+  const isCoach = Boolean(currentUser?.isCoach);
 
   const courts = club?.courts ?? [];
 
@@ -853,6 +902,14 @@ export default function ClubBookingSheet({ open, onClose, club, initialCourt = n
   const [pendingDealSlotStart, setPendingDealSlotStart] = useState(null);
   const [clubAssets, setClubAssets] = useState([]);
   const [assetQuantities, setAssetQuantities] = useState({});
+  const [bulkMode, setBulkMode] = useState(false);
+  const [bulkCart, setBulkCart] = useState([]); // { court, date, slot }
+
+  // Bulk-cart slot starts for the currently viewed court + date (for highlighting)
+  const cartStarts = bulkCart
+    .filter((i) => selectedCourt && i.court.id === selectedCourt.id && i.date === selectedDate)
+    .map((i) => i.slot.start);
+  const bulkTotal = bulkCart.reduce((sum, it) => sum + bulkItemPrice(it), 0);
 
   const goToBooking = useCallback((court) => {
     setSelectedCourt(court);
@@ -866,6 +923,8 @@ export default function ClubBookingSheet({ open, onClose, club, initialCourt = n
     setCreatedBooking(null);
     setPendingDealSlotStart(null);
     setAssetQuantities({});
+    setBulkMode(false);
+    setBulkCart([]);
     if (initialCourt) {
       setSelectedCourt(initialCourt);
       setStep("booking");
@@ -886,6 +945,8 @@ export default function ClubBookingSheet({ open, onClose, club, initialCourt = n
     setCreatedBooking(null);
     setPendingDealSlotStart(initialSlotStart ?? null);
     setSelectedDate(initialDate ?? today);
+    setBulkMode(false);
+    setBulkCart([]);
     if (court) {
       setSelectedCourt(court);
       setStep("booking");
@@ -928,6 +989,78 @@ export default function ClubBookingSheet({ open, onClose, club, initialCourt = n
       .finally(() => setSlotsLoading(false));
   }, [open, selectedCourt, selectedDate, step, pendingDealSlotStart]);
 
+  const toggleBulkMode = () => {
+    setBulkMode((on) => {
+      if (on) setBulkCart([]); // turning off clears the cart
+      return !on;
+    });
+  };
+
+  // In the booking step, a slot tap either advances the single-booking flow or
+  // toggles the slot in the bulk cart (coach bulk mode).
+  const handleSlotPick = (slot) => {
+    if (bulkMode && selectedCourt) {
+      setBulkCart((prev) => {
+        const exists = prev.some(
+          (i) => i.court.id === selectedCourt.id && i.date === selectedDate && i.slot.start === slot.start
+        );
+        if (exists) {
+          return prev.filter(
+            (i) => !(i.court.id === selectedCourt.id && i.date === selectedDate && i.slot.start === slot.start)
+          );
+        }
+        return [...prev, { court: selectedCourt, date: selectedDate, slot }];
+      });
+      return;
+    }
+    setSelectedSlot(slot);
+    setStep(clubAssets.length > 0 ? "assets" : "summary");
+  };
+
+  const removeCartItem = (item) => {
+    setBulkCart((prev) => {
+      const next = prev.filter(
+        (i) => !(i.court.id === item.court.id && i.date === item.date && i.slot.start === item.slot.start)
+      );
+      if (next.length === 0) setStep("booking"); // nothing left to confirm
+      return next;
+    });
+  };
+
+  const handleConfirmBulk = async (paymentMethod = "none", notes = "") => {
+    if (bulkCart.length === 0) return;
+    setSubmitting(true);
+    try {
+      const items = bulkCart.map((i) => ({
+        courtId: i.court.id,
+        date: i.date,
+        startTime: i.slot.start,
+        endTime: i.slot.end,
+        notes,
+      }));
+      const res = await bookingService.createBulkBooking({ items, paymentMethod });
+      if (res.ok) {
+        if (paymentMethod === "online" && res.data?.payment?.redirectUrl) {
+          window.location.href = res.data.payment.redirectUrl;
+          return;
+        }
+        if (res.data?.wallet) {
+          window.dispatchEvent(new CustomEvent("wallet:updated", { detail: res.data.wallet }));
+        }
+        toast.success(`${(res.data?.bookings?.length ?? bulkCart.length).toLocaleString("fa-IR")} سانس با موفقیت ثبت شد`);
+        reset();
+        onClose();
+        navigate("/mybooking");
+      } else {
+        toast.error(res.data?.message ?? "خطا در ثبت رزرو گروهی");
+      }
+    } catch {
+      toast.error("خطا در ثبت رزرو گروهی");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleConfirm = async (notes, discountCode, paymentMethod = "none", selectedAssets = []) => {
     if (!selectedCourt || !selectedDate || !selectedSlot) return;
     setSubmitting(true);
@@ -962,12 +1095,13 @@ export default function ClubBookingSheet({ open, onClose, club, initialCourt = n
     }
   };
 
-  const showBack = (step === "booking" && courts.length > 1 && !initialCourt) || step === "assets" || step === "summary";
+  const showBack = (step === "booking" && courts.length > 1 && !initialCourt) || step === "assets" || step === "summary" || step === "bulkSummary";
 
   const handleBack = () => {
     if (step === "booking") { setStep("court"); setSelectedCourt(null); }
     else if (step === "assets") setStep("booking");
     else if (step === "summary") setStep(clubAssets.length > 0 ? "assets" : "booking");
+    else if (step === "bulkSummary") setStep("booking");
   };
 
   const selectedAssetsList = clubAssets
@@ -1017,7 +1151,26 @@ export default function ClubBookingSheet({ open, onClose, club, initialCourt = n
                 slots={slots}
                 slotsLoading={slotsLoading}
                 selectedSlot={selectedSlot}
-                onSelectSlot={(slot) => { setSelectedSlot(slot); setStep(clubAssets.length > 0 ? "assets" : "summary"); }}
+                onSelectSlot={handleSlotPick}
+                isCoach={isCoach}
+                bulkMode={bulkMode}
+                onToggleBulk={toggleBulkMode}
+                cartStarts={cartStarts}
+                bulkCount={bulkCart.length}
+                bulkTotal={bulkTotal}
+                onContinueBulk={() => setStep("bulkSummary")}
+              />
+            </motion.div>
+          )}
+
+          {step === "bulkSummary" && bulkCart.length > 0 && (
+            <motion.div key="bulkSummary" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+              <BulkBookingSummary
+                items={bulkCart}
+                onConfirm={handleConfirmBulk}
+                onRemove={removeCartItem}
+                onBack={() => setStep("booking")}
+                submitting={submitting}
               />
             </motion.div>
           )}

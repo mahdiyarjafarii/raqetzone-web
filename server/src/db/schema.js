@@ -294,6 +294,7 @@ export const bookings = pgTable("bookings", {
   paymentStatus: varchar("payment_status", { length: 20 }).notNull().default("unpaid"),
   status: varchar("status", { length: 20 }).notNull().default("pending"), // pending | approved | rejected | cancelled
   trackingCode: varchar("tracking_code", { length: 20 }).unique(),
+  groupId: uuid("group_id"), // shared id for bookings created together in a bulk request (null for single bookings)
   reminderSent: boolean("reminder_sent").notNull().default(false),
   notes: text("notes"),
   adminNote: text("admin_note"),
@@ -304,6 +305,7 @@ export const bookings = pgTable("bookings", {
   index("idx_bookings_court_id").on(table.courtId),
   index("idx_bookings_date").on(table.date),
   index("idx_bookings_status").on(table.status),
+  index("idx_bookings_group_id").on(table.groupId),
 ]);
 
 // ─── Coach Classes ────────────────────────────────────────────────────────────
