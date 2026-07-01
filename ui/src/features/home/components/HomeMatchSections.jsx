@@ -1,6 +1,6 @@
 import React from "react";
 import MatchesCarousel from "./MatchesCarousel";
-import SectionHeader from "./SectionHeader";
+import GamesSectionHeader from "./GamesSectionHeader";
 
 export default function HomeMatchSections({ data, loading }) {
   const almostFull = data?.almostFullMatches ?? [];
@@ -15,8 +15,21 @@ export default function HomeMatchSections({ data, loading }) {
   const hasNewest = newest.length > 0;
   const showFallback = !loading && !hasAlmostFull && !hasToday && !hasNewest;
 
+  // All match start times — the header countdown syncs to the soonest upcoming one.
+  const schedules = [...almostFull, ...today, ...newest, ...upcoming]
+    .map((m) => m?.scheduledAt)
+    .filter(Boolean);
+
   return (
-    <div className="space-y-5">
+    <section className="relative mx-4 overflow-hidden rounded-3xl border border-primary/10 bg-gradient-to-br from-primary/[0.09] via-pink-500/[0.045] to-primary/[0.06] shadow-sm dark:border-white/5 dark:from-primary/20 dark:via-primary/10 dark:to-transparent">
+      {/* decorative brand glows */}
+      <div className="pointer-events-none absolute -left-10 -top-12 h-40 w-40 rounded-full bg-primary/10 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-14 -right-8 h-40 w-40 rounded-full bg-pink-500/10 blur-3xl" />
+
+      <div className="relative">
+        <GamesSectionHeader schedules={schedules} />
+
+        <div className="space-y-5 pb-4">
       {/* Almost full — highest urgency — disabled until match count grows */}
       {/* {(loading || hasAlmostFull) && (
         <MatchesCarousel
@@ -59,6 +72,8 @@ export default function HomeMatchSections({ data, loading }) {
           emoji="⚔️"
         />
       )}
-    </div>
+        </div>
+      </div>
+    </section>
   );
 }
